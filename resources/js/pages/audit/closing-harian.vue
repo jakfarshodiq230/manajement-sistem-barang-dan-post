@@ -1,0 +1,580 @@
+<script setup>
+import { ref, computed, onMounted, watch } from 'vue'
+import { useSnackbarStore } from '@/stores/snackbar'
+
+const { show: showSnackbar } = useSnackbarStore()
+
+const todayDate = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+const todayRawDate = new Date().toISOString().split('T')[0]
+
+const branches = ref([])
+const selectedBranch = ref(null)
+
+const isLoading = ref(false)
+const requiredClosingDate = ref('')
+const isPastClosing = ref(false)
+const requiredClosingDateFormatted = ref('')
+const overridePin = ref('')
+
+const history = ref([])
+const totalItems = ref(0)
+const options = ref({ page: 1, itemsPerPage: 10 })
+const showForm = ref(false)
+
+const activeTab = ref('input')
+const monitoringDate = ref(new Date().toISOString().split('T')[0])
+const monitoringData = ref([])
+const isMonitoringLoading = ref(false)
+
+const fetchMonitoring = async () => {
+  isMonitoringLoading.value = true
+  try {
+    const res = await $api('/apps/cash-reconciliations/monitoring', {
+      params: { date: monitoringDate.value },
+    })
+
+    if (res && res.success) {
+      monitoringData.value = res.data
+    }
+  } catch (error) {
+    console.error('Error fetching monitoring data:', error)
+  } finally {
+    isMonitoringLoading.value = false
+  }
+}
+
+watch(activeTab, val => {
+  if (val === 'monitoring') {
+    fetchMonitoring()
+  }
+})
+
+watch(monitoringDate, () => {
+  if (activeTab.value === 'monitoring') {
+    fetchMonitoring()
+  }
+})
+
+const tableHeaders = [
+  { title: 'Tanggal', key: 'date' },
+  { title: 'Kasir', key: 'user.name' },
+  { title: 'Uang Sistem', key: 'expected_cash' },
+  { title: 'Uang Fisik', key: 'actual_cash' },
+  { title: 'Selisih (Variance)', key: 'variance' },
+  { title: 'Status Waktu', key: 'status_waktu' },
+  { title: 'Catatan', key: 'notes' },
+  { title: 'Aksi', key: 'actions', sortable: false, align: 'center' },
+]
+
+const actualCashRaw = ref(0)
+
+const actualCashDisplay = computed({
+  get: () => {
+    return actualCashRaw.value ? new Intl.NumberFormat('id-ID').format(actualCashRaw.value) : ''
+  },
+  set: val => {
+    const numericStr = String(val).replace(/\D/g, '')
+
+    actualCashRaw.value = numericStr ? parseInt(numericStr, 10) : 0
+  },
+})
+
+const notes = ref('')
+
+const fetchBranches = async () => {
+  try {
+    const res = await $api('/apps/branches?simple=true')
+    if (res && res.length > 0) {
+      branches.value = res.map(b => ({ title: b.name, value: b.id }))
+      if (branches.value.length > 0) {
+        selectedBranch.value = branches.value[0].value
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching branches:', error)
+  }
+}
+
+const fetchRequiredDate = async () => {
+  if (!selectedBranch.value) return
+  try {
+    const res = await $api('/apps/cash-reconciliations/required-date', {
+      params: { branch_id: selectedBranch.value },
+    })
+
+    if (res && res.date) {
+      requiredClosingDate.value = res.date
+      isPastClosing.value = res.date < todayRawDate
+
+      const d = new Date(res.date)
+
+      requiredClosingDateFormatted.value = d.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    }
+  } catch (error) {
+    console.error('Error fetching required date:', error)
+  }
+}
+
+const fetchHistory = async () => {
+  if (!selectedBranch.value) return
+  isLoading.value = true
+  try {
+    const res = await $api(`/apps/cash-reconciliations`, {
+      params: {
+        branch_id: selectedBranch.value,
+        page: options.value.page,
+        itemsPerPage: options.value.itemsPerPage,
+      },
+    })
+
+    history.value = res.data
+    totalItems.value = res.total
+  } catch (error) {
+    console.error('Error fetching history:', error)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const submitClosing = async () => {
+  if (!selectedBranch.value) return
+  isLoading.value = true
+  try {
+    if (activeEditId.value) {
+      await $api(`/apps/cash-reconciliations/${activeEditId.value}`, {
+        method: 'PUT',
+        body: {
+          actual_cash: actualCashRaw.value,
+          notes: notes.value,
+          pin: managerPin.value,
+        },
+      })
+      showSnackbar('Perubahan berhasil disimpan', 'success')
+    } else {
+      await $api('/apps/cash-reconciliations', {
+        method: 'POST',
+        body: {
+          branch_id: selectedBranch.value,
+          actual_cash: actualCashRaw.value,
+          notes: notes.value,
+          date: requiredClosingDate.value,
+          manager_pin: overridePin.value,
+        },
+      })
+      showSnackbar('Closing berhasil disimpan', 'success')
+    }
+    showForm.value = false
+    activeEditId.value = null
+    managerPin.value = ''
+    overridePin.value = ''
+    actualCashRaw.value = 0
+    notes.value = ''
+    fetchHistory()
+    fetchRequiredDate()
+  } catch (error) {
+    console.error('Error submitting closing:', error)
+    showSnackbar(error.data?.message || 'Terjadi kesalahan', 'error')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const activeEditId = ref(null)
+
+const showPinDialog = ref(false)
+const managerPin = ref('')
+const pendingAction = ref(null) // 'edit' or 'delete'
+const pendingItemId = ref(null)
+
+const confirmActionWithPin = (action, itemOrId) => {
+  pendingAction.value = action
+  pendingItemId.value = action === 'edit' ? itemOrId.id : itemOrId
+  
+  if (action === 'edit') {
+    activeEditId.value = itemOrId.id
+    actualCashRaw.value = parseFloat(itemOrId.actual_cash)
+    notes.value = itemOrId.notes
+  }
+  
+  managerPin.value = ''
+  showPinDialog.value = true
+}
+
+const submitWithPin = async () => {
+  if (!managerPin.value) {
+    showSnackbar('Masukkan PIN Kepala Cabang', 'warning')
+    
+    return
+  }
+  
+  showPinDialog.value = false
+  
+  if (pendingAction.value === 'delete') {
+    await performDelete(pendingItemId.value, managerPin.value)
+  } else if (pendingAction.value === 'edit') {
+    showForm.value = true
+
+    // Form is opened, when they submit the form, we will use the PIN stored in managerPin
+  }
+}
+
+const performDelete = async (id, pin) => {
+  isLoading.value = true
+  try {
+    await $api(`/apps/cash-reconciliations/${id}?pin=${pin}`, {
+      method: 'DELETE',
+    })
+    showSnackbar('Data closing berhasil dihapus', 'success')
+    fetchHistory()
+  } catch (error) {
+    console.error('Error deleting closing:', error)
+    showSnackbar(error.data?.message || 'Gagal menghapus data', 'error')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const editItem = item => {
+  confirmActionWithPin('edit', item)
+}
+
+const deleteItem = id => {
+  confirmActionWithPin('delete', id)
+}
+
+const formatCurrency = value => {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+watch(selectedBranch, () => {
+  fetchRequiredDate()
+  fetchHistory()
+})
+
+onMounted(async () => {
+  await fetchBranches()
+  fetchHistory()
+})
+</script>
+
+<template>
+  <div>
+    <div class="d-flex align-center justify-space-between mb-4">
+      <div>
+        <h4 class="text-h4 mb-1">
+          Audit Harian (Closing Kasir)
+        </h4>
+        <div class="text-body-1 text-medium-emphasis">
+          {{ todayDate }}
+        </div>
+      </div>
+      <div class="d-flex gap-4">
+        <div style="width: 250px;">
+          <VSelect
+            v-model="selectedBranch"
+            :items="branches"
+            item-title="title"
+            item-value="value"
+            variant="outlined"
+            density="compact"
+            hide-details
+            label="Pilih Cabang"
+          />
+        </div>
+        <VBtn
+          v-if="!showForm"
+          color="primary"
+          @click="showForm = true"
+        >
+          + Input Closing
+        </VBtn>
+      </div>
+    </div>
+
+    <VTabs
+      v-model="activeTab"
+      class="mb-4"
+    >
+      <VTab value="input">
+        Input & Riwayat
+      </VTab>
+      <VTab value="monitoring">
+        Monitoring Cabang
+      </VTab>
+    </VTabs>
+
+    <VWindow v-model="activeTab">
+      <VWindowItem value="input">
+        <!-- Form Input Closing -->
+        <VCard
+          v-if="showForm"
+          class="mb-4"
+          :title="activeEditId ? 'Edit Kas Fisik' : 'Input Kas Fisik (Blind Close)'"
+        >
+          <VCardText>
+            <VAlert
+              color="info"
+              variant="tonal"
+              class="mb-4"
+            >
+              <strong>Tanggal Target Closing:</strong> {{ activeEditId ? 'Edit Mode (Tanggal Tidak Berubah)' : requiredClosingDateFormatted }}
+            </VAlert>
+
+            <VAlert
+              v-if="!activeEditId && isPastClosing"
+              color="warning"
+              variant="tonal"
+              class="mb-4"
+            >
+              <strong>Keterlambatan!</strong> Anda sedang melakukan closing untuk hari kemarin karena melewati batas jam 12 malam. Hal ini membutuhkan otorisasi Kepala Cabang.
+            </VAlert>
+
+            <p class="text-body-2 mb-4">
+              Hitung uang tunai yang ada di laci kasir saat ini dan masukkan totalnya. Sistem akan otomatis menghitung selisihnya.
+            </p>
+            <VRow>
+              <VCol
+                cols="12"
+                md="4"
+              >
+                <VTextField
+                  v-model="actualCashDisplay"
+                  label="Total Uang Fisik (Rp)"
+                  type="text"
+                  variant="outlined"
+                />
+              </VCol>
+              <VCol
+                cols="12"
+                md="8"
+              >
+                <VTextField
+                  v-model="notes"
+                  label="Catatan (Opsional)"
+                  variant="outlined"
+                />
+              </VCol>
+              <VCol
+                v-if="!activeEditId && isPastClosing"
+                cols="12"
+                md="4"
+              >
+                <VTextField
+                  v-model="overridePin"
+                  label="PIN Kepala Cabang"
+                  type="password"
+                  variant="outlined"
+                  color="warning"
+                />
+              </VCol>
+            </VRow>
+          </VCardText>
+          <VCardActions class="px-4 pb-4">
+            <VSpacer />
+            <VBtn
+              variant="outlined"
+              color="secondary"
+              @click="showForm = false; activeEditId = null"
+            >
+              Batal
+            </VBtn>
+            <VBtn
+              color="primary"
+              :loading="isLoading"
+              @click="submitClosing"
+            >
+              {{ activeEditId ? 'Simpan Perubahan' : 'Simpan Closing' }}
+            </VBtn>
+          </VCardActions>
+        </VCard>
+
+        <!-- History Table -->
+        <VCard title="Riwayat Closing Cabang">
+          <VDataTableServer
+            v-model:options="options"
+            :headers="tableHeaders"
+            :items="history"
+            :items-length="totalItems"
+            :loading="isLoading"
+            class="text-no-wrap"
+            @update:options="fetchHistory"
+          >
+            <template #item.date="{ item }">
+              {{ new Date(item.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' }) }}
+            </template>
+        
+            <template #item.expected_cash="{ item }">
+              {{ formatCurrency(item.expected_cash) }}
+            </template>
+        
+            <template #item.actual_cash="{ item }">
+              {{ formatCurrency(item.actual_cash) }}
+            </template>
+        
+            <template #item.variance="{ item }">
+              <VChip
+                :color="item.variance == 0 ? 'success' : 'error'"
+                size="small"
+              >
+                {{ formatCurrency(item.variance) }}
+              </VChip>
+            </template>
+
+            <template #item.status_waktu="{ item }">
+              <VChip
+                :color="new Date(item.created_at).toISOString().split('T')[0] > item.date ? 'warning' : 'success'"
+                size="small"
+              >
+                {{ new Date(item.created_at).toISOString().split('T')[0] > item.date ? 'Terlambat' : 'Tepat Waktu' }}
+              </VChip>
+            </template>
+        
+            <template #item.notes="{ item }">
+              {{ item.notes || '-' }}
+            </template>
+        
+            <template #item.actions="{ item }">
+              <VBtn
+                icon="ri-edit-line"
+                variant="text"
+                size="small"
+                color="primary"
+                @click="editItem(item)"
+              />
+              <VBtn
+                icon="ri-delete-bin-line"
+                variant="text"
+                size="small"
+                color="error"
+                @click="deleteItem(item.id)"
+              />
+            </template>
+        
+            <template #no-data>
+              Belum ada riwayat closing.
+            </template>
+          </VDataTableServer>
+        </VCard>
+      </VWindowItem>
+
+      <VWindowItem value="monitoring">
+        <VCard title="Monitoring Status Closing Cabang">
+          <template #append>
+            <div style="width: 200px">
+              <VTextField
+                v-model="monitoringDate"
+                type="date"
+                label="Tanggal Monitoring"
+                density="compact"
+                hide-details
+                variant="outlined"
+              />
+            </div>
+          </template>
+          
+          <VDataTable
+            :headers="[
+              { title: 'Cabang', key: 'branch_name' },
+              { title: 'Status', key: 'is_closed', align: 'center' },
+              { title: 'Status Waktu', key: 'status_waktu', align: 'center' },
+              { title: 'Waktu Closing', key: 'closed_at' },
+              { title: 'Petugas', key: 'closed_by' },
+              { title: 'Uang Fisik', key: 'actual_cash' },
+              { title: 'Selisih Kas', key: 'variance' },
+            ]"
+            :items="monitoringData"
+            :loading="isMonitoringLoading"
+            :items-per-page="-1"
+            hide-default-footer
+            class="text-no-wrap"
+          >
+            <template #item.is_closed="{ item }">
+              <VChip
+                :color="item.is_closed ? 'success' : 'error'"
+                size="small"
+              >
+                {{ item.is_closed ? 'Sudah Closing' : 'Belum Closing' }}
+              </VChip>
+            </template>
+            <template #item.status_waktu="{ item }">
+              <VChip
+                v-if="item.is_closed"
+                :color="new Date(item.closed_at).toISOString().split('T')[0] > monitoringDate ? 'warning' : 'success'"
+                size="small"
+              >
+                {{ new Date(item.closed_at).toISOString().split('T')[0] > monitoringDate ? 'Terlambat' : 'Tepat Waktu' }}
+              </VChip>
+              <span v-else>-</span>
+            </template>
+            <template #item.closed_at="{ item }">
+              {{ item.closed_at ? new Date(item.closed_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-' }}
+            </template>
+            <template #item.closed_by="{ item }">
+              {{ item.closed_by || '-' }}
+            </template>
+            <template #item.actual_cash="{ item }">
+              {{ item.is_closed ? formatCurrency(item.actual_cash) : '-' }}
+            </template>
+            <template #item.variance="{ item }">
+              <VChip
+                v-if="item.is_closed"
+                :color="item.variance == 0 ? 'success' : (item.variance > 0 ? 'info' : 'error')"
+                size="small"
+              >
+                {{ formatCurrency(item.variance) }}
+              </VChip>
+              <span v-else>-</span>
+            </template>
+          </VDataTable>
+        </VCard>
+      </VWindowItem>
+    </VWindow>
+
+    <!-- PIN Dialog -->
+    <VDialog
+      v-model="showPinDialog"
+      max-width="400"
+    >
+      <VCard title="Otorisasi Kepala Cabang">
+        <VCardText>
+          <p class="text-body-2 mb-4">
+            Aksi ini membutuhkan otorisasi. Silakan masukkan PIN Kepala Cabang / Admin Cabang.
+          </p>
+          <VTextField
+            v-model="managerPin"
+            label="PIN Otorisasi"
+            type="password"
+            variant="outlined"
+            @keyup.enter="submitWithPin"
+          />
+        </VCardText>
+        <VCardActions class="px-4 pb-4">
+          <VSpacer />
+          <VBtn
+            variant="text"
+            color="secondary"
+            @click="showPinDialog = false"
+          >
+            Batal
+          </VBtn>
+          <VBtn
+            color="primary"
+            @click="submitWithPin"
+          >
+            Verifikasi
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+  </div>
+</template>
+
+<route lang="yaml">
+meta:
+  action: read
+  subject: Closing Harian
+</route>
