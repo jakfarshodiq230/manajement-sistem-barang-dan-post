@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "predev": "npm run build:icons",
     "build": "vite build",
+    "prebuild": "npm run build:icons",
+    "postinstall": "npm run build:icons",
     "lint": "eslint . -c .eslintrc.cjs --fix --ext .ts,.js,.cjs,.vue,.tsx,.jsx",
     "build:icons": "tsx resources/js/plugins/iconify/build-icons.js",
     "msw:init": "msw init public/ --save"

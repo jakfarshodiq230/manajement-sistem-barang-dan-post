@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('customers', function (Blueprint $table) {
+        if (Schema::hasTable('customers')) {
+            Schema::table('customers', function (Blueprint $table) {
             if (!Schema::hasColumn('customers', 'email')) {
                 $table->string('email')->nullable();
             }
@@ -37,6 +38,7 @@ return new class extends Migration
                 $table->decimal('credit_limit', 15, 2)->default(0);
             }
         });
+        }
     }
 
     /**
@@ -44,15 +46,17 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('customers', function (Blueprint $table) {
-            // Drop columns if they exist
-            $columnsToDrop = ['email', 'nik', 'company_name', 'city', 'province', 'notes', 'is_active', 'credit_limit'];
-            
-            foreach ($columnsToDrop as $column) {
-                if (Schema::hasColumn('customers', $column)) {
-                    $table->dropColumn($column);
+        if (Schema::hasTable('customers')) {
+            Schema::table('customers', function (Blueprint $table) {
+                // Drop columns if they exist
+                $columnsToDrop = ['email', 'nik', 'company_name', 'city', 'province', 'notes', 'is_active', 'credit_limit'];
+                
+                foreach ($columnsToDrop as $column) {
+                    if (Schema::hasColumn('customers', $column)) {
+                        $table->dropColumn($column);
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 };
