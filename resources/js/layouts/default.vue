@@ -41,6 +41,7 @@ watch([
 
     <RouterView v-slot="{ Component }">
       <Suspense
+        v-if="Component"
         :timeout="0"
         @fallback="isFallbackStateActive = true"
         @resolve="isFallbackStateActive = false"

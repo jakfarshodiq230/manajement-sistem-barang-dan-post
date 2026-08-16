@@ -222,19 +222,19 @@ const headers = [
           
           <template #item.type="{ item }">
             <VChip
-              :color="item.type === 'in' ? 'success' : 'error'"
+              :color="item?.type === 'in' ? 'success' : 'error'"
               size="small"
             >
-              {{ item.type === 'in' ? 'Masuk' : 'Keluar' }}
+              {{ item?.type === 'in' ? 'Masuk' : 'Keluar' }}
             </VChip>
           </template>
           
           <template #item.quantity="{ item }">
             <span
               class="font-weight-bold"
-              :class="item.type === 'in' ? 'text-success' : 'text-error'"
+              :class="item?.type === 'in' ? 'text-success' : 'text-error'"
             >
-              {{ item.type === 'in' ? '+' : '-' }}{{ Math.abs(item.quantity) }}
+              {{ item?.type === 'in' ? '+' : '-' }}{{ Math.abs(item?.quantity || 0) }}
             </span>
           </template>
           

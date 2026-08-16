@@ -237,11 +237,11 @@ const filteredBranches = computed(() => {
 
         <template #item.type="{ item }">
           <VChip
-            :color="item.type === 'warehouse' ? 'warning' : 'primary'"
+            :color="item?.type === 'warehouse' ? 'warning' : 'primary'"
             size="small"
             class="text-capitalize"
           >
-            {{ item.type === 'warehouse' ? 'Gudang' : 'Toko' }}
+            {{ item?.type === 'warehouse' ? 'Gudang' : 'Toko' }}
           </VChip>
         </template>
 

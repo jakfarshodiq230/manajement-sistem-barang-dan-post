@@ -26,14 +26,14 @@ export const createLayouts = userConfig => {
     configStore.$patch({
       appContentLayoutNav: cookieRef('appContentLayoutNav', userConfig.app?.contentLayoutNav ?? layoutConfig.app.contentLayoutNav).value,
       appContentWidth: cookieRef('appContentWidth', userConfig.app?.contentWidth ?? layoutConfig.app.contentWidth).value,
-      footerType: cookieRef('footerType', userConfig.footer?.type ?? layoutConfig.footer.type).value,
-      navbarType: cookieRef('navbarType', userConfig.navbar?.type ?? layoutConfig.navbar.type).value,
-      isNavbarBlurEnabled: cookieRef('isNavbarBlurEnabled', userConfig.navbar?.navbarBlur ?? layoutConfig.navbar.navbarBlur).value,
-      isVerticalNavCollapsed: cookieRef('isVerticalNavCollapsed', userConfig.verticalNav?.isVerticalNavCollapsed ?? layoutConfig.verticalNav.isVerticalNavCollapsed).value,
+      footerType: cookieRef('footerType', userConfig.footer?.type ?? layoutConfig.footer?.type).value,
+      navbarType: cookieRef('navbarType', userConfig.navbar?.type ?? layoutConfig.navbar?.type).value,
+      isNavbarBlurEnabled: cookieRef('isNavbarBlurEnabled', userConfig.navbar?.navbarBlur ?? layoutConfig.navbar?.navbarBlur).value,
+      isVerticalNavCollapsed: cookieRef('isVerticalNavCollapsed', userConfig.verticalNav?.isVerticalNavCollapsed ?? layoutConfig.verticalNav?.isVerticalNavCollapsed).value,
 
       // isAppRTL: userConfig.app?.isRTL ?? config.app.isRTL,
       // isLessThanOverlayNavBreakpoint: false,
-      horizontalNavType: cookieRef('horizontalNavType', userConfig.horizontalNav?.type ?? layoutConfig.horizontalNav.type).value,
+      horizontalNavType: cookieRef('horizontalNavType', userConfig.horizontalNav?.type ?? layoutConfig.horizontalNav?.type).value,
     })
 
     // _setDirAttr(config.app.isRTL ? 'rtl' : 'ltr')

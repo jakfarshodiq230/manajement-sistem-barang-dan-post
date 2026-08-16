@@ -13,19 +13,19 @@ export const useLayoutConfigStore = defineStore('layoutConfig', () => {
   const route = useRoute()
 
   // 👉 Navbar Type
-  const navbarType = ref(layoutConfig.navbar.type)
+  const navbarType = ref(layoutConfig.navbar?.type)
 
   // 👉 Navbar Type
-  const isNavbarBlurEnabled = cookieRef('isNavbarBlurEnabled', layoutConfig.navbar.navbarBlur)
+  const isNavbarBlurEnabled = cookieRef('isNavbarBlurEnabled', layoutConfig.navbar?.navbarBlur)
 
   // 👉 Vertical Nav Collapsed
-  const isVerticalNavCollapsed = cookieRef('isVerticalNavCollapsed', layoutConfig.verticalNav.isVerticalNavCollapsed)
+  const isVerticalNavCollapsed = cookieRef('isVerticalNavCollapsed', layoutConfig.verticalNav?.isVerticalNavCollapsed)
 
   // 👉 App Content Width
-  const appContentWidth = cookieRef('appContentWidth', layoutConfig.app.contentWidth)
+  const appContentWidth = cookieRef('appContentWidth', layoutConfig.app?.contentWidth)
 
   // 👉 App Content Layout Nav
-  const appContentLayoutNav = ref(layoutConfig.app.contentLayoutNav)
+  const appContentLayoutNav = ref(layoutConfig.app?.contentLayoutNav)
 
   watch(appContentLayoutNav, val => {
     // If Navbar type is hidden while switching to horizontal nav => Reset it to sticky
@@ -38,13 +38,13 @@ export const useLayoutConfigStore = defineStore('layoutConfig', () => {
 
 
   // 👉 Horizontal Nav Type
-  const horizontalNavType = ref(layoutConfig.horizontalNav.type)
+  const horizontalNavType = ref(layoutConfig.horizontalNav?.type)
 
   //  👉 Horizontal Nav Popover Offset
-  const horizontalNavPopoverOffset = ref(layoutConfig.horizontalNav.popoverOffset)
+  const horizontalNavPopoverOffset = ref(layoutConfig.horizontalNav?.popoverOffset)
 
   // 👉 Footer Type
-  const footerType = ref(layoutConfig.footer.type)
+  const footerType = ref(layoutConfig.footer?.type)
 
   // 👉 Misc
   const breakpointRef = ref(false)

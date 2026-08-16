@@ -75,7 +75,7 @@ const formatDate = dateString => {
       </div>
       
       <!-- Valid Document State -->
-      <div v-else-if="isValid">
+      <div v-else-if="isValid && docData">
         <VIcon
           icon="ri-checkbox-circle-fill"
           color="success"
@@ -102,7 +102,7 @@ const formatDate = dateString => {
             cols="7"
             class="font-weight-bold"
           >
-            {{ getDocTypeName(docData.type) }}
+            {{ getDocTypeName(docData?.type) }}
           </VCol>
         </VRow>
         

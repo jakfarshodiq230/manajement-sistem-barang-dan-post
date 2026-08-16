@@ -165,11 +165,11 @@ const getRoleColor = roleName => {
 
           <PerfectScrollbar :options="{ wheelPropagation: false }">
             <template
-              v-for="item in userProfileList"
-              :key="item.title"
+              v-for="(item, index) in userProfileList"
+              :key="item?.title || index"
             >
               <VListItem
-                v-if="item.type === 'navItem'"
+                v-if="item?.type === 'navItem'"
                 :to="item.to"
                 class="px-4"
               >
