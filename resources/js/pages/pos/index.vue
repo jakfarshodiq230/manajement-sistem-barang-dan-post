@@ -159,7 +159,7 @@ const fetchData = async () => {
     branches.value = branchData
     categories.value = categoryData
     customers.value = customerData.data || customerData
-    receiptSettings.value = receiptSettingsData
+    receiptSettings.value = receiptSettingsData.data || receiptSettingsData
     
     // For demo purposes, auto select the first branch
     if (branches.value.length > 0 && !activeBranchId.value) {
