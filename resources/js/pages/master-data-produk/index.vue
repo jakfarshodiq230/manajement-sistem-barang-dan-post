@@ -144,8 +144,8 @@ const confirmDeleteProduct = async id => {
 const fileInput = ref(null)
 
 const downloadTemplate = () => {
-  let csvContent = 'Nama Produk,SKU,Kategori (Wajib),Deskripsi,Merek,Barcode,Satuan,Berat (Gram),Bisa Retur (true/false)\n'
-  csvContent += 'Produk Contoh A,SKU001,Makanan Ringan,Deskripsi produk A,Indofood,89912345678,Pcs,150,true\n'
+  let csvContent = 'SKU,Nama Produk,Kategori (Wajib),Type,Merek,Satuan,Qty Stok,Harga Modal,Harga Jual Pusat,Harga Cabang Bandung,Harga Cabang Sudirman\n'
+  csvContent += 'SKU-001,Produk Contoh A,Mesin,R175,Dongfeng,Unit,10,1000000,1200000,1300000,1350000\n'
   csvContent += 'Produk Contoh B,SKU002,Minuman,Deskripsi produk B,Aqua,,Karton,5000,false\n\n'
   
   if (categories.value && categories.value.length > 0) {

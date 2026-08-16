@@ -156,7 +156,7 @@ class ProductController extends Controller
 
     public function import(Request $request)
     {
-        if (!request()->user()->can('Produk Create')) {
+        if (!$request->user()->can('Produk Create')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -170,37 +170,85 @@ class ProductController extends Controller
         $header = true;
         $count = 0;
         
-        while (($row = fgetcsv($handle, 1000, ",")) !== FALSE) {
-            if ($header) {
-                $header = false;
-                continue; // Skip header row
-            }
-            
-            // Format: Nama Produk, SKU, Kategori (Wajib), Deskripsi, Merek, Barcode, Satuan, Berat, Bisa Retur
-            if (isset($row[0]) && trim($row[0]) !== '' && isset($row[1]) && trim($row[1]) !== '' && isset($row[2]) && trim($row[2]) !== '') {
-                // Terintegrasi: Cari kategori berdasarkan nama, jika tidak ada, buat baru
-                $category = \App\Models\Category::firstOrCreate(
-                    ['name' => trim($row[2])],
-                    ['description' => 'Kategori dibuat otomatis dari import produk']
-                );
-                $categoryId = $category->id;
+        \DB::beginTransaction();
+        try {
+            while (($row = fgetcsv($handle, 1000, ",")) !== FALSE) {
+                if ($header) {
+                    $header = false;
+                    continue; // Skip header row
+                }
+                
+                // Format CSV: SKU, Nama Produk, Kategori, Type, Merek, Satuan, Qty Stok, Harga Modal, Harga Jual Pusat, Harga Cabang Bandung, Harga Cabang Sudirman
+                if (isset($row[0]) && trim($row[0]) !== '' && isset($row[1]) && trim($row[1]) !== '' && isset($row[2]) && trim($row[2]) !== '') {
+                    
+                    $category = \App\Models\Category::firstOrCreate(
+                        ['name' => trim($row[2])],
+                        ['description' => 'Kategori dibuat otomatis dari import produk']
+                    );
+                    $categoryId = $category->id;
 
-                \App\Models\Product::updateOrCreate(
-                    ['sku' => trim($row[1])],
-                    [
-                        'name' => trim($row[0]),
-                        'category_id' => $categoryId,
-                        'description' => isset($row[3]) ? trim($row[3]) : null,
-                        'brand' => isset($row[4]) ? trim($row[4]) : null,
-                        'barcode' => isset($row[5]) ? trim($row[5]) : null,
-                        'unit' => isset($row[6]) && trim($row[6]) !== '' ? trim($row[6]) : 'Pcs',
-                        'weight' => isset($row[7]) && is_numeric(trim($row[7])) ? trim($row[7]) : null,
-                        'is_returnable' => isset($row[8]) && strtolower(trim($row[8])) === 'false' ? false : true,
-                        'status' => 'Aktif',
-                    ]
-                );
-                $count++;
+                    $product = \App\Models\Product::updateOrCreate(
+                        ['sku' => trim($row[0])],
+                        [
+                            'name' => trim($row[1]),
+                            'category_id' => $categoryId,
+                            'type' => isset($row[3]) ? trim($row[3]) : null,
+                            'brand' => isset($row[4]) ? trim($row[4]) : null,
+                            'unit' => isset($row[5]) && trim($row[5]) !== '' ? trim($row[5]) : 'Pcs',
+                            'status' => 'Aktif',
+                        ]
+                    );
+
+                    $qty = isset($row[6]) && is_numeric(trim($row[6])) ? intval(trim($row[6])) : 0;
+                    $cost = isset($row[7]) && is_numeric(trim($row[7])) ? floatval(trim($row[7])) : 0;
+                    
+                    if (isset($row[8]) && is_numeric(trim($row[8]))) {
+                        $pb1 = \App\Models\ProductBranch::firstOrCreate(
+                            ['product_id' => $product->id, 'branch_id' => 1],
+                            ['price' => floatval(trim($row[8])), 'cost_price' => $cost, 'stock' => 0]
+                        );
+                        
+                        if ($qty > 0) {
+                            $batchExists = \App\Models\ProductBatch::where('product_branch_id', $pb1->id)
+                                ->where('entry_date', now()->toDateString())
+                                ->where('cost_price', $cost)
+                                ->first();
+                                
+                            if (!$batchExists) {
+                                \App\Models\ProductBatch::create([
+                                    'product_branch_id' => $pb1->id,
+                                    'qty' => $qty,
+                                    'cost_price' => $cost,
+                                    'entry_date' => now()->toDateString()
+                                ]);
+                                $pb1->stock += $qty;
+                                $pb1->save();
+                            }
+                        }
+                    }
+                    
+                    if (isset($row[9]) && is_numeric(trim($row[9]))) {
+                        \App\Models\ProductBranch::firstOrCreate(
+                            ['product_id' => $product->id, 'branch_id' => 2],
+                            ['price' => floatval(trim($row[9])), 'cost_price' => $cost, 'stock' => 0]
+                        );
+                    }
+                    
+                    if (isset($row[10]) && is_numeric(trim($row[10]))) {
+                        \App\Models\ProductBranch::firstOrCreate(
+                            ['product_id' => $product->id, 'branch_id' => 4],
+                            ['price' => floatval(trim($row[10])), 'cost_price' => $cost, 'stock' => 0]
+                        );
+                    }
+
+                    $count++;
+                }
             }
+            \DB::commit();
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            fclose($handle);
+            return response()->json(['message' => 'Gagal mengimpor: ' . $e->getMessage()], 500);
         }
         
         fclose($handle);

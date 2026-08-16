@@ -733,7 +733,7 @@ const executeDeleteGR = async () => {
         </VCardActions>
       </VCard>
     </VDialog>
-  </div>
+  </section>
 </template>
 
 <route lang="yaml">
