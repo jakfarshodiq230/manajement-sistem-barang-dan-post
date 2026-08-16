@@ -590,7 +590,6 @@ const marginCalc = row => {
       </VCardActions>
     </VCard>
   </VDialog>
-  </VRow>
   </section>
 </template>
 
