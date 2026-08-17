@@ -50,7 +50,7 @@ const fetchReceivable = async id => {
   try {
     const response = await $api(`/apps/receivables/${id}`)
 
-    receivable.value = response
+    receivable.value = response.data || response
     paymentForm.value.amount = remainingBalance.value
   } catch (error) {
     console.error(error)

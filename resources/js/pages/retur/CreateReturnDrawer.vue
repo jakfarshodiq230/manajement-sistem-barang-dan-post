@@ -61,7 +61,7 @@ const fetchTransactions = async () => {
     
     // Filter completed transactions
     if (referenceType.value === 'sale') {
-      availableTransactions.value = data
+      availableTransactions.value = data.data || data
     } else {
       availableTransactions.value = data.filter(po => po.status === 'completed')
     }

@@ -10,6 +10,31 @@ const totalItems = ref(0)
 const options = ref({ page: 1, itemsPerPage: 10 })
 
 const selectedStatus = ref('')
+const selectedBranch = ref(null)
+const branches = ref([])
+
+const fetchBranches = async () => {
+  try {
+    const data = await ('/apps/branches')
+    branches.value = data.data || data
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+onMounted(() => {
+  fetchBranches()
+})
+const searchQuery = ref('')
+let searchTimeout = null
+
+watch(searchQuery, () => {
+  if (searchTimeout) clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    options.value.page = 1
+    fetchReceivables()
+  }, 500)
+})
 
 const statusOptions = [
   { title: 'Semua Status', value: '' },
