@@ -9,7 +9,10 @@ import PrintLabelDialog from './PrintLabelDialog.vue'
 const productBranches = ref([])
 const masterProducts = ref([])
 const branches = ref([])
+const categories = ref([])
 const search = ref('')
+const selectedBranch = ref(null)
+const selectedCategory = ref(null)
 const isLoading = ref(false)
 const isAddNewDrawerVisible = ref(false)
 const isStockDrawerVisible = ref(false)
@@ -226,7 +229,7 @@ const printLabel = async item => {
   try {
     const data = await $api(`/apps/product-branches/${item.id}`)
 
-    selectedProductBranch.value = data
+    selectedProductBranch.value = data.data || data
     isPrintLabelDialogVisible.value = true
   } catch(error) {
     console.error(error)

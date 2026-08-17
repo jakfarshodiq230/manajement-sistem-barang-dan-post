@@ -13,8 +13,7 @@ const fetchReceipt = async () => {
   try {
     const data = await $api(`/apps/goods-receipts/${grId}`)
 
-    goodsReceipt.value = data
-    
+    goodsReceipt.value = data.data || data
     // Auto-trigger print when data is loaded
     setTimeout(() => {
       window.print()

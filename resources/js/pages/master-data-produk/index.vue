@@ -6,6 +6,7 @@ import AddNewProductDrawer from './AddNewProductDrawer.vue'
 const products = ref([])
 const categories = ref([])
 const search = ref('')
+const selectedCategory = ref(null)
 const isLoading = ref(false)
 const isAddNewProductDrawerVisible = ref(false)
 const selectedProduct = ref(null)
@@ -39,6 +40,9 @@ const fetchProducts = async () => {
     if (search.value) {
       params.search = search.value
     }
+    if (selectedCategory.value) {
+      params.category_id = selectedCategory.value
+    }
 
     const data = await $api('/apps/products', { query: params })
 
@@ -64,9 +68,9 @@ const handleSearch = () => {
 
 const fetchCategories = async () => {
   try {
-    const data = await $api('/apps/categories')
+    const data = await $api('/apps/categories', { query: { itemsPerPage: -1 } })
 
-    categories.value = data
+      categories.value = data.data || data
   } catch (error) {
     console.error(error)
   }

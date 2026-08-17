@@ -7,7 +7,7 @@ const faqs = ref([])
 const fetchFaqs = async () => {
   const data = await $api('/pages/faq', { query: { q: faqSearchQuery.value } }).catch(err => console.log(err))
 
-  faqs.value = data
+  faqs.value = data.data || data
 }
 
 const activeTab = ref('Payment')

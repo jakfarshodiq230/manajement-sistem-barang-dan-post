@@ -8,6 +8,8 @@ const mutasiList = ref([])
 const branches = ref([])
 const masterProducts = ref([])
 const search = ref('')
+const selectedSourceBranch = ref(null)
+const selectedDestinationBranch = ref(null)
 const isLoading = ref(false)
 const isAddNewDrawerVisible = ref(false)
 const isTrackingDialogVisible = ref(false)
@@ -31,6 +33,8 @@ const fetchData = async () => {
     }
     
     if (search.value) params.search = search.value
+    if (selectedSourceBranch.value) params.source_branch_id = selectedSourceBranch.value
+    if (selectedDestinationBranch.value) params.destination_branch_id = selectedDestinationBranch.value
     
     if (activeTab.value === 'need_approval') {
       params.status = 'pending'
@@ -50,8 +54,8 @@ const fetchData = async () => {
     if (mutasiData.total !== undefined) {
       totalItems.value = mutasiData.total
     }
-    branches.value = branchData
-    masterProducts.value = productData
+    branches.value = branchData.data || branchData
+    masterProducts.value = productData.data || productData
   } catch (error) {
     console.error(error)
     snackbar.show('Gagal mengambil data mutasi stok', 'error')

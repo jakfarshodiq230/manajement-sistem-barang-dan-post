@@ -22,7 +22,7 @@ const fetchModules = async () => {
   try {
     const data = await $api('/apps/modules?all=true')
 
-    modules.value = data
+    modules.value = data.data || data
   } catch (error) {
     console.error(error)
     snackbar.show('Gagal memuat modul', 'error')
@@ -33,7 +33,7 @@ const fetchRoles = async () => {
   try {
     const data = await $api('/apps/roles')
 
-    roles.value = data
+    roles.value = data.data || data
   } catch (error) {
     console.error(error)
   }
@@ -199,7 +199,7 @@ const saveGlobalOrder = async () => {
     // Silent fetch so we don't jank the UI too much, but ensures sync
     const data = await $api('/apps/modules?all=true')
 
-    modules.value = data
+    modules.value = data.data || data
   } catch (error) {
     console.error(error)
     snackbar.show('Gagal menyimpan urutan', 'error')
