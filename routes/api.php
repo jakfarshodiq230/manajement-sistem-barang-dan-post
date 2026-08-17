@@ -33,6 +33,7 @@ Route::get('/fix-permissions', function () {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/apps/update-pin', [\App\Http\Controllers\Api\AuthController::class, 'updatePin']);
+    Route::post('/apps/users/{id}/update-pin', [\App\Http\Controllers\Api\UserController::class, 'updatePin']);
     Route::post('/apps/verify-pin', [\App\Http\Controllers\Api\AuthController::class, 'verifyPin']);
 });
 
