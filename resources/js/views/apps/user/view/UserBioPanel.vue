@@ -118,7 +118,43 @@ const resolveUserRoleVariant = role => {
             <VListItem>
               <VListItemTitle class="text-sm">
                 <span class="font-weight-medium">Role: </span>
-                <span class="text-capitalize text-body-1">{{ props.userData.role }}</span>
+                <span class="text-capitalize text-body-1">{{ Array.isArray(props.userData.role) ? props.userData.role.join("", "") : props.userData.role }}</span>
+              </VListItemTitle>
+            </VListItem>
+
+            <VListItem>
+              <VListItemTitle class="text-sm">
+                <span class="font-weight-medium">Cabang: </span>
+                <span class="text-capitalize text-body-1">
+                  {{ props.userData.assignments && props.userData.assignments.length > 0 ? props.userData.assignments.map(a => a.branch_name).join("", "") : "-" }}
+                </span>
+              </VListItemTitle>
+            </VListItem>
+
+            <VListItem>
+              <VListItemTitle class="text-sm">
+                <span class="font-weight-medium">Status: </span>
+                <VChip
+                  :color="props.userData.status === 'Active' ? 'success' : 'error'"
+                  size="small"
+                  class="text-capitalize"
+                >
+                  {{ props.userData.status === 'Active' ? 'Aktif' : 'Nonaktif' }}
+                </VChip>
+              </VListItemTitle>
+            </VListItem>
+
+            <VListItem>
+              <VListItemTitle class="text-sm">
+                <span class="font-weight-medium">No. HP: </span>
+                <span class="text-body-1">{{ props.userData.phone || "-" }}</span>
+              </VListItemTitle>
+            </VListItem>
+
+            <VListItem>
+              <VListItemTitle class="text-sm">
+                <span class="font-weight-medium">Alamat: </span>
+                <span class="text-body-1">{{ props.userData.address || "-" }}</span>
               </VListItemTitle>
             </VListItem>
           </VList>

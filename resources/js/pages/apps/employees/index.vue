@@ -8,6 +8,8 @@ const employees = ref([])
 const branches = ref([])
 const roles = ref([])
 const search = ref('')
+const selectedBranch = ref(null)
+const selectedRole = ref(null)
 const isLoading = ref(false)
 
 // Pagination
@@ -34,6 +36,12 @@ const fetchEmployees = async () => {
     
     if (search.value) {
       params.search = search.value
+    }
+    if (selectedBranch.value) {
+      params.branch_id = selectedBranch.value
+    }
+    if (selectedRole.value) {
+      params.role = selectedRole.value
     }
     
     const data = await $api('/apps/employees', { query: params })
@@ -62,7 +70,7 @@ const fetchBranches = async () => {
   try {
     const data = await $api('/apps/branches')
 
-    branches.value = data
+    branches.value = data.data || data
   } catch (error) {
     console.error(error)
   }
@@ -72,7 +80,7 @@ const fetchRoles = async () => {
   try {
     const data = await $api('/apps/roles')
 
-    roles.value = data
+    roles.value = data.data || data
   } catch (error) {
     console.error(error)
   }

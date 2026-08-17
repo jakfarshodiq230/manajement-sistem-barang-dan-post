@@ -6,7 +6,7 @@ const fetchProjectData = async () => {
   if (router.params.tab === 'projects') {
     const data = await $api('/pages/profile', { query: { tab: router.params.tab } }).catch(err => console.log(err))
 
-    projectData.value = data
+    projectData.value = data.data || data
   }
 }
 

@@ -94,31 +94,11 @@ const dialogVisibleUpdate = val => {
           @submit.prevent="onFormSubmit"
         >
           <VRow>
-            <!-- 👉 First Name -->
-            <VCol
-              cols="12"
-              md="6"
-            >
-              <VTextField
-                v-model="userData.fullName.split(' ')[0]"
-                label="First Name"
-                placeholder="John"
-              />
-            </VCol>
-
-            <!-- 👉 Last Name -->
-            <VCol
-              cols="12"
-              md="6"
-            >
-              <VTextField
-                v-model="userData.fullName.split(' ')[1]"
-                label="Last Name"
-                placeholder="doe"
-              />
-            </VCol>
-
-            <!-- 👉 User Name  -->
+            <!-- 👉 Full Name -->
+              <VCol cols="12">
+                <VTextField v-model="userData.fullName" label="Nama Lengkap" />
+              </VCol>
+              <!-- 👉 User Name  -->
 
             <VCol cols="12">
               <VTextField
