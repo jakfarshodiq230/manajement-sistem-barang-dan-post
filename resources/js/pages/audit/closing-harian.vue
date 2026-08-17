@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useSnackbarStore } from '@/stores/snackbar'
+import AppDateTimePicker from '@core/components/app-form-elements/AppDateTimePicker.vue'
 
 const { show: showSnackbar } = useSnackbarStore()
 
@@ -14,7 +15,45 @@ const isLoading = ref(false)
 const requiredClosingDate = ref('')
 const isPastClosing = ref(false)
 const requiredClosingDateFormatted = ref('')
+const closingStatus = ref('draft')
+const userData = JSON.parse(localStorage.getItem('userData') || '{}')
+const isSuperAdmin = computed(() => {
+  if (!userData || !userData.roles) return false
+  return userData.roles.some(r => r === 'Super Admin' || r.name === 'Super Admin')
+})
+const unclosedDates = ref([])
+const draftDates = ref([])
+const completedDates = ref([])
+
+const fpConfig = computed(() => {
+  return {
+    disable: completedDates.value,
+    onDayCreate: function(dObj, dStr, fp, dayElem) {
+      if (!dayElem.dateObj) return;
+      
+      // Use Flatpickr's own formatter for consistency
+      const localDate = fp.formatDate(dayElem.dateObj, "Y-m-d");
+      
+      let dotColor = '';
+      if (completedDates.value.includes(localDate)) {
+        dotColor = '#28c76f'; // Success (Green)
+      } else if (draftDates.value.includes(localDate)) {
+        dotColor = '#ff9f43'; // Warning (Orange)
+      } else if (unclosedDates.value.includes(localDate)) {
+        dotColor = '#ea5455'; // Error (Red)
+      }
+      
+      if (dotColor) {
+        dayElem.innerHTML += `<span class="event-dot" style="background-color: ${dotColor};"></span>`;
+      }
+    }
+  }
+})
 const overridePin = ref('')
+
+watch(requiredClosingDate, val => {
+  if (val) isPastClosing.value = val < todayRawDate
+})
 
 const history = ref([])
 const totalItems = ref(0)
@@ -62,6 +101,7 @@ const tableHeaders = [
   { title: 'Uang Fisik', key: 'actual_cash' },
   { title: 'Selisih (Variance)', key: 'variance' },
   { title: 'Status Waktu', key: 'status_waktu' },
+  { title: 'Status Laporan', key: 'status' },
   { title: 'Catatan', key: 'notes' },
   { title: 'Aksi', key: 'actions', sortable: false, align: 'center' },
 ]
@@ -146,7 +186,8 @@ const submitClosing = async () => {
         body: {
           actual_cash: actualCashRaw.value,
           notes: notes.value,
-          pin: managerPin.value,
+        status: closingStatus.value,
+          
         },
       })
       showSnackbar('Perubahan berhasil disimpan', 'success')
@@ -157,17 +198,17 @@ const submitClosing = async () => {
           branch_id: selectedBranch.value,
           actual_cash: actualCashRaw.value,
           notes: notes.value,
+        status: closingStatus.value,
           date: requiredClosingDate.value,
-          manager_pin: overridePin.value,
+          
         },
       })
       showSnackbar('Closing berhasil disimpan', 'success')
     }
     showForm.value = false
     activeEditId.value = null
-    managerPin.value = ''
-    overridePin.value = ''
     actualCashRaw.value = 0
+    closingStatus.value = 'draft'
     notes.value = ''
     fetchHistory()
     fetchRequiredDate()
@@ -181,65 +222,63 @@ const submitClosing = async () => {
 
 const activeEditId = ref(null)
 
-const showPinDialog = ref(false)
-const managerPin = ref('')
-const pendingAction = ref(null) // 'edit' or 'delete'
+const showAjukanDialog = ref(false)
+const pendingAction = ref(null)
 const pendingItemId = ref(null)
 
-const confirmActionWithPin = (action, itemOrId) => {
-  pendingAction.value = action
-  pendingItemId.value = action === 'edit' ? itemOrId.id : itemOrId
-  
-  if (action === 'edit') {
-    activeEditId.value = itemOrId.id
-    actualCashRaw.value = parseFloat(itemOrId.actual_cash)
-    notes.value = itemOrId.notes
-  }
-  
-  managerPin.value = ''
-  showPinDialog.value = true
+const editItem = item => {
+  activeEditId.value = item.id
+  actualCashRaw.value = parseFloat(item.actual_cash)
+  notes.value = item.notes
+  closingStatus.value = item.status || 'draft'
+  showForm.value = true
 }
 
-const submitWithPin = async () => {
-  if (!managerPin.value) {
-    showSnackbar('Masukkan PIN Kepala Cabang', 'warning')
-    
-    return
-  }
-  
-  showPinDialog.value = false
-  
-  if (pendingAction.value === 'delete') {
-    await performDelete(pendingItemId.value, managerPin.value)
-  } else if (pendingAction.value === 'edit') {
-    showForm.value = true
-
-    // Form is opened, when they submit the form, we will use the PIN stored in managerPin
+const deleteItem = async id => {
+  if (confirm('Yakin ingin menghapus data ini?')) {
+    isLoading.value = true
+    try {
+      await $api(`/apps/cash-reconciliations/${id}`, {
+        method: 'DELETE'
+      })
+      showSnackbar('Data berhasil dihapus', 'success')
+      fetchHistory()
+      fetchRequiredDate()
+    } catch (e) {
+      showSnackbar(e.data?.message || 'Gagal menghapus data', 'error')
+    } finally {
+      isLoading.value = false
+    }
   }
 }
 
-const performDelete = async (id, pin) => {
+const ajukanItem = item => {
+  pendingItemId.value = item.id
+  actualCashRaw.value = parseFloat(item.actual_cash)
+  notes.value = item.notes
+  showAjukanDialog.value = true
+}
+
+const submitAjukan = async () => {
   isLoading.value = true
   try {
-    await $api(`/apps/cash-reconciliations/${id}?pin=${pin}`, {
-      method: 'DELETE',
+    await $api(`/apps/cash-reconciliations/${pendingItemId.value}`, {
+      method: 'PUT',
+      body: {
+        actual_cash: actualCashRaw.value,
+        notes: notes.value,
+        status: 'completed',
+      },
     })
-    showSnackbar('Data closing berhasil dihapus', 'success')
+    showSnackbar('Laporan berhasil diajukan menjadi Final', 'success')
+    showAjukanDialog.value = false
     fetchHistory()
-  } catch (error) {
-    console.error('Error deleting closing:', error)
-    showSnackbar(error.data?.message || 'Gagal menghapus data', 'error')
+    fetchRequiredDate()
+  } catch (e) {
+    showSnackbar(e.data?.message || 'Gagal mengajukan laporan', 'error')
   } finally {
     isLoading.value = false
   }
-}
-
-const editItem = item => {
-  confirmActionWithPin('edit', item)
-}
-
-const deleteItem = id => {
-  confirmActionWithPin('delete', id)
 }
 
 const formatCurrency = value => {
@@ -321,19 +360,35 @@ onMounted(async () => {
               variant="tonal"
               class="mb-4"
             >
-              <strong>Tanggal Target Closing:</strong> {{ activeEditId ? 'Edit Mode (Tanggal Tidak Berubah)' : requiredClosingDateFormatted }}
+              <div v-if="activeEditId">
+                <strong>Tanggal Target Closing:</strong> Edit Mode (Tanggal Tidak Berubah)
+              </div>
+              <div v-else class="d-flex align-center gap-4">
+                <strong style="white-space: nowrap;">Pilih Tanggal Closing:</strong>
+                <AppDateTimePicker
+                  :key="completedDates.length"
+                  v-model="requiredClosingDate"
+                  placeholder="Pilih Tanggal"
+                  :config="fpConfig"
+                  density="compact"
+                  hide-details
+                  style="min-width: 200px; background: white; border-radius: 6px;"
+                />
+              </div>
             </VAlert>
+
+            
 
             <VAlert
-              v-if="!activeEditId && isPastClosing"
-              color="warning"
-              variant="tonal"
-              class="mb-4"
-            >
-              <strong>Keterlambatan!</strong> Anda sedang melakukan closing untuk hari kemarin karena melewati batas jam 12 malam. Hal ini membutuhkan otorisasi Kepala Cabang.
-            </VAlert>
+                v-if="!activeEditId && isPastClosing"
+                color="warning"
+                variant="tonal"
+                class="mb-4"
+              >
+                <strong>Keterlambatan!</strong> Anda sedang melakukan closing untuk hari kemarin karena melewati batas jam 12 malam. Pastikan alasan keterlambatan jelas pada catatan.
+              </VAlert>
 
-            <p class="text-body-2 mb-4">
+              <p class="text-body-2 mb-4">
               Hitung uang tunai yang ada di laci kasir saat ini dan masukkan totalnya. Sistem akan otomatis menghitung selisihnya.
             </p>
             <VRow>
@@ -358,20 +413,9 @@ onMounted(async () => {
                   variant="outlined"
                 />
               </VCol>
-              <VCol
-                v-if="!activeEditId && isPastClosing"
-                cols="12"
-                md="4"
-              >
-                <VTextField
-                  v-model="overridePin"
-                  label="PIN Kepala Cabang"
-                  type="password"
-                  variant="outlined"
-                  color="warning"
-                />
-              </VCol>
+              
             </VRow>
+
           </VCardText>
           <VCardActions class="px-4 pb-4">
             <VSpacer />
@@ -401,8 +445,30 @@ onMounted(async () => {
             :items-length="totalItems"
             :loading="isLoading"
             class="text-no-wrap"
+            show-expand
             @update:options="fetchHistory"
           >
+            <template #expanded-row="{ columns, item }">
+              <tr>
+                <td :colspan="columns.length" class="pa-4" style="background-color: rgba(var(--v-theme-on-surface), 0.04);">
+                  <div class="d-flex flex-column gap-1">
+                    <div class="text-subtitle-2 mb-1 text-primary">Rincian Uang Sistem ({{ formatCurrency(item.expected_cash) }})</div>
+                    <div class="d-flex justify-space-between" style="max-width: 400px;">
+                      <span class="text-body-2 text-medium-emphasis">Penjualan Tunai Murni:</span>
+                      <span class="text-body-2 font-weight-medium">{{ formatCurrency(item.cash_sales_amount || 0) }}</span>
+                    </div>
+                    <div class="d-flex justify-space-between" style="max-width: 400px;">
+                      <span class="text-body-2 text-medium-emphasis">Uang Muka (DP) Tunai:</span>
+                      <span class="text-body-2 font-weight-medium">{{ formatCurrency(item.dp_cash_amount || 0) }}</span>
+                    </div>
+                    <div class="d-flex justify-space-between" style="max-width: 400px;">
+                      <span class="text-body-2 text-medium-emphasis">Pelunasan Piutang Tunai:</span>
+                      <span class="text-body-2 font-weight-medium">{{ formatCurrency(item.receivable_payments_amount || 0) }}</span>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </template>
             <template #item.date="{ item }">
               {{ new Date(item.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' }) }}
             </template>
@@ -436,9 +502,28 @@ onMounted(async () => {
             <template #item.notes="{ item }">
               {{ item.notes || '-' }}
             </template>
-        
+            <template #item.status="{ item }">
+              <VChip
+                :color="item.status === 'completed' ? 'success' : 'warning'"
+                size="small"
+              >
+                {{ item.status === 'completed' ? 'Final (Completed)' : 'Draft' }}
+              </VChip>
+            </template>
             <template #item.actions="{ item }">
               <VBtn
+                v-if="item.status !== 'completed' || isSuperAdmin"
+                size="small"
+                color="success"
+                variant="tonal"
+                @click="ajukanItem(item)"
+                class="mr-2"
+              >
+                Ajukan
+              </VBtn>
+
+              <VBtn
+                v-if="item.status !== 'completed' || isSuperAdmin"
                 icon="ri-edit-line"
                 variant="text"
                 size="small"
@@ -446,6 +531,7 @@ onMounted(async () => {
                 @click="editItem(item)"
               />
               <VBtn
+                v-if="item.status !== 'completed' || isSuperAdmin"
                 icon="ri-delete-bin-line"
                 variant="text"
                 size="small"
@@ -535,38 +621,20 @@ onMounted(async () => {
     </VWindow>
 
     <!-- PIN Dialog -->
-    <VDialog
-      v-model="showPinDialog"
-      max-width="400"
-    >
-      <VCard title="Otorisasi Kepala Cabang">
+    
+    <!-- Dialog Konfirmasi Ajukan -->
+    <VDialog v-model="showAjukanDialog" max-width="400">
+      <VCard>
+        <VCardTitle class="text-h5 pt-4 px-4 pb-2">Konfirmasi Pengajuan</VCardTitle>
         <VCardText>
-          <p class="text-body-2 mb-4">
-            Aksi ini membutuhkan otorisasi. Silakan masukkan PIN Kepala Cabang / Admin Cabang.
-          </p>
-          <VTextField
-            v-model="managerPin"
-            label="PIN Otorisasi"
-            type="password"
-            variant="outlined"
-            @keyup.enter="submitWithPin"
-          />
+          Apakah Anda yakin ingin mengajukan laporan closing ini menjadi <strong>Final (Completed)</strong>? 
+          <br><br>
+          <span class="text-error">Perhatian: Data yang sudah diajukan tidak dapat diubah atau dihapus kembali!</span>
         </VCardText>
         <VCardActions class="px-4 pb-4">
           <VSpacer />
-          <VBtn
-            variant="text"
-            color="secondary"
-            @click="showPinDialog = false"
-          >
-            Batal
-          </VBtn>
-          <VBtn
-            color="primary"
-            @click="submitWithPin"
-          >
-            Verifikasi
-          </VBtn>
+          <VBtn color="secondary" variant="outlined" @click="showAjukanDialog = false">Batal</VBtn>
+          <VBtn color="success" @click="submitAjukan">Ya, Ajukan Final</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
@@ -578,3 +646,18 @@ meta:
   action: read
   subject: Closing Harian
 </route>
+
+<style>
+.event-dot {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.flatpickr-day {
+  position: relative;
+}
+</style>
