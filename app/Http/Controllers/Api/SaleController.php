@@ -31,6 +31,12 @@ class SaleController extends Controller
             });
         }
         
+        if ($request->has('start_date') && $request->has('end_date')) {
+            $startDate = \Carbon\Carbon::parse($request->start_date)->startOfDay();
+            $endDate = \Carbon\Carbon::parse($request->end_date)->endOfDay();
+            $query->whereBetween('date', [$startDate, $endDate]);
+        }
+        
         $query->orderBy('created_at', 'desc');
 
         if ($itemsPerPage == -1) {
@@ -41,8 +47,34 @@ class SaleController extends Controller
             $sales = $paginated->items();
         }
         
+        $summaryQuery = clone $query;
+        if (!$request->has('start_date') && !$request->has('end_date')) {
+            $summaryQuery->whereDate('date', now()->toDateString());
+        }
+        $summaryQuery->reorder(); // Remove orderBy to prevent GROUP BY error
+        $summaryQuery->limit(PHP_INT_MAX)->offset(0); // Remove limit/offset from paginate
+        $summaryData = $summaryQuery->select('payment_method', \Illuminate\Support\Facades\DB::raw("SUM(total_amount) as total_net"))
+                                    ->where('status', '!=', 'cancelled')
+                                    ->groupBy('payment_method')
+                                    ->get();
+        
+        $summary = [
+            'cash' => 0,
+            'transfer' => 0,
+            'qris' => 0,
+            'tempo' => 0,
+        ];
+
+        foreach ($summaryData as $row) {
+            $method = $row->payment_method;
+            if (array_key_exists($method, $summary)) {
+                $summary[$method] = $row->total_net;
+            }
+        }
+
         $response = [
             'data' => $sales,
+            'summary' => $summary,
         ];
         
         if ($paginated) {

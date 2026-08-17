@@ -26,7 +26,7 @@ const fetchSupervisors = async () => {
     // For demo: get employees, we assume head of branches are here
     const data = await $api('/apps/employees')
 
-    supervisors.value = data
+    supervisors.value = data.data || data
     if (data.length > 0) {
       selectedSupervisor.value = data[0].user_id
     }
