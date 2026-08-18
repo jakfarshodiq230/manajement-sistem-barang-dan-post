@@ -5,8 +5,10 @@ import SaleDetailDrawer from './SaleDetailDrawer.vue'
 
 const sales = ref([])
 const search = ref('')
+const selectedStatus = ref(null)
 const dateRange = ref('')
 const isLoading = ref(false)
+const summary = ref({ cash: 0, transfer: 0, qris: 0, tempo: 0 })
 const isDrawerVisible = ref(false)
 const selectedSale = ref(null)
 
@@ -21,6 +23,19 @@ const saleToVoid = ref(null)
 const voidPin = ref('')
 
 const snackbar = useSnackbarStore()
+
+const displayDate = computed(() => {
+  if (dateRange.value) {
+    const dates = dateRange.value.split(' to ')
+    const start = new Date(dates[0]).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
+    if (dates[1]) {
+      const end = new Date(dates[1]).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
+      return `${start} - ${end}`
+    }
+    return start
+  }
+  return new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }) + ' (Hari Ini)'
+})
 
 // Format currency
 const formatRupiah = value => {
@@ -43,12 +58,23 @@ const fetchSales = async () => {
     if (search.value) {
       params.search = search.value
     }
+    if (selectedStatus.value) {
+      params.payment_status = selectedStatus.value
+    }
+    if (dateRange.value) {
+      const dates = dateRange.value.split(' to ')
+      params.start_date = dates[0]
+      params.end_date = dates[1] || dates[0]
+    }
     
     const data = await $api('/apps/sales', { query: params })
 
     sales.value = data.data || data
     if (data.total !== undefined) {
       totalItems.value = data.total
+    }
+    if (data.summary) {
+      summary.value = data.summary
     }
   } catch (error) {
     console.error(error)
@@ -160,7 +186,7 @@ const exportToExcel = () => {
   const csvRows = [headers.join(',')]
   
   // Format rows
-  filteredSales.value.forEach(sale => {
+  sales.value.forEach(sale => {
     const row = [
       `"${sale.invoice_number}"`,
       `"${sale.date || ''}"`,
@@ -192,6 +218,68 @@ const exportToExcel = () => {
 
 <template>
   <div>
+    <!-- Summary Cards -->
+    <div class="mb-4">
+      <h2 class="text-h5 font-weight-bold mb-1">Ringkasan Pendapatan</h2>
+      <p class="text-body-1 text-medium-emphasis mb-4">
+        Berdasarkan periode: <strong class="text-primary">{{ displayDate }}</strong>
+      </p>
+      <VRow>
+      <VCol cols="12" sm="6" md="3">
+        <VCard>
+          <VCardText class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-subtitle-2 text-medium-emphasis">Tunai (Cash)</div>
+              <div class="text-h6 font-weight-semibold">{{ formatRupiah(summary.cash || 0) }}</div>
+            </div>
+            <VAvatar rounded color="success" variant="tonal">
+              <VIcon icon="ri-money-dollar-circle-line" size="24" />
+            </VAvatar>
+          </VCardText>
+        </VCard>
+      </VCol>
+      <VCol cols="12" sm="6" md="3">
+        <VCard>
+          <VCardText class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-subtitle-2 text-medium-emphasis">Transfer Bank</div>
+              <div class="text-h6 font-weight-semibold">{{ formatRupiah(summary.transfer || 0) }}</div>
+            </div>
+            <VAvatar rounded color="info" variant="tonal">
+              <VIcon icon="ri-bank-card-line" size="24" />
+            </VAvatar>
+          </VCardText>
+        </VCard>
+      </VCol>
+      <VCol cols="12" sm="6" md="3">
+        <VCard>
+          <VCardText class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-subtitle-2 text-medium-emphasis">QRIS</div>
+              <div class="text-h6 font-weight-semibold">{{ formatRupiah(summary.qris || 0) }}</div>
+            </div>
+            <VAvatar rounded color="primary" variant="tonal">
+              <VIcon icon="ri-qr-code-line" size="24" />
+            </VAvatar>
+          </VCardText>
+        </VCard>
+      </VCol>
+      <VCol cols="12" sm="6" md="3">
+        <VCard>
+          <VCardText class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-subtitle-2 text-medium-emphasis">Kasbon (Tempo)</div>
+              <div class="text-h6 font-weight-semibold text-warning">{{ formatRupiah(summary.tempo || 0) }}</div>
+            </div>
+            <VAvatar rounded color="warning" variant="tonal">
+              <VIcon icon="ri-time-line" size="24" />
+            </VAvatar>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+    </div>
+
     <p class="text-2xl mb-6">
       Riwayat Transaksi Penjualan
     </p>
@@ -209,6 +297,7 @@ const exportToExcel = () => {
           style="width: 250px;"
           hide-details
           clearable
+          @update:model-value="handleSearch"
         />
         <VTextField
           v-model="search"
@@ -225,7 +314,7 @@ const exportToExcel = () => {
         <VBtn
           color="success"
           prepend-icon="ri-file-excel-2-line"
-          :disabled="isLoading || filteredSales.length === 0"
+          :disabled="isLoading || sales.length === 0"
           @click="exportToExcel"
         >
           Export Excel
@@ -239,7 +328,7 @@ const exportToExcel = () => {
         v-model:items-per-page="itemsPerPage"
         v-model:page="page"
         :headers="tableHeaders"
-        :items="filteredSales"
+        :items="sales"
         :items-length="totalItems"
         :loading="isLoading"
         class="text-no-wrap"

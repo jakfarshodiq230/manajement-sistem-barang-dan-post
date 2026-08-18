@@ -7,6 +7,7 @@ import { useSnackbarStore } from '@/stores/snackbar'
 const branches = ref([])
 const owners = ref([])
 const search = ref('')
+const selectedStatus = ref(null)
 const isDrawerOpen = ref(false)
 const selectedBranch = ref(null)
 
@@ -33,6 +34,9 @@ const fetchBranches = async () => {
     
     if (search.value) {
       params.search = search.value
+    }
+    if (selectedStatus.value !== null) {
+      params.is_active = selectedStatus.value
     }
     
     const data = await $api('/apps/branches', { query: params })
@@ -61,7 +65,7 @@ const fetchOwners = async () => {
   try {
     const data = await $api('/apps/owners')
 
-    owners.value = data
+    owners.value = data.data || data
   } catch (error) {
     console.error(error)
   }

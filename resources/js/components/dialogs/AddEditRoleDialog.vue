@@ -29,13 +29,14 @@ const snackbar = useSnackbarStore()
 // 👉 Permission List
 const permissions = ref([])
 
-const availableActions = ['Read', 'Write', 'Create', 'Delete', 'Validate', 'Approve', 'Export', 'Import']
+const availableActions = ['Read', 'Write', 'Create', 'Delete', 'Validate', 'Approve', 'Export', 'Import', 'PIN']
 
 const fetchModules = async () => {
   try {
     const data = await $api('/apps/modules?all=true')
 
-    permissions.value = data.map(module => {
+    const dData = data.data || data;
+    permissions.value = dData.map(module => {
       const permObj = { name: module.name }
 
       availableActions.forEach(action => {

@@ -8,11 +8,9 @@
     </div>
     <!-- 👉 Footer: right content -->
     <span class="d-md-flex gap-x-4 text-primary d-none">
-      <a
-        href="#"
-        target="_blank"
-        rel="noopener noreferrer"
-      >Panduan Sistem</a>
+      <RouterLink
+        to="/panduan-sistem"
+      >Panduan Sistem</RouterLink>
       <a
         href="#"
         target="_blank"

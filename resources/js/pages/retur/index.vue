@@ -14,6 +14,7 @@ const isApprovalDialogVisible = ref(false)
 const returnToApprove = ref(null)
 const activeTab = ref('all') // all, purchase, sale
 const search = ref('')
+const selectedBranch = ref(null)
 
 // Pagination
 const page = ref(1)
@@ -53,6 +54,9 @@ const fetchData = async () => {
     if (search.value) {
       params.search = search.value
     }
+    if (selectedBranch.value) {
+      params.branch_id = selectedBranch.value
+    }
     
     const [returnsData, branchData] = await Promise.all([
       $api('/apps/returns', { query: params }),
@@ -63,7 +67,7 @@ const fetchData = async () => {
     if (returnsData.total !== undefined) {
       totalItems.value = returnsData.total
     }
-    branches.value = branchData
+    branches.value = branchData.data || branchData
   } catch (error) {
     console.error(error)
     snackbar.show('Gagal mengambil data', 'error')

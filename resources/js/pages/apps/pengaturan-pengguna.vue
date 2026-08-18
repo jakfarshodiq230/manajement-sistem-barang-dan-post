@@ -1,4 +1,5 @@
 <script setup>
+import { useSnackbarStore } from '@/stores/snackbar'
 import AddNewUserDrawer from '@/views/apps/user/list/AddNewUserDrawer.vue'
 
 definePage({
@@ -8,6 +9,8 @@ definePage({
 // =================== STATE ===================
 const searchQuery = ref('')
 const itemsPerPage = ref(10)
+const selectedRole = ref(null)
+const selectedBranch = ref(null)
 const page = ref(1)
 
 // Drawer & Dialog
@@ -18,6 +21,20 @@ const editingUser = ref(null)
 const editingAssignments = ref([])
 const deletingUser = ref(null)
 const savingAssignment = ref(false)
+const isConfirmPinDialogOpen = ref(false)
+const pinVisibility = ref({})
+const editingPin = ref('')
+const confirmPin = ref('')
+const savingPin = ref(false)
+
+const authUserData = JSON.parse(localStorage.getItem('userData') || '{}')
+const isDev = computed(() => {
+  const role = authUserData.role || []
+  if (Array.isArray(role)) {
+    return role.some(r => ['Dev', 'Developer', 'Super Admin'].includes(r))
+  }
+  return ['Dev', 'Developer', 'Super Admin'].includes(role)
+})
 
 // Data
 const availableBranches = ref([])
@@ -28,7 +45,7 @@ const {
   data: usersData,
   execute: fetchUsers,
 } = await useApi(createUrl('/apps/users', {
-  query: { q: searchQuery, itemsPerPage, page },
+  query: { q: searchQuery, itemsPerPage, page, role: selectedRole, branch_id: selectedBranch },
 }))
 
 const users = computed(() => usersData.value?.users ?? [])
@@ -41,7 +58,7 @@ onMounted(async () => {
       $api('/apps/roles'),
     ])
 
-    availableBranches.value = branchData
+    availableBranches.value = branchData.data || branchData
     availableRoles.value = roleData.map(r => r.role)
   } catch(e) { console.error(e) }
 })
@@ -60,8 +77,37 @@ const headers = [
   { title: 'Email', key: 'email' },
   { title: 'Jabatan & Cabang', key: 'assignments', sortable: false },
   { title: 'Status', key: 'status', sortable: false },
+  { title: 'PIN Otorisasi', key: 'pos_pin', sortable: false },
   { title: 'Aksi', key: 'actions', sortable: false },
 ]
+
+// =================== PIN MANAGEMENT ===================
+const openPinDialog = user => {
+  editingUser.value = { ...user }
+  isConfirmPinDialogOpen.value = true
+}
+
+const togglePinVisibility = (userId) => {
+  pinVisibility.value[userId] = !pinVisibility.value[userId]
+}
+
+const generateAndSavePin = async () => {
+  savingPin.value = true
+  try {
+    const randomPin = Math.floor(100000 + Math.random() * 900000).toString()
+    await $api(`/apps/users/${editingUser.value.id}/update-pin`, {
+      method: 'POST',
+      body: { pin: randomPin },
+    })
+    useSnackbarStore().show(`PIN berhasil di-generate: ${randomPin}`, 'success')
+    isConfirmPinDialogOpen.value = false
+    fetchUsers()
+  } catch (error) {
+    useSnackbarStore().show(error.data?.message || 'Gagal membuat PIN', 'error')
+  } finally {
+    savingPin.value = false
+  }
+}
 
 // =================== ADD USER ===================
 const addNewUser = async userData => {
@@ -267,6 +313,29 @@ const deleteUser = async () => {
         </template>
 
         <!-- Actions -->
+        <template #item.pos_pin="{ item }">
+          <div v-if="$can('pin', 'Pengguna')" class="d-flex align-center">
+            <template v-if="item.pos_pin">
+              <span class="font-weight-medium me-2" style="letter-spacing: 2px;">
+                {{ pinVisibility[item.id] ? item.pos_pin : '******' }}
+              </span>
+              <IconBtn size="small" @click="togglePinVisibility(item.id)">
+                <VIcon :icon="pinVisibility[item.id] ? 'ri-eye-off-line' : 'ri-eye-line'" />
+              </IconBtn>
+              <IconBtn size="small" color="primary" @click="openPinDialog(item)">
+                <VTooltip activator="parent" location="top">Buat Ulang PIN</VTooltip>
+                <VIcon icon="ri-refresh-line" />
+              </IconBtn>
+            </template>
+            <template v-else>
+              <VBtn size="small" variant="outlined" color="primary" @click="openPinDialog(item)">
+                Generate PIN
+              </VBtn>
+            </template>
+          </div>
+          <span v-else class="text-disabled">-</span>
+        </template>
+        
         <template #item.actions="{ item }">
           <div class="d-flex gap-1 align-center">
             <VTooltip
@@ -560,5 +629,41 @@ const deleteUser = async () => {
         </VCardActions>
       </VCard>
     </VDialog>
+
+    <!-- Dialog Konfirmasi PIN Acak -->
+    <VDialog
+      v-model="isConfirmPinDialogOpen"
+      max-width="400"
+    >
+      <VCard title="Konfirmasi Generate PIN">
+        <VCardText>
+          Apakah Anda yakin ingin membuat ulang PIN acak (6 digit) untuk pengguna <strong>{{ editingUser?.fullName }}</strong>? PIN lama akan tertimpa dan tidak bisa dikembalikan.
+        </VCardText>
+        <VCardActions class="px-6 pb-6 pt-0 justify-end">
+          <VBtn
+            color="secondary"
+            variant="outlined"
+            @click="isConfirmPinDialogOpen = false"
+          >
+            Batal
+          </VBtn>
+          <VBtn
+            color="primary"
+            :loading="savingPin"
+            @click="generateAndSavePin"
+          >
+            Ya, Buat PIN
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
+
+
 </template>
+
+<route lang="yaml">
+meta:
+  action: read
+  subject: Pengguna
+</route>

@@ -18,7 +18,7 @@ onMounted(async () => {
   try {
     const data = await $api('/apps/modules/navigation')
 
-    navItems.value = data
+    navItems.value = data.data || data
   } catch (e) {
     console.error('Failed to load navigation', e)
   }

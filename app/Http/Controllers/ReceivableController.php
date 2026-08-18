@@ -13,11 +13,21 @@ class ReceivableController extends Controller
     {
         $query = Receivable::with(['customer', 'sale.branch', 'sale.user']);
 
-        if ($request->has('status')) {
+        if ($request->has('status') && !empty($request->status)) {
             $query->where('status', $request->status);
         }
 
-        $receivables = $query->orderBy('due_date', 'asc')->paginate(15);
+        if ($request->has('q') && !empty($request->q)) {
+            $q = $request->q;
+            $query->whereHas('customer', function($q2) use ($q) {
+                $q2->where('name', 'like', "%{$q}%");
+            })->orWhereHas('sale', function($q3) use ($q) {
+                $q3->where('invoice_number', 'like', "%{$q}%");
+            });
+        }
+
+        $itemsPerPage = $request->input('itemsPerPage', 15);
+        $receivables = $query->orderBy('due_date', 'asc')->paginate($itemsPerPage);
         
         return response()->json($receivables);
     }

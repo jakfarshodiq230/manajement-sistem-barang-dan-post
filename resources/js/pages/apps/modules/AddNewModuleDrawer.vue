@@ -32,7 +32,7 @@ onMounted(async () => {
   try {
     const data = await $api('/apps/modules?all=true')
 
-    parentModules.value = data
+    parentModules.value = data.data || data
   } catch (e) {
     console.error(e)
   }

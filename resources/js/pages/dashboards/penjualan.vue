@@ -36,7 +36,7 @@ const fetchAnalytics = async () => {
   try {
     const res = await $api(`/apps/dashboards/sales-analytics?period=${period.value}&branch_id=${selectedBranch.value}`)
     if (res.summary) {
-      analyticsData.value = res
+      analyticsData.value = res.data || res
     }
   } catch (error) {
     console.error('Error fetching sales analytics:', error)

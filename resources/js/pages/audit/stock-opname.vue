@@ -10,6 +10,9 @@ const selectedBranch = ref(null)
 const opnames = ref([])
 const isLoading = ref(false)
 const totalOpnames = ref(0)
+const opnamesSearch = ref('')
+const opnamesBranch = ref(null)
+let opnamesSearchTimeout = null
 const opnameOptions = ref({ page: 1, itemsPerPage: 10 })
 
 const showCreateDialog = ref(false)
@@ -174,8 +177,11 @@ const fetchOpnames = async () => {
   try {
     let url = '/apps/stock-opnames'
     let queryParams = new URLSearchParams()
-    
-    if (viewMode.value === 'batchList') {
+      
+      if (opnamesSearch.value) queryParams.append('search', opnamesSearch.value)
+      if (opnamesBranch.value) queryParams.append('branch_id', opnamesBranch.value)
+
+      if (viewMode.value === 'batchList') {
       queryParams.append('group_by_batch', 'true')
     } else if (viewMode.value === 'branchList' && activeBatch.value) {
       queryParams.append('batch_id', activeBatch.value.batch_id)
@@ -196,6 +202,14 @@ const fetchOpnames = async () => {
   } finally {
     isLoading.value = false
   }
+}
+
+const handleOpnamesSearch = () => {
+  if (opnamesSearchTimeout) clearTimeout(opnamesSearchTimeout)
+  opnamesSearchTimeout = setTimeout(() => {
+    opnameOptions.value.page = 1
+    fetchOpnames()
+  }, 500)
 }
 
 const openBatchDetails = batch => {
@@ -659,6 +673,57 @@ onMounted(async () => {
 
     <!-- Opnames / Batches List -->
     <VCard v-if="viewMode !== 'detail'">
+
+      <VCardText class="d-flex align-center flex-wrap gap-4">
+
+        <VTextField
+
+          v-model="opnamesSearch"
+
+          placeholder="Cari Catatan atau Batch..."
+
+          density="compact"
+
+          prepend-inner-icon="ri-search-line"
+
+          style="max-inline-size: 300px"
+
+          clearable
+
+          hide-details
+
+          @update:model-value="handleOpnamesSearch"
+
+        />
+
+        <VSelect
+
+          v-if="branches.length > 1"
+
+          v-model="opnamesBranch"
+
+          :items="branches"
+
+          item-title="title"
+
+          item-value="value"
+
+          placeholder="Semua Cabang"
+
+          density="compact"
+
+          style="max-inline-size: 200px"
+
+          clearable
+
+          hide-details
+
+          @update:model-value="fetchOpnames"
+
+        />
+
+      </VCardText>
+
       <VDataTableServer
         v-model:options="opnameOptions"
         :headers="opnamesHeaders"

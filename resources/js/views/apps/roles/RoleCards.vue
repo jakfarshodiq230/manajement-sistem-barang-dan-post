@@ -17,7 +17,7 @@ const fetchRoles = async () => {
   try {
     const res = await $api('/apps/roles')
 
-    roles.value = res
+    roles.value = res.data || res
   } catch (err) {
     console.error(err)
   }

@@ -17,10 +17,15 @@ class StockOpnameController extends Controller
     {
         if ($request->has('group_by_batch')) {
             $query = StockOpname::with('creator:id,name')
-                ->select('batch_id', 'audit_date', 'notes', 'created_at', 'created_by', DB::raw('COUNT(id) as total_branches'))
+                ->select('batch_id', 'audit_date', 'notes', 'created_by', DB::raw('MAX(created_at) as created_at'), DB::raw('COUNT(id) as total_branches'))
                 ->whereNotNull('batch_id')
-                ->groupBy('batch_id', 'audit_date', 'notes', 'created_at', 'created_by')
-                ->orderBy('created_at', 'desc');
+                ->groupBy('batch_id', 'audit_date', 'notes', 'created_by')
+                ->orderByRaw('MAX(created_at) DESC');
+
+            if ($request->has('search') && $request->search != '') {
+                $search = $request->search;
+                $query->where('notes', 'like', "%{$search}%");
+            }
             
             return response()->json($query->paginate(10));
         }
@@ -119,7 +124,9 @@ class StockOpnameController extends Controller
                 }
 
                 if (!empty($items)) {
-                    StockOpnameItem::insert($items);
+                    foreach (array_chunk($items, 500) as $chunk) {
+                        StockOpnameItem::insert($chunk);
+                    }
                 }
 
                 $branchAdminIds = DB::table('model_has_roles')

@@ -23,7 +23,7 @@ onMounted(async () => {
 
 
     // Combine standard headers with dynamic menus, and also add back the Roles/Modules config
-    navItems.value = data
+    navItems.value = data.data || data
   } catch (e) {
     console.error('Failed to load navigation', e)
   }

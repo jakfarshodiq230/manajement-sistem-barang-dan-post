@@ -34,6 +34,7 @@ const userData = useCookie('userData')
 const cart = ref([])
 const discount = ref(0)
 const isApprovalDialogVisible = ref(false)
+const isCheckoutDialogVisible = ref(false)
 const isConfirmDialogVisible = ref(false)
 const pendingCheckoutData = ref(null)
 
@@ -156,8 +157,8 @@ const fetchData = async () => {
       $api('/apps/receipt-settings').catch(() => [])
     ])
 
-    branches.value = branchData
-    categories.value = categoryData
+    branches.value = branchData.data || branchData
+    categories.value = categoryData.data || categoryData
     customers.value = customerData.data || customerData
     receiptSettings.value = receiptSettingsData.data || receiptSettingsData
     

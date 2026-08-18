@@ -9,6 +9,8 @@ const branches = ref([])
 const suppliers = ref([])
 const masterProducts = ref([])
 const search = ref('')
+const selectedBranch = ref(null)
+const selectedStatus = ref(null)
 const isLoading = ref(false)
 const isAddNewDrawerVisible = ref(false)
 const isTrackingDialogVisible = ref(false)
@@ -72,10 +74,9 @@ const fetchData = async () => {
     if (poData.total !== undefined) {
       totalItems.value = poData.total
     }
-    branches.value = branchData
+    branches.value = branchData.data || branchData
     suppliers.value = supplierData
-    masterProducts.value = productData
-    
+    masterProducts.value = productData.data || productData
     // Update badge counts
     const allPOs = countsData.data || countsData
     countNeedValidation.value = allPOs.filter(item => !item.approval_status || item.approval_status === 'draft' || item.approval_status === 'pending').length

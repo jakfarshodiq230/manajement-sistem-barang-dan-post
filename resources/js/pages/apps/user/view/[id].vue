@@ -67,11 +67,11 @@ const { data: userData } = await useApi(`/apps/users/${ route.params.id }`)
         :touch="false"
       >
         <VWindowItem>
-          <UserTabOverview />
+          <UserTabOverview :user-data="userData" />
         </VWindowItem>
 
         <VWindowItem>
-          <UserTabSecurity />
+          <UserTabSecurity :user-data="userData" />
         </VWindowItem>
       </VWindow>
     </VCol>

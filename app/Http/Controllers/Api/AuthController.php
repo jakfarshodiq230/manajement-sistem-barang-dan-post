@@ -77,9 +77,26 @@ class AuthController extends Controller
                 ])->values()->toArray(),
             ];
 
+            $userAgent = request()->header('User-Agent');
+            $os = 'Unknown OS';
+            $browser = 'Unknown Browser';
+            if (preg_match('/windows|win32/i', $userAgent)) $os = 'Windows';
+            elseif (preg_match('/macintosh|mac os x/i', $userAgent)) $os = 'Mac';
+            elseif (preg_match('/linux/i', $userAgent)) $os = 'Linux';
+            elseif (preg_match('/android/i', $userAgent)) $os = 'Android';
+            elseif (preg_match('/iphone|ipad|ipod/i', $userAgent)) $os = 'iOS';
+
+            if (preg_match('/chrome|crios|crmo/i', $userAgent)) $browser = 'Chrome';
+            elseif (preg_match('/firefox|fxios/i', $userAgent)) $browser = 'Firefox';
+            elseif (preg_match('/safari/i', $userAgent)) $browser = 'Safari';
+            elseif (preg_match('/opera|opr\//i', $userAgent)) $browser = 'Opera';
+            elseif (preg_match('/edg/i', $userAgent)) $browser = 'Edge';
+
+            $deviceName = $os . ' - ' . $browser;
+
             return response()->json([
                 'userAbilityRules' => $abilityRules,
-                'accessToken'      => $user->createToken('auth_token')->plainTextToken,
+                'accessToken'      => $user->createToken($deviceName)->plainTextToken,
                 'userData'         => $userData,
             ], 201);
         }
@@ -96,7 +113,7 @@ class AuthController extends Controller
         ]);
 
         $user = $request->user();
-        $user->pos_pin = \Illuminate\Support\Facades\Hash::make($request->pin);
+        $user->pos_pin = $request->pin;
         $user->save();
 
         return response()->json(['message' => 'PIN berhasil diperbarui']);
@@ -114,7 +131,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Otorisator belum mengatur PIN mereka. Silakan atur di pengaturan.'], 400);
         }
 
-        if (!\Illuminate\Support\Facades\Hash::check($request->pin, $approver->pos_pin)) {
+        if ((string) $request->pin !== (string) $approver->pos_pin) {
             return response()->json(['message' => 'PIN Salah'], 400);
         }
 

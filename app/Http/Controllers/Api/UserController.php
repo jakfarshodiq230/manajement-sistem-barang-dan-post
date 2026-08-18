@@ -9,6 +9,41 @@ use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
+    public function updatePin(Request $request, $id)
+    {
+        $admin = $request->user();
+        
+        $hasPermission = \Illuminate\Support\Facades\DB::table('model_has_roles')
+            ->join('role_has_permissions', 'model_has_roles.role_id', '=', 'role_has_permissions.role_id')
+            ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
+            ->where('model_has_roles.model_id', $admin->id)
+            ->where('permissions.name', 'Pengguna PIN')
+            ->exists();
+
+        if (!$hasPermission) {
+            return response()->json(['message' => 'Anda tidak memiliki izin (Pengguna PIN) untuk mengubah PIN pengguna.'], 403);
+        }
+
+        $user = \App\Models\User::findOrFail($id);
+
+        $pin = $request->pin;
+        if (!$pin) {
+            $pin = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+        }
+
+        $request->validate([
+            'pin' => 'nullable|string|digits:6',
+        ]);
+
+        $user->pos_pin = $pin;
+        $user->save();
+
+        return response()->json([
+            'message' => 'PIN berhasil diperbarui',
+            'pin' => $pin // Return the generated pin so the Dev can see it
+        ]);
+    }
+
     public function index(Request $request)
     {
         $q = $request->query('q', '');
@@ -40,6 +75,7 @@ class UserController extends Controller
 
             return [
                 'id' => $user->id,
+                'pos_pin' => $user->pos_pin,
                 'fullName' => $user->name,
                 'username' => strtolower(str_replace(' ', '', $user->name)),
                 'email' => $user->email,
@@ -98,6 +134,23 @@ class UserController extends Controller
             }
         }
 
+        $recentDevices = $user->tokens()
+            ->orderBy('last_used_at', 'desc')
+            ->take(5)
+            ->get()
+            ->map(function ($token) {
+                // Return structure for Vue component
+                // Define active as having been used in the last 15 minutes
+                $isActive = $token->last_used_at && $token->last_used_at->diffInMinutes(now()) <= 15;
+
+                return [
+                    'browser' => $token->name,
+                    'device' => $token->name,
+                    'recentActivity' => $token->last_used_at ? $token->last_used_at->diffForHumans() : '-',
+                    'isActive' => $isActive,
+                ];
+            });
+
         return response()->json(['message' => 'User created successfully', 'user' => $user], 201);
     }
 
@@ -111,11 +164,45 @@ class UserController extends Controller
             ->select('branches.id as branch_id', 'branches.name as branch_name', 'roles.id as role_id', 'roles.name as role_name')
             ->get();
 
+        $recentSales = \App\Models\Sale::where('user_id', $user->id)
+            ->with(['branch'])
+            ->orderBy('created_at', 'desc')
+            ->take(20)
+            ->get()
+            ->map(function ($s) {
+                return [
+                    'invoice_number' => $s->invoice_number,
+                    'date' => $s->date,
+                    'total_amount' => $s->total_amount,
+                    'status' => $s->status,
+                    'branch_name' => $s->branch ? $s->branch->name : '-',
+                ];
+            });
+
+        $recentDevices = $user->tokens()
+            ->orderBy('last_used_at', 'desc')
+            ->take(5)
+            ->get()
+            ->map(function ($token) {
+                // Return structure for Vue component
+                // Define active as having been used in the last 15 minutes
+                $isActive = $token->last_used_at && $token->last_used_at->diffInMinutes(now()) <= 15;
+
+                return [
+                    'browser' => $token->name,
+                    'device' => $token->name,
+                    'recentActivity' => $token->last_used_at ? $token->last_used_at->diffForHumans() : '-',
+                    'isActive' => $isActive,
+                ];
+            });
+
         return response()->json([
             'id'           => $user->id,
             'fullName'     => $user->name,
             'username'     => strtolower(str_replace(' ', '', $user->name)),
             'email'        => $user->email,
+            'phone'        => $user->phone,
+            'address'      => $user->address,
             'role'         => $assignments->pluck('role_name')->unique()->values()->toArray(),
             'assignments'  => $assignments->map(fn($a) => [
                 'branch_id'   => $a->branch_id,
@@ -123,15 +210,10 @@ class UserController extends Controller
                 'role_id'     => $a->role_id,
                 'role_name'   => $a->role_name,
             ])->values()->toArray(),
-            'currentPlan'  => 'basic',
-            'status'       => 'Active',
-            'avatar'       => '',
-            'taskDone'     => 1230,
-            'projectDone'  => 568,
-            'taxId'        => 'Tax-8894',
-            'language'     => 'English',
-            'country'      => 'Indonesia',
-            'contact'      => '+62 812-3456-7890',
+            'status'       => $user->status ? 'Active' : 'Inactive',
+            'avatar'       => $user->avatar,
+            'recentSales'  => $recentSales,
+            'recentDevices' => $recentDevices,
         ]);
     }
 
@@ -147,8 +229,11 @@ class UserController extends Controller
         ]);
 
         $user->update([
-            'name'  => $request->fullName,
-            'email' => $request->email,
+            'name'    => $request->fullName,
+            'email'   => $request->email,
+            'phone'   => $request->phone ?? $user->phone,
+            'address' => $request->address ?? $user->address,
+            'status'  => $request->has('status') ? ($request->status === 'Active' || $request->status == 1 ? 1 : 0) : $user->status,
         ]);
 
         // Re-sync all branch-role assignments
@@ -177,6 +262,23 @@ class UserController extends Controller
             }
         }
 
+        $recentDevices = $user->tokens()
+            ->orderBy('last_used_at', 'desc')
+            ->take(5)
+            ->get()
+            ->map(function ($token) {
+                // Return structure for Vue component
+                // Define active as having been used in the last 15 minutes
+                $isActive = $token->last_used_at && $token->last_used_at->diffInMinutes(now()) <= 15;
+
+                return [
+                    'browser' => $token->name,
+                    'device' => $token->name,
+                    'recentActivity' => $token->last_used_at ? $token->last_used_at->diffForHumans() : '-',
+                    'isActive' => $isActive,
+                ];
+            });
+
         return response()->json(['message' => 'User updated successfully', 'user' => $user]);
     }
 
@@ -187,6 +289,23 @@ class UserController extends Controller
         }
 
         $user->delete();
+        $recentDevices = $user->tokens()
+            ->orderBy('last_used_at', 'desc')
+            ->take(5)
+            ->get()
+            ->map(function ($token) {
+                // Return structure for Vue component
+                // Define active as having been used in the last 15 minutes
+                $isActive = $token->last_used_at && $token->last_used_at->diffInMinutes(now()) <= 15;
+
+                return [
+                    'browser' => $token->name,
+                    'device' => $token->name,
+                    'recentActivity' => $token->last_used_at ? $token->last_used_at->diffForHumans() : '-',
+                    'isActive' => $isActive,
+                ];
+            });
+
         return response()->json(['message' => 'User deleted successfully']);
     }
 }

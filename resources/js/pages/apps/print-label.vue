@@ -33,8 +33,7 @@ onMounted(async () => {
   if (batchId) {
     try {
       const res = await $api(`/apps/product-batches/detail/${batchId}`)
-      batchData.value = res
-      
+      batchData.value = res.data || res
       // Delay to render barcodes
       setTimeout(() => {
         const barcodeElements = document.querySelectorAll('.barcode-svg')

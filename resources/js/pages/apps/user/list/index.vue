@@ -29,7 +29,7 @@ onMounted(async () => {
       $api('/apps/roles'),
     ])
 
-    availableBranches.value = branchData
+    availableBranches.value = branchData.data || branchData
     availableRoles.value = roleData.map(r => r.role)
   } catch(e) { console.error(e) }
 })
