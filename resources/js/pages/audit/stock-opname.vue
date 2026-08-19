@@ -17,9 +17,12 @@ const opnameOptions = ref({ page: 1, itemsPerPage: 10 })
 
 const showCreateDialog = ref(false)
 
+const categories = ref([])
 const createData = ref({
   audit_date: new Date().toISOString().substr(0, 10),
   notes: '',
+  branch_id: null,
+  category_id: null,
 })
 
 const activeOpname = ref(null)
@@ -155,9 +158,12 @@ const opnamesHeaders = computed(() => {
 
 const fetchBranches = async () => {
   try {
-    const res = await $api('/apps/branches?simple=true')
-    if (res && res.length > 0) {
-      branches.value = res.map(b => ({ title: b.name, value: b.id }))
+    const [branchRes, catRes] = await Promise.all([
+      $api('/apps/branches?simple=true'),
+      $api('/apps/categories'),
+    ])
+    if (branchRes && branchRes.length > 0) {
+      branches.value = branchRes.map(b => ({ title: b.name, value: b.id }))
 
       // If user is branch admin (only 1 branch), skip batch list
       if (branches.value.length === 1) {
@@ -167,8 +173,9 @@ const fetchBranches = async () => {
         viewMode.value = 'batchList'
       }
     }
+    categories.value = catRes.data || catRes || []
   } catch (error) {
-    console.error('Error fetching branches:', error)
+    console.error('Error fetching branches/categories:', error)
   }
 }
 
@@ -232,11 +239,15 @@ const createOpname = async () => {
       body: {
         audit_date: createData.value.audit_date,
         notes: createData.value.notes,
+        branch_id: createData.value.branch_id || undefined,
+        category_id: createData.value.category_id || undefined,
       },
     })
     showCreateDialog.value = false
     createData.value.notes = ''
-    showSnackbar('Jadwal Stock Opname Massal Berhasil Dibuat', 'success')
+    createData.value.branch_id = null
+    createData.value.category_id = null
+    showSnackbar('Jadwal Stock Opname Berhasil Dibuat', 'success')
     fetchOpnames()
   } catch (error) {
     console.error('Error creating opname:', error)
@@ -820,37 +831,92 @@ onMounted(async () => {
     <!-- Create Dialog -->
     <VDialog
       v-model="showCreateDialog"
-      max-width="500"
+      max-width="560"
     >
-      <VCard title="Mulai Stock Opname Baru">
-        <VCardText>
-          <VTextField
-            v-model="createData.audit_date"
-            label="Tanggal Audit"
-            type="date"
+      <VCard>
+        <VCardTitle class="px-6 pt-6 pb-2">
+          <div class="d-flex align-center gap-2">
+            <VIcon icon="ri-file-list-3-line" color="primary" />
+            <span class="text-h5 font-weight-bold">Mulai Stock Opname Baru</span>
+          </div>
+        </VCardTitle>
+
+        <VCardText class="px-6 py-4">
+          <VAlert
+            color="info"
+            variant="tonal"
+            density="compact"
+            icon="ri-lightbulb-line"
             class="mb-4"
-          />
-          <VTextarea
-            v-model="createData.notes"
-            label="Catatan (Tujuan audit, dll)"
-            rows="3"
-          />
+          >
+            <strong>Tips Audit Skala Besar:</strong> Untuk katalog ribuan hingga jutaan barang, Anda dapat memilih <strong>Kategori Tertentu</strong> untuk melakukan audit bergilir (<em>Cycle Counting</em>).
+          </VAlert>
+
+          <VRow>
+            <VCol cols="12" md="6">
+              <VTextField
+                v-model="createData.audit_date"
+                label="Tanggal Audit"
+                type="date"
+                density="compact"
+              />
+            </VCol>
+
+            <VCol cols="12" md="6">
+              <VAutocomplete
+                v-model="createData.branch_id"
+                :items="[{ title: 'Semua Cabang Aktif (Massal)', value: null }, ...branches]"
+                item-title="title"
+                item-value="value"
+                label="Target Cabang"
+                placeholder="Pilih Cabang"
+                density="compact"
+              />
+            </VCol>
+
+            <VCol cols="12">
+              <VAutocomplete
+                v-model="createData.category_id"
+                :items="[{ name: 'Semua Kategori (Full Opname)', id: null }, ...categories]"
+                item-title="name"
+                item-value="id"
+                label="Cakupan Kategori Barang"
+                placeholder="Pilih Kategori (Opsional)"
+                density="compact"
+                clearable
+              />
+            </VCol>
+
+            <VCol cols="12">
+              <VTextarea
+                v-model="createData.notes"
+                label="Catatan / Instruksi Audit"
+                placeholder="Contoh: Audit berkala Q3, audit khusus oli dan filter..."
+                rows="2"
+                density="compact"
+              />
+            </VCol>
+          </VRow>
         </VCardText>
-        <VCardActions class="px-4 pb-4">
-          <VSpacer />
+
+        <VDivider />
+
+        <VCardActions class="px-6 py-4 justify-end gap-2 bg-grey-50">
           <VBtn
             color="secondary"
-            variant="text"
+            variant="outlined"
             @click="showCreateDialog = false"
           >
             Batal
           </VBtn>
           <VBtn
             color="primary"
+            variant="elevated"
+            prepend-icon="ri-check-line"
             :loading="isLoading"
             @click="createOpname"
           >
-            Buat Sesi
+            Buat Sesi Opname
           </VBtn>
         </VCardActions>
       </VCard>

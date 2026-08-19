@@ -63,13 +63,20 @@ class StockOpnameController extends Controller
         $validated = $request->validate([
             'audit_date' => 'required|date',
             'notes' => 'nullable|string',
+            'category_id' => 'nullable|exists:categories,id',
+            'branch_id' => 'nullable|exists:branches,id',
         ]);
 
         $batchId = (string) \Illuminate\Support\Str::uuid();
-        $branches = \App\Models\Branch::where('status', 'Aktif')->get();
+        
+        $branchQuery = \App\Models\Branch::where('status', 'Aktif');
+        if (!empty($validated['branch_id'])) {
+            $branchQuery->where('id', $validated['branch_id']);
+        }
+        $branches = $branchQuery->get();
 
         if ($branches->isEmpty()) {
-            return response()->json(['message' => 'No active branches found.'], 400);
+            return response()->json(['message' => 'Tidak ada cabang aktif yang ditemukan.'], 400);
         }
 
         $creatorId = $request->user()->id;
@@ -88,9 +95,6 @@ class StockOpnameController extends Controller
 
                 $endDate = \Carbon\Carbon::parse($validated['audit_date'])->endOfDay();
 
-                $inventories = ProductBranch::where('branch_id', $branch->id)->get();
-                $items = [];
-                
                 // Cari audit terakhir yang approved
                 $lastAudit = StockOpname::where('branch_id', $branch->id)
                     ->where('status', 'approved')
@@ -109,25 +113,32 @@ class StockOpnameController extends Controller
                     ->groupBy('product_branches.product_id')
                     ->pluck('total_sold', 'product_id');
 
-                foreach ($inventories as $inv) {
-                    $items[] = [
-                        'stock_opname_id' => $stockOpname->id,
-                        'product_id' => $inv->product_id,
-                        'system_qty' => $inv->stock,
-                        'physical_qty' => null,
-                        'damaged_qty' => null,
-                        'sold_qty' => $salesData[$inv->product_id] ?? 0,
-                        'variance' => null,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
+                $invQuery = ProductBranch::where('branch_id', $branch->id);
+                if (!empty($validated['category_id'])) {
+                    $invQuery->whereHas('product', function($q) use ($validated) {
+                        $q->where('category_id', $validated['category_id']);
+                    });
                 }
 
-                if (!empty($items)) {
-                    foreach (array_chunk($items, 500) as $chunk) {
-                        StockOpnameItem::insert($chunk);
+                $invQuery->chunkById(500, function ($inventories) use ($stockOpname, $salesData) {
+                    $items = [];
+                    foreach ($inventories as $inv) {
+                        $items[] = [
+                            'stock_opname_id' => $stockOpname->id,
+                            'product_id' => $inv->product_id,
+                            'system_qty' => $inv->stock,
+                            'physical_qty' => null,
+                            'damaged_qty' => null,
+                            'sold_qty' => $salesData[$inv->product_id] ?? 0,
+                            'variance' => null,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ];
                     }
-                }
+                    if (!empty($items)) {
+                        StockOpnameItem::insert($items);
+                    }
+                });
 
                 $branchAdminIds = DB::table('model_has_roles')
                     ->where('branch_id', $branch->id)
@@ -140,11 +151,11 @@ class StockOpnameController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Failed to create stock opnames: '.$e->getMessage()], 500);
+            return response()->json(['message' => 'Gagal membuat sesi stock opname: '.$e->getMessage()], 500);
         }
 
         return response()->json([
-            'message' => 'Stock Opname session created for all active branches successfully.',
+            'message' => 'Sesi Stock Opname berhasil dibuat.',
         ], 201);
     }
 
@@ -211,7 +222,9 @@ class StockOpnameController extends Controller
             $search = $request->search;
             $query->whereHas('product', function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('sku', 'like', "%{$search}%");
+                  ->orWhere('sku', 'like', "%{$search}%")
+                  ->orWhere('barcode', 'like', "%{$search}%")
+                  ->orWhere('brand', 'like', "%{$search}%");
             });
         }
 

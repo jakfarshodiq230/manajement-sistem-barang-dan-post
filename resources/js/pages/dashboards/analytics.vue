@@ -2,10 +2,8 @@
 import { ref, onMounted } from 'vue'
 import { $api } from '@/utils/api'
 
-// Existing components
+// Components
 import AnalyticsCongratulationsJohn from '@/views/dashboards/analytics/AnalyticsCongratulationsJohn.vue'
-import AnalyticsTotalProfitLineCharts from '@/views/dashboards/analytics/AnalyticsTotalProfitLineCharts.vue'
-import AnalyticsTotalTransactions from '@/views/dashboards/analytics/AnalyticsTotalTransactions.vue'
 
 const analyticsData = ref({
   low_stock: [],
@@ -34,6 +32,7 @@ const analyticsData = ref({
 const isLoading = ref(true)
 
 const fetchAnalytics = async () => {
+  isLoading.value = true
   try {
     const res = await $api('/apps/dashboards/analytics')
     if (res.success) {
@@ -51,6 +50,7 @@ onMounted(() => {
 })
 
 const formatCurrency = value => {
+  if (value === null || value === undefined || isNaN(value)) return 'Rp 0'
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
@@ -60,536 +60,353 @@ const formatCurrency = value => {
 </script>
 
 <template>
-  <VRow class="match-height">
-    <!-- 👉 Congratulations / Welcome -->
-    <VCol
-      cols="12"
-      md="8"
-      lg="8"
-    >
-      <AnalyticsCongratulationsJohn />
-    </VCol>
+  <div class="pa-4">
+    <!-- Top Welcome & Daily Metrics Row -->
+    <VRow class="match-height mb-4">
+      <!-- Welcome Hero Banner -->
+      <VCol cols="12" md="8">
+        <AnalyticsCongratulationsJohn
+          :daily-income="analyticsData.income.daily"
+          :monthly-income="analyticsData.income.monthly"
+        />
+      </VCol>
 
-    <!-- 👉 Daily Income -->
-    <VCol
-      cols="12"
-      sm="6"
-      md="4"
-      lg="4"
-    >
-      <VCard>
-        <VCardText class="d-flex align-center justify-space-between pb-4">
-          <div>
-            <h6 class="text-h6 font-weight-medium mb-1">
-              Pendapatan Hari Ini
-            </h6>
-            <h4 class="text-h4 text-primary">
-              {{ formatCurrency(analyticsData.income.daily) }}
-            </h4>
+      <!-- Side Daily & Monthly Income Cards -->
+      <VCol cols="12" md="4" class="d-flex flex-column gap-4">
+        <VCard elevation="2" class="border-s-lg border-primary flex-grow-1">
+          <VCardText class="d-flex align-center justify-space-between py-4">
+            <div>
+              <div class="text-caption text-primary font-weight-bold">
+                PENDAPATAN HARI INI
+              </div>
+              <div class="text-h4 font-weight-bold text-primary mt-1">
+                {{ formatCurrency(analyticsData.income.daily) }}
+              </div>
+              <div class="text-caption text-medium-emphasis mt-1">Total transaksi kasir hari ini</div>
+            </div>
+            <VAvatar color="primary" variant="tonal" rounded size="48">
+              <VIcon icon="ri-money-dollar-circle-line" size="26" />
+            </VAvatar>
+          </VCardText>
+        </VCard>
+
+        <VCard elevation="2" class="border-s-lg border-success flex-grow-1">
+          <VCardText class="d-flex align-center justify-space-between py-4">
+            <div>
+              <div class="text-caption text-success font-weight-bold">
+                PENDAPATAN BULAN INI
+              </div>
+              <div class="text-h4 font-weight-bold text-success mt-1">
+                {{ formatCurrency(analyticsData.income.monthly) }}
+              </div>
+              <div class="text-caption text-medium-emphasis mt-1">Akumulasi omzet bulan berjalan</div>
+            </div>
+            <VAvatar color="success" variant="tonal" rounded size="48">
+              <VIcon icon="ri-wallet-3-line" size="26" />
+            </VAvatar>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- Row of 4 Stats: Piutang, Retur, Yearly Income, Opname -->
+    <VRow class="mb-4">
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-warning">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-warning font-weight-bold">TOTAL PIUTANG AKTIF</div>
+              <div class="text-h4 font-weight-bold text-warning mt-1">{{ formatCurrency(analyticsData.receivables.outstanding) }}</div>
+            </div>
+            <VAvatar color="warning" variant="tonal" rounded size="46">
+              <VIcon icon="ri-hand-coin-line" size="26" />
+            </VAvatar>
           </div>
-          <VAvatar
-            color="primary"
-            variant="tonal"
-            rounded
-            size="42"
-          >
-            <VIcon
-              icon="ri-money-dollar-circle-line"
-              size="26"
-            />
-          </VAvatar>
-        </VCardText>
-      </VCard>
-      
-      <VCard class="mt-4">
-        <VCardText class="d-flex align-center justify-space-between pb-4">
-          <div>
-            <h6 class="text-h6 font-weight-medium mb-1">
-              Pendapatan Bulan Ini
-            </h6>
-            <h4 class="text-h4 text-success">
-              {{ formatCurrency(analyticsData.income.monthly) }}
-            </h4>
+          <div class="text-caption text-medium-emphasis mt-2">Sisa tagihan belum lunas</div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-error">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-error font-weight-bold">RETUR BULAN INI</div>
+              <div class="text-h4 font-weight-bold text-error mt-1">{{ formatCurrency(analyticsData.returns.monthly) }}</div>
+            </div>
+            <VAvatar color="error" variant="tonal" rounded size="46">
+              <VIcon icon="ri-arrow-go-back-line" size="26" />
+            </VAvatar>
           </div>
-          <VAvatar
-            color="success"
-            variant="tonal"
-            rounded
-            size="42"
-          >
-            <VIcon
-              icon="ri-wallet-3-line"
-              size="26"
-            />
-          </VAvatar>
-        </VCardText>
-      </VCard>
-    </VCol>
+          <div class="text-caption text-medium-emphasis mt-2">Pengembalian barang</div>
+        </VCard>
+      </VCol>
 
-    <!-- 👉 Low Stock Table -->
-    <VCol
-      cols="12"
-      md="6"
-    >
-      <VCard
-        title="⚠️ Peringatan Stok Menipis"
-        subtitle="Produk yang segera butuh restock"
-      >
-        <VTable class="text-no-wrap">
-          <thead>
-            <tr>
-              <th class="text-uppercase">
-                Produk
-              </th>
-              <th class="text-uppercase text-center">
-                Cabang
-              </th>
-              <th class="text-uppercase text-center">
-                Stok Sisa
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="analyticsData.low_stock.length === 0">
-              <td
-                colspan="3"
-                class="text-center text-medium-emphasis"
-              >
-                Semua stok produk aman.
-              </td>
-            </tr>
-            <tr
-              v-for="item in analyticsData.low_stock"
-              :key="item.id"
-            >
-              <td>
-                <div class="d-flex align-center">
-                  <VAvatar
-                    variant="tonal"
-                    color="warning"
-                    class="me-3"
-                    size="34"
-                  >
-                    <VIcon
-                      icon="ri-box-3-line"
-                      size="20"
-                    />
-                  </VAvatar>
-                  <div class="d-flex flex-column">
-                    <h6 class="text-h6 font-weight-medium user-list-name">
-                      {{ item.product?.name }}
-                    </h6>
-                    <span class="text-sm text-medium-emphasis">{{ item.product?.sku }}</span>
-                  </div>
-                </div>
-              </td>
-              <td class="text-center">
-                {{ item.branch?.name }}
-              </td>
-              <td class="text-center font-weight-bold text-error">
-                {{ item.stock }}
-              </td>
-            </tr>
-          </tbody>
-        </VTable>
-        <VDivider />
-        <VCardActions>
-          <VBtn block variant="text" to="/inventori-cabang" color="primary">Lihat Semua Data Stok</VBtn>
-        </VCardActions>
-      </VCard>
-    </VCol>
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-info font-weight-bold">PENDAPATAN TAHUN INI</div>
+              <div class="text-h4 font-weight-bold text-info mt-1">{{ formatCurrency(analyticsData.income.yearly) }}</div>
+            </div>
+            <VAvatar color="info" variant="tonal" rounded size="46">
+              <VIcon icon="ri-bank-line" size="26" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Akumulasi omzet tahun berjalan</div>
+        </VCard>
+      </VCol>
 
-    <!-- 👉 High Stock Table -->
-    <VCol
-      cols="12"
-      md="6"
-    >
-      <VCard
-        title="📦 Stok Terbanyak"
-        subtitle="Produk dengan jumlah stok berlebih"
-      >
-        <VTable class="text-no-wrap">
-          <thead>
-            <tr>
-              <th class="text-uppercase">
-                Produk
-              </th>
-              <th class="text-uppercase text-center">
-                Cabang
-              </th>
-              <th class="text-uppercase text-center">
-                Stok
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="analyticsData.high_stock.length === 0">
-              <td
-                colspan="3"
-                class="text-center text-medium-emphasis"
-              >
-                Tidak ada produk stok berlebih.
-              </td>
-            </tr>
-            <tr
-              v-for="item in analyticsData.high_stock"
-              :key="item.id"
-            >
-              <td>
-                <div class="d-flex align-center">
-                  <VAvatar
-                    variant="tonal"
-                    color="success"
-                    class="me-3"
-                    size="34"
-                  >
-                    <VIcon
-                      icon="ri-checkbox-multiple-blank-line"
-                      size="20"
-                    />
-                  </VAvatar>
-                  <div class="d-flex flex-column">
-                    <h6 class="text-h6 font-weight-medium user-list-name">
-                      {{ item.product?.name }}
-                    </h6>
-                    <span class="text-sm text-medium-emphasis">{{ item.product?.sku }}</span>
-                  </div>
-                </div>
-              </td>
-              <td class="text-center">
-                {{ item.branch?.name }}
-              </td>
-              <td class="text-center font-weight-bold text-success">
-                {{ item.stock }}
-              </td>
-            </tr>
-          </tbody>
-        </VTable>
-        <VDivider />
-        <VCardActions>
-          <VBtn block variant="text" to="/inventori-cabang" color="primary">Lihat Semua Data Stok</VBtn>
-        </VCardActions>
-      </VCard>
-    </VCol>
-
-    <!-- 👉 Expiring Batches Table -->
-    <VCol
-      cols="12"
-      md="12"
-    >
-      <VCard
-        title="⚠️ Peringatan Barang Mendekati Kadaluwarsa"
-        subtitle="Batch produk yang akan expired dalam 30 hari"
-      >
-        <VTable class="text-no-wrap">
-          <thead>
-            <tr>
-              <th class="text-uppercase">
-                Produk
-              </th>
-              <th class="text-uppercase text-center">
-                Cabang
-              </th>
-              <th class="text-uppercase text-center">
-                Sisa Stok
-              </th>
-              <th class="text-uppercase text-center">
-                Tgl Kadaluwarsa
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="analyticsData.expiring_batches.length === 0">
-              <td
-                colspan="4"
-                class="text-center text-medium-emphasis"
-              >
-                Tidak ada produk yang mendekati kadaluwarsa.
-              </td>
-            </tr>
-            <tr
-              v-for="item in analyticsData.expiring_batches"
-              :key="item.id"
-            >
-              <td>
-                <div class="d-flex align-center">
-                  <VAvatar
-                    variant="tonal"
-                    color="error"
-                    class="me-3"
-                    size="34"
-                  >
-                    <VIcon
-                      icon="ri-time-line"
-                      size="20"
-                    />
-                  </VAvatar>
-                  <div class="d-flex flex-column">
-                    <h6 class="text-h6 font-weight-medium user-list-name">
-                      {{ item.product_branch?.product?.name }}
-                    </h6>
-                    <span class="text-sm text-medium-emphasis">Batch ID: #{{ item.id }} (Masuk: {{ new Date(item.entry_date).toLocaleDateString('id-ID') }})</span>
-                  </div>
-                </div>
-              </td>
-              <td class="text-center">
-                {{ item.product_branch?.branch?.name }}
-              </td>
-              <td class="text-center font-weight-bold">
-                {{ item.qty }}
-              </td>
-              <td class="text-center font-weight-bold text-error">
-                {{ new Date(item.expiration_date).toLocaleDateString('id-ID') }}
-              </td>
-            </tr>
-          </tbody>
-        </VTable>
-        <VDivider />
-        <VCardActions>
-          <VBtn block variant="text" to="/laporan/stok-aging" color="primary">Buka Laporan Analisis Stok</VBtn>
-        </VCardActions>
-      </VCard>
-    </VCol>
-
-    <!-- 👉 Dead Stock Table (FIFO) -->
-    <VCol
-      cols="12"
-      md="6"
-    >
-      <VCard
-        title="🐌 Peringatan Dead Stock (FIFO)"
-        subtitle="Stok lama mengendap > 90 hari"
-      >
-        <VTable class="text-no-wrap">
-          <thead>
-            <tr>
-              <th class="text-uppercase">Produk</th>
-              <th class="text-uppercase text-center">Cabang</th>
-              <th class="text-uppercase text-center">Tgl Masuk</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="analyticsData.dead_stock && analyticsData.dead_stock.length === 0">
-              <td colspan="3" class="text-center text-medium-emphasis">
-                Tidak ada stok usang yang terdeteksi.
-              </td>
-            </tr>
-            <tr v-for="item in analyticsData.dead_stock" :key="item.id">
-              <td>
-                <div class="d-flex flex-column">
-                  <h6 class="text-h6 font-weight-medium">{{ item.product_branch?.product?.name }}</h6>
-                  <span class="text-sm text-medium-emphasis">Sisa: {{ item.qty }} pcs</span>
-                </div>
-              </td>
-              <td class="text-center">{{ item.product_branch?.branch?.name }}</td>
-              <td class="text-center font-weight-bold text-error">
-                {{ new Date(item.entry_date).toLocaleDateString('id-ID') }}
-              </td>
-            </tr>
-          </tbody>
-        </VTable>
-        <VDivider />
-        <VCardActions>
-          <VBtn block variant="text" to="/laporan/stok-aging" color="primary">Analisis Selengkapnya</VBtn>
-        </VCardActions>
-      </VCard>
-    </VCol>
-
-    <!-- 👉 New Stock Table (LIFO) -->
-    <VCol
-      cols="12"
-      md="6"
-    >
-      <VCard
-        title="✨ Stok Baru Masuk (LIFO)"
-        subtitle="Batch produk yang baru ditambahkan"
-      >
-        <VTable class="text-no-wrap">
-          <thead>
-            <tr>
-              <th class="text-uppercase">Produk</th>
-              <th class="text-uppercase text-center">Cabang</th>
-              <th class="text-uppercase text-center">Tgl Masuk</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="analyticsData.new_stock && analyticsData.new_stock.length === 0">
-              <td colspan="3" class="text-center text-medium-emphasis">
-                Belum ada produk baru.
-              </td>
-            </tr>
-            <tr v-for="item in analyticsData.new_stock" :key="item.id">
-              <td>
-                <div class="d-flex flex-column">
-                  <h6 class="text-h6 font-weight-medium">{{ item.product_branch?.product?.name }}</h6>
-                  <span class="text-sm text-medium-emphasis">Sisa: {{ item.qty }} pcs</span>
-                </div>
-              </td>
-              <td class="text-center">{{ item.product_branch?.branch?.name }}</td>
-              <td class="text-center font-weight-bold text-success">
-                {{ new Date(item.entry_date).toLocaleDateString('id-ID') }}
-              </td>
-            </tr>
-          </tbody>
-        </VTable>
-        <VDivider />
-        <VCardActions>
-          <VBtn block variant="text" to="/laporan/stok-aging" color="primary">Analisis Selengkapnya</VBtn>
-        </VCardActions>
-      </VCard>
-    </VCol>
-    
-    <!-- 👉 Row of 4 stats: Piutang, Retur, Yearly Income, Opname -->
-    <VCol cols="12">
-      <VRow>
-        <!-- 👉 Outstanding Receivables -->
-        <VCol
-          cols="12"
-          md="3"
-        >
-          <VCard>
-            <VCardText class="d-flex align-center justify-space-between pb-4">
-              <div>
-                <h6 class="text-h6 font-weight-medium mb-1">
-                  Total Piutang
-                </h6>
-                <h4 class="text-h4 text-warning">
-                  {{ formatCurrency(analyticsData.receivables.outstanding) }}
-                </h4>
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-secondary">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-secondary font-weight-bold">SELISIH OPNAME TERAKHIR</div>
+              <div class="text-h4 font-weight-bold text-secondary mt-1">
+                {{ analyticsData.latest_opname ? analyticsData.latest_opname.total_discrepancy : '0' }} <span class="text-caption text-medium-emphasis">Pcs</span>
               </div>
-              <VAvatar
-                color="warning"
-                variant="tonal"
-                rounded
-                size="42"
-              >
-                <VIcon
-                  icon="ri-hand-coin-line"
-                  size="26"
-                />
-              </VAvatar>
-            </VCardText>
-          </VCard>
-        </VCol>
+            </div>
+            <VAvatar color="secondary" variant="tonal" rounded size="46">
+              <VIcon icon="ri-survey-line" size="26" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">
+            {{ analyticsData.latest_opname ? ('Audit ' + new Date(analyticsData.latest_opname.date).toLocaleDateString('id-ID')) : 'Belum ada data opname' }}
+          </div>
+        </VCard>
+      </VCol>
+    </VRow>
 
-        <!-- 👉 Monthly Returns -->
-        <VCol
-          cols="12"
-          md="3"
-        >
-          <VCard>
-            <VCardText class="d-flex align-center justify-space-between pb-4">
-              <div>
-                <h6 class="text-h6 font-weight-medium mb-1">
-                  Retur Bulan Ini
-                </h6>
-                <h4 class="text-h4 text-error">
-                  {{ formatCurrency(analyticsData.returns.monthly) }}
-                </h4>
-              </div>
-              <VAvatar
-                color="error"
-                variant="tonal"
-                rounded
-                size="42"
-              >
-                <VIcon
-                  icon="ri-arrow-go-back-line"
-                  size="26"
-                />
+    <!-- Row: Low Stock & Expiring Batches -->
+    <VRow class="mb-4">
+      <!-- Low Stock Table -->
+      <VCol cols="12" md="6">
+        <VCard elevation="2" class="h-100 d-flex flex-column">
+          <VCardItem class="pb-2">
+            <template #prepend>
+              <VAvatar color="warning" variant="tonal" size="36" class="me-2">
+                <VIcon icon="ri-alarm-warning-line" size="20" />
               </VAvatar>
-            </VCardText>
-          </VCard>
-        </VCol>
-        
-        <!-- 👉 Total Yearly Income -->
-        <VCol
-          cols="12"
-          md="3"
-        >
-          <VCard>
-            <VCardText class="d-flex align-center justify-space-between pb-4">
-              <div>
-                <h6 class="text-h6 font-weight-medium mb-1">
-                  Pendapatan Tahun Ini
-                </h6>
-                <h4 class="text-h4 text-info">
-                  {{ formatCurrency(analyticsData.income.yearly) }}
-                </h4>
-              </div>
-              <VAvatar
-                color="info"
-                variant="tonal"
-                rounded
-                size="42"
-              >
-                <VIcon
-                  icon="ri-bank-line"
-                  size="26"
-                />
-              </VAvatar>
-            </VCardText>
-          </VCard>
-        </VCol>
+            </template>
+            <VCardTitle class="text-h6 font-weight-bold">Peringatan Stok Menipis</VCardTitle>
+            <VCardSubtitle>Produk yang sisa stoknya kritis (&le; 10 unit)</VCardSubtitle>
+          </VCardItem>
+          <VDivider />
 
-        <!-- 👉 Stock Opname Selisih -->
-        <VCol
-          cols="12"
-          md="3"
-        >
-          <VCard v-if="analyticsData.latest_opname">
-            <VCardText class="d-flex align-center justify-space-between pb-4">
-              <div>
-                <h6 class="text-h6 font-weight-medium mb-1">
-                  Selisih Opname
-                </h6>
-                <h4 class="text-h4 text-secondary">
-                  {{ analyticsData.latest_opname.total_discrepancy }}
-                </h4>
-                <div class="text-caption text-medium-emphasis">
-                  {{ new Date(analyticsData.latest_opname.date).toLocaleDateString('id-ID') }}
-                </div>
-              </div>
-              <VAvatar
-                color="secondary"
-                variant="tonal"
-                rounded
-                size="42"
-              >
-                <VIcon
-                  icon="ri-survey-line"
-                  size="26"
-                />
+          <VTable class="text-no-wrap" hover density="comfortable">
+            <thead>
+              <tr class="bg-grey-50">
+                <th class="text-left font-weight-bold">PRODUK</th>
+                <th class="text-center font-weight-bold">CABANG</th>
+                <th class="text-center font-weight-bold">SISA STOK</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="analyticsData.low_stock.length === 0">
+                <td colspan="3" class="text-center text-medium-emphasis py-6">
+                  <VIcon icon="ri-checkbox-circle-line" color="success" size="18" class="me-1" />
+                  Semua stok produk aman.
+                </td>
+              </tr>
+              <tr v-for="item in analyticsData.low_stock" :key="item.id">
+                <td>
+                  <div class="font-weight-medium text-subtitle-2">{{ item.product?.name || '-' }}</div>
+                  <div class="text-caption text-disabled"><code>{{ item.product?.sku || '-' }}</code></div>
+                </td>
+                <td class="text-center">
+                  <VChip size="x-small" variant="tonal" color="secondary">{{ item.branch?.name || '-' }}</VChip>
+                </td>
+                <td class="text-center">
+                  <VChip size="small" variant="elevated" color="error" class="font-weight-bold">
+                    {{ item.stock }} unit
+                  </VChip>
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+
+          <VSpacer />
+          <VDivider />
+          <VCardActions class="pa-2">
+            <VBtn block variant="text" to="/inventori-cabang" color="primary" append-icon="ri-arrow-right-line">
+              Lihat Semua Data Stok
+            </VBtn>
+          </VCardActions>
+        </VCard>
+      </VCol>
+
+      <!-- Expiring Batches (FEFO) Table -->
+      <VCol cols="12" md="6">
+        <VCard elevation="2" class="h-100 d-flex flex-column">
+          <VCardItem class="pb-2">
+            <template #prepend>
+              <VAvatar color="error" variant="tonal" size="36" class="me-2">
+                <VIcon icon="ri-time-line" size="20" />
               </VAvatar>
-            </VCardText>
-          </VCard>
-          <VCard v-else>
-            <VCardText class="d-flex align-center justify-space-between pb-4">
-              <div>
-                <h6 class="text-h6 font-weight-medium mb-1">
-                  Selisih Opname
-                </h6>
-                <h4 class="text-h4 text-secondary">
-                  -
-                </h4>
-              </div>
-              <VAvatar
-                color="secondary"
-                variant="tonal"
-                rounded
-                size="42"
-              >
-                <VIcon
-                  icon="ri-survey-line"
-                  size="26"
-                />
+            </template>
+            <VCardTitle class="text-h6 font-weight-bold">Barang Segera Kedaluwarsa (FEFO)</VCardTitle>
+            <VCardSubtitle>Batch produk yang akan expired dalam 30 hari</VCardSubtitle>
+          </VCardItem>
+          <VDivider />
+
+          <VTable class="text-no-wrap" hover density="comfortable">
+            <thead>
+              <tr class="bg-grey-50">
+                <th class="text-left font-weight-bold">PRODUK</th>
+                <th class="text-center font-weight-bold">CABANG</th>
+                <th class="text-center font-weight-bold">SISA QTY</th>
+                <th class="text-center font-weight-bold">TGL EXPIRED</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="analyticsData.expiring_batches.length === 0">
+                <td colspan="4" class="text-center text-medium-emphasis py-6">
+                  <VIcon icon="ri-checkbox-circle-line" color="success" size="18" class="me-1" />
+                  Tidak ada produk yang mendekati kedaluwarsa.
+                </td>
+              </tr>
+              <tr v-for="item in analyticsData.expiring_batches" :key="item.id">
+                <td>
+                  <div class="font-weight-medium text-subtitle-2">{{ item.product_branch?.product?.name || '-' }}</div>
+                  <div class="text-caption text-disabled">Batch #{{ item.id }}</div>
+                </td>
+                <td class="text-center">
+                  <VChip size="x-small" variant="tonal" color="secondary">{{ item.product_branch?.branch?.name || '-' }}</VChip>
+                </td>
+                <td class="text-center font-weight-bold">{{ item.qty }}</td>
+                <td class="text-center">
+                  <VChip size="small" variant="elevated" color="error" class="font-weight-bold">
+                    {{ new Date(item.expiration_date).toLocaleDateString('id-ID') }}
+                  </VChip>
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+
+          <VSpacer />
+          <VDivider />
+          <VCardActions class="pa-2">
+            <VBtn block variant="text" to="/laporan/stok-aging" color="error" append-icon="ri-arrow-right-line">
+              Buka Analisis Usia Stok
+            </VBtn>
+          </VCardActions>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- Row: Dead Stock (FIFO) & New Stock (LIFO) -->
+    <VRow>
+      <!-- Dead Stock Table (FIFO) -->
+      <VCol cols="12" md="6">
+        <VCard elevation="2" class="h-100 d-flex flex-column">
+          <VCardItem class="pb-2">
+            <template #prepend>
+              <VAvatar color="warning" variant="tonal" size="36" class="me-2">
+                <VIcon icon="ri-history-line" size="20" />
               </VAvatar>
-            </VCardText>
-          </VCard>
-        </VCol>
-      </VRow>
-    </VCol>
-  </VRow>
+            </template>
+            <VCardTitle class="text-h6 font-weight-bold">Peringatan Dead Stock (FIFO)</VCardTitle>
+            <VCardSubtitle>Stok lama mengendap di gudang &gt; 90 hari</VCardSubtitle>
+          </VCardItem>
+          <VDivider />
+
+          <VTable class="text-no-wrap" hover density="comfortable">
+            <thead>
+              <tr class="bg-grey-50">
+                <th class="text-left font-weight-bold">PRODUK</th>
+                <th class="text-center font-weight-bold">CABANG</th>
+                <th class="text-center font-weight-bold">TGL MASUK</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="analyticsData.dead_stock && analyticsData.dead_stock.length === 0">
+                <td colspan="3" class="text-center text-medium-emphasis py-6">
+                  <VIcon icon="ri-checkbox-circle-line" color="success" size="18" class="me-1" />
+                  Tidak ada stok usang yang terdeteksi.
+                </td>
+              </tr>
+              <tr v-for="item in analyticsData.dead_stock" :key="item.id">
+                <td>
+                  <div class="font-weight-medium text-subtitle-2">{{ item.product_branch?.product?.name }}</div>
+                  <div class="text-caption text-disabled">Sisa: {{ item.qty }} pcs</div>
+                </td>
+                <td class="text-center">
+                  <VChip size="x-small" variant="tonal" color="secondary">{{ item.product_branch?.branch?.name }}</VChip>
+                </td>
+                <td class="text-center">
+                  <VChip size="small" variant="tonal" color="warning" class="font-weight-bold">
+                    {{ new Date(item.entry_date).toLocaleDateString('id-ID') }}
+                  </VChip>
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+
+          <VSpacer />
+          <VDivider />
+          <VCardActions class="pa-2">
+            <VBtn block variant="text" to="/laporan/stok-aging" color="warning" append-icon="ri-arrow-right-line">
+              Analisis Stok FIFO
+            </VBtn>
+          </VCardActions>
+        </VCard>
+      </VCol>
+
+      <!-- New Stock Table (LIFO) -->
+      <VCol cols="12" md="6">
+        <VCard elevation="2" class="h-100 d-flex flex-column">
+          <VCardItem class="pb-2">
+            <template #prepend>
+              <VAvatar color="info" variant="tonal" size="36" class="me-2">
+                <VIcon icon="ri-inbox-unarchive-line" size="20" />
+              </VAvatar>
+            </template>
+            <VCardTitle class="text-h6 font-weight-bold">Stok Baru Masuk (LIFO)</VCardTitle>
+            <VCardSubtitle>Batch produk yang baru ditambahkan ke gudang</VCardSubtitle>
+          </VCardItem>
+          <VDivider />
+
+          <VTable class="text-no-wrap" hover density="comfortable">
+            <thead>
+              <tr class="bg-grey-50">
+                <th class="text-left font-weight-bold">PRODUK</th>
+                <th class="text-center font-weight-bold">CABANG</th>
+                <th class="text-center font-weight-bold">TGL MASUK</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="analyticsData.new_stock && analyticsData.new_stock.length === 0">
+                <td colspan="3" class="text-center text-medium-emphasis py-6">
+                  Belum ada produk baru masuk.
+                </td>
+              </tr>
+              <tr v-for="item in analyticsData.new_stock" :key="item.id">
+                <td>
+                  <div class="font-weight-medium text-subtitle-2">{{ item.product_branch?.product?.name }}</div>
+                  <div class="text-caption text-disabled">Sisa: {{ item.qty }} pcs</div>
+                </td>
+                <td class="text-center">
+                  <VChip size="x-small" variant="tonal" color="secondary">{{ item.product_branch?.branch?.name }}</VChip>
+                </td>
+                <td class="text-center">
+                  <VChip size="small" variant="tonal" color="info" class="font-weight-bold">
+                    {{ new Date(item.entry_date).toLocaleDateString('id-ID') }}
+                  </VChip>
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+
+          <VSpacer />
+          <VDivider />
+          <VCardActions class="pa-2">
+            <VBtn block variant="text" to="/laporan/stok-aging" color="info" append-icon="ri-arrow-right-line">
+              Analisis Stok LIFO
+            </VBtn>
+          </VCardActions>
+        </VCard>
+      </VCol>
+    </VRow>
+  </div>
 </template>
 
 <style lang="scss">

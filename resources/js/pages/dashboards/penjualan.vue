@@ -24,8 +24,7 @@ const isLoading = ref(true)
 const fetchBranches = async () => {
   try {
     const data = await $api('/apps/branches?simple=true')
-
-    branches.value = [{ id: 'all', name: 'Semua Cabang' }, ...data]
+    branches.value = [{ id: 'all', name: 'Semua Cabang Toko' }, ...data]
   } catch (error) {
     console.error('Error fetching branches:', error)
   }
@@ -65,14 +64,12 @@ const formatCurrency = value => {
 const getGrowthColor = growth => {
   if (growth > 0) return 'success'
   if (growth < 0) return 'error'
-  
   return 'secondary'
 }
 
 const getGrowthIcon = growth => {
   if (growth > 0) return 'ri-arrow-up-line'
   if (growth < 0) return 'ri-arrow-down-line'
-  
   return 'ri-subtract-line'
 }
 
@@ -83,15 +80,27 @@ const chartOptions = computed(() => {
       type: 'area',
       parentHeightOffset: 0,
       toolbar: { show: false },
+      zoom: { enabled: false },
     },
     colors: [theme.current.value.colors.primary, theme.current.value.colors.success],
     dataLabels: { enabled: false },
-    stroke: { curve: 'smooth', width: 2 },
+    stroke: { curve: 'smooth', width: 2.5 },
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 0.8,
+        opacityFrom: 0.45,
+        opacityTo: 0.05,
+        stops: [0, 95, 100],
+      },
+    },
     xaxis: {
       categories: analyticsData.value.chart.map(item => item.date),
       labels: {
         style: { colors: theme.current.value.colors['on-surface'] },
       },
+      axisBorder: { show: false },
+      axisTicks: { show: false },
     },
     yaxis: {
       labels: {
@@ -102,6 +111,7 @@ const chartOptions = computed(() => {
       },
     },
     tooltip: {
+      theme: theme.current.value.dark ? 'dark' : 'light',
       y: {
         formatter: function (val) {
           return formatCurrency(val)
@@ -110,12 +120,13 @@ const chartOptions = computed(() => {
     },
     legend: {
       position: 'top',
-      horizontalAlign: 'left',
+      horizontalAlign: 'right',
       labels: { colors: theme.current.value.colors['on-surface'] },
     },
     grid: {
       borderColor: theme.current.value.colors['border-color'],
       strokeDashArray: 4,
+      xaxis: { lines: { show: false } },
     },
   }
 })
@@ -123,11 +134,11 @@ const chartOptions = computed(() => {
 const chartSeries = computed(() => {
   return [
     {
-      name: 'Pendapatan',
+      name: 'Total Omzet (Revenue)',
       data: analyticsData.value.chart.map(item => item.revenue),
     },
     {
-      name: 'Keuntungan',
+      name: 'Laba Bersih (Net Profit)',
       data: analyticsData.value.chart.map(item => item.profit),
     },
   ]
@@ -135,198 +146,160 @@ const chartSeries = computed(() => {
 </script>
 
 <template>
-  <div>
-    <div class="d-flex justify-space-between align-center mb-6">
-      <h4 class="text-h4 font-weight-bold">
-        Dashboard Penjualan
-      </h4>
-      <div class="d-flex gap-4">
-        <div
+  <div class="pa-4">
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-center justify-space-between mb-4 gap-4">
+      <div>
+        <h2 class="text-h4 font-weight-bold mb-1">
+          Dashboard Analisis Penjualan
+        </h2>
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          Metrik pertumbuhan performa omzet penjualan, volume transaksi, dan laba kotor toko.
+        </p>
+      </div>
+
+      <!-- Controls -->
+      <div class="d-flex flex-wrap align-center gap-3">
+        <VAutocomplete
           v-if="branches.length > 1"
-          style="width: 200px;"
+          v-model="selectedBranch"
+          :items="branches"
+          item-title="name"
+          item-value="id"
+          density="compact"
+          variant="outlined"
+          placeholder="Semua Cabang Toko"
+          label="Pilih Cabang"
+          style="min-width: 220px; max-width: 260px;"
+          hide-details
+        />
+
+        <VBtnToggle
+          v-model="period"
+          mandatory
+          density="compact"
+          color="primary"
+          variant="tonal"
+          divided
+          rounded="lg"
+          class="border"
         >
-          <VSelect
-            v-model="selectedBranch"
-            :items="branches"
-            item-title="name"
-            item-value="id"
-            density="compact"
-            hide-details
-            variant="outlined"
-            bg-color="surface"
-          />
-        </div>
-        <div style="width: 200px;">
-          <VSelect
-            v-model="period"
-            :items="[
-              { title: 'Harian (7 Hari Terakhir)', value: 'daily' },
-              { title: 'Bulanan (6 Bulan Terakhir)', value: 'monthly' },
-              { title: 'Tahunan (5 Tahun Terakhir)', value: 'yearly' }
-            ]"
-            density="compact"
-            hide-details
-            variant="outlined"
-            bg-color="surface"
-          />
-        </div>
+          <VBtn value="daily" class="px-4 text-none font-weight-medium" style="min-width: 90px;">
+            7 Hari
+          </VBtn>
+          <VBtn value="monthly" class="px-4 text-none font-weight-medium" style="min-width: 90px;">
+            6 Bulan
+          </VBtn>
+          <VBtn value="yearly" class="px-4 text-none font-weight-medium" style="min-width: 90px;">
+            5 Tahun
+          </VBtn>
+        </VBtnToggle>
       </div>
     </div>
 
-    <!-- Summary Cards -->
-    <VRow>
-      <VCol
-        cols="12"
-        md="4"
-      >
-        <VCard :loading="isLoading">
-          <VCardText class="d-flex align-center justify-space-between pb-4">
+    <!-- Summary KPI Cards -->
+    <VRow class="mb-4">
+      <VCol cols="12" sm="6" md="4">
+        <VCard elevation="2" class="pa-4 border-s-lg border-primary" :loading="isLoading">
+          <div class="d-flex align-center justify-space-between">
             <div>
-              <h6 class="text-h6 font-weight-medium mb-1">
-                Total Transaksi
-              </h6>
-              <h3 class="text-h3 text-primary">
-                {{ analyticsData.summary.sales.value }}
-              </h3>
-              <div class="d-flex align-center mt-1">
-                <VIcon
-                  :icon="getGrowthIcon(analyticsData.summary.sales.growth)"
+              <div class="text-caption text-medium-emphasis font-weight-medium">VOLUME TRANSAKSI</div>
+              <div class="text-h4 font-weight-bold text-primary mt-1">{{ analyticsData.summary.sales.value.toLocaleString('id-ID') }} <span class="text-caption text-medium-emphasis">Struk</span></div>
+              <div class="d-flex align-center mt-2">
+                <VChip
                   :color="getGrowthColor(analyticsData.summary.sales.growth)"
-                  size="18"
-                  class="me-1"
-                />
-                <span
-                  class="text-sm font-weight-medium"
-                  :class="`text-${getGrowthColor(analyticsData.summary.sales.growth)}`"
+                  size="x-small"
+                  variant="tonal"
+                  class="font-weight-bold me-1"
                 >
+                  <VIcon :icon="getGrowthIcon(analyticsData.summary.sales.growth)" size="14" class="me-1" />
                   {{ Math.abs(analyticsData.summary.sales.growth) }}%
-                </span>
-                <span class="text-sm text-medium-emphasis ms-1">vs periode lalu</span>
+                </VChip>
+                <span class="text-caption text-medium-emphasis">vs periode sebelumnya</span>
               </div>
             </div>
-            <VAvatar
-              color="primary"
-              variant="tonal"
-              rounded
-              size="50"
-            >
-              <VIcon
-                icon="ri-shopping-cart-2-line"
-                size="32"
-              />
+            <VAvatar color="primary" variant="tonal" size="48">
+              <VIcon icon="ri-shopping-cart-2-line" size="26" />
             </VAvatar>
-          </VCardText>
+          </div>
         </VCard>
       </VCol>
 
-      <VCol
-        cols="12"
-        md="4"
-      >
-        <VCard :loading="isLoading">
-          <VCardText class="d-flex align-center justify-space-between pb-4">
+      <VCol cols="12" sm="6" md="4">
+        <VCard elevation="2" class="pa-4 border-s-lg border-info" :loading="isLoading">
+          <div class="d-flex align-center justify-space-between">
             <div>
-              <h6 class="text-h6 font-weight-medium mb-1">
-                Pendapatan
-              </h6>
-              <h3 class="text-h3 text-info">
-                {{ formatCurrency(analyticsData.summary.revenue.value) }}
-              </h3>
-              <div class="d-flex align-center mt-1">
-                <VIcon
-                  :icon="getGrowthIcon(analyticsData.summary.revenue.growth)"
+              <div class="text-caption text-medium-emphasis font-weight-medium">TOTAL PENDAPATAN (OMZET)</div>
+              <div class="text-h4 font-weight-bold text-info mt-1">{{ formatCurrency(analyticsData.summary.revenue.value) }}</div>
+              <div class="d-flex align-center mt-2">
+                <VChip
                   :color="getGrowthColor(analyticsData.summary.revenue.growth)"
-                  size="18"
-                  class="me-1"
-                />
-                <span
-                  class="text-sm font-weight-medium"
-                  :class="`text-${getGrowthColor(analyticsData.summary.revenue.growth)}`"
+                  size="x-small"
+                  variant="tonal"
+                  class="font-weight-bold me-1"
                 >
+                  <VIcon :icon="getGrowthIcon(analyticsData.summary.revenue.growth)" size="14" class="me-1" />
                   {{ Math.abs(analyticsData.summary.revenue.growth) }}%
-                </span>
-                <span class="text-sm text-medium-emphasis ms-1">vs periode lalu</span>
+                </VChip>
+                <span class="text-caption text-medium-emphasis">vs periode sebelumnya</span>
               </div>
             </div>
-            <VAvatar
-              color="info"
-              variant="tonal"
-              rounded
-              size="50"
-            >
-              <VIcon
-                icon="ri-wallet-3-line"
-                size="32"
-              />
+            <VAvatar color="info" variant="tonal" size="48">
+              <VIcon icon="ri-wallet-3-line" size="26" />
             </VAvatar>
-          </VCardText>
+          </div>
         </VCard>
       </VCol>
 
-      <VCol
-        cols="12"
-        md="4"
-      >
-        <VCard :loading="isLoading">
-          <VCardText class="d-flex align-center justify-space-between pb-4">
+      <VCol cols="12" sm="6" md="4">
+        <VCard elevation="2" class="pa-4 border-s-lg border-success" :loading="isLoading">
+          <div class="d-flex align-center justify-space-between">
             <div>
-              <h6 class="text-h6 font-weight-medium mb-1">
-                Keuntungan Bersih
-              </h6>
-              <h3 class="text-h3 text-success">
-                {{ formatCurrency(analyticsData.summary.profit.value) }}
-              </h3>
-              <div class="d-flex align-center mt-1">
-                <VIcon
-                  :icon="getGrowthIcon(analyticsData.summary.profit.growth)"
+              <div class="text-caption text-medium-emphasis font-weight-medium">LABA BERSIH (NET PROFIT)</div>
+              <div class="text-h4 font-weight-bold text-success mt-1">{{ formatCurrency(analyticsData.summary.profit.value) }}</div>
+              <div class="d-flex align-center mt-2">
+                <VChip
                   :color="getGrowthColor(analyticsData.summary.profit.growth)"
-                  size="18"
-                  class="me-1"
-                />
-                <span
-                  class="text-sm font-weight-medium"
-                  :class="`text-${getGrowthColor(analyticsData.summary.profit.growth)}`"
+                  size="x-small"
+                  variant="tonal"
+                  class="font-weight-bold me-1"
                 >
+                  <VIcon :icon="getGrowthIcon(analyticsData.summary.profit.growth)" size="14" class="me-1" />
                   {{ Math.abs(analyticsData.summary.profit.growth) }}%
-                </span>
-                <span class="text-sm text-medium-emphasis ms-1">vs periode lalu</span>
+                </VChip>
+                <span class="text-caption text-medium-emphasis">vs periode sebelumnya</span>
               </div>
             </div>
-            <VAvatar
-              color="success"
-              variant="tonal"
-              rounded
-              size="50"
-            >
-              <VIcon
-                icon="ri-money-dollar-circle-line"
-                size="32"
-              />
+            <VAvatar color="success" variant="tonal" size="48">
+              <VIcon icon="ri-money-dollar-circle-line" size="26" />
             </VAvatar>
-          </VCardText>
+          </div>
         </VCard>
       </VCol>
     </VRow>
 
     <!-- Chart -->
-    <VRow class="mt-4">
-      <VCol cols="12">
-        <VCard
-          title="📈 Tren Pendapatan & Keuntungan"
-          subtitle="Pergerakan performa finansial berdasarkan periode yang dipilih"
-          :loading="isLoading"
-        >
-          <VCardText>
-            <VueApexCharts
-              type="area"
-              height="400"
-              :options="chartOptions"
-              :series="chartSeries"
-            />
-          </VCardText>
-        </VCard>
-      </VCol>
-    </VRow>
+    <VCard elevation="2" :loading="isLoading">
+      <VCardItem class="pb-2">
+        <template #prepend>
+          <VAvatar color="primary" variant="tonal" size="36" class="me-2">
+            <VIcon icon="ri-line-chart-line" size="20" />
+          </VAvatar>
+        </template>
+        <VCardTitle class="text-h6 font-weight-bold">Grafik Tren Omzet vs Keuntungan</VCardTitle>
+        <VCardSubtitle>Visualisasi komparatif pendapatan kotor dan laba bersih per siklus waktu</VCardSubtitle>
+      </VCardItem>
+      <VDivider />
+
+      <VCardText class="pt-4">
+        <VueApexCharts
+          type="area"
+          height="380"
+          :options="chartOptions"
+          :series="chartSeries"
+        />
+      </VCardText>
+    </VCard>
   </div>
 </template>
 

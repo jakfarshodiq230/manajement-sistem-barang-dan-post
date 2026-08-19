@@ -60,56 +60,62 @@ class ReportController extends Controller
         }
 
         foreach ($productBranches as $pb) {
-            // Get all movements up to the end date
-            $movements = StockMovement::where('product_branch_id', $pb->id)
-                ->where('created_at', '<=', $end)
+            // Calculate movements after the period to find ending stock at $end
+            $movementsAfter = StockMovement::where('product_branch_id', $pb->id)
+                ->where('created_at', '>', $end)
                 ->get();
 
-            // Calculate initial stock (before start date)
-            $initialStock = 0;
-            $movementsBeforeStart = $movements->where('created_at', '<', $start);
-            foreach ($movementsBeforeStart as $mov) {
-                if ($mov->type === 'in') {
-                    $initialStock += $mov->quantity;
-                } else if ($mov->type === 'out') {
-                    $initialStock -= $mov->quantity;
+            $netAfter = 0;
+            foreach ($movementsAfter as $m) {
+                if ($m->type === 'in') {
+                    $netAfter += $m->quantity;
+                } else if ($m->type === 'out') {
+                    $netAfter -= $m->quantity;
                 }
             }
+            $stockAtEnd = (int) $pb->stock - $netAfter;
 
             // Group movements during the period by date
-            $movementsDuring = $movements->where('created_at', '>=', $start);
+            $movementsDuring = StockMovement::where('product_branch_id', $pb->id)
+                ->whereBetween('created_at', [$start, $end])
+                ->get();
             
             $dailyData = [];
             foreach ($dateRanges as $date) {
                 $dailyData[$date] = ['in' => 0, 'out' => 0];
             }
 
-            $currentStock = $initialStock;
-            
+            $netDuring = 0;
             foreach ($movementsDuring as $mov) {
                 $movDate = $mov->created_at->format('Y-m-d');
                 if (isset($dailyData[$movDate])) {
                     if ($mov->type === 'in') {
-                        $dailyData[$movDate]['in'] += $mov->quantity;
-                        $currentStock += $mov->quantity;
+                        $dailyData[$movDate]['in'] += (int) $mov->quantity;
+                        $netDuring += (int) $mov->quantity;
                     } else if ($mov->type === 'out') {
-                        $dailyData[$movDate]['out'] += $mov->quantity;
-                        $currentStock -= $mov->quantity;
+                        $dailyData[$movDate]['out'] += (int) $mov->quantity;
+                        $netDuring -= (int) $mov->quantity;
                     }
                 }
             }
 
+            $initialStock = $stockAtEnd - $netDuring;
+            if ($initialStock < 0) {
+                $initialStock = 0;
+            }
+
             $report[] = [
                 'id' => $pb->id,
-                'kode_barang' => $pb->product->sku,
-                'nama_barang' => $pb->product->name,
+                'kode_barang' => $pb->product->sku ?? '-',
+                'nama_barang' => $pb->product->name ?? 'Produk',
+                'brand' => $pb->product->brand ?? '-',
                 'kategori' => $pb->product->category->name ?? '-',
                 'cabang' => $pb->branch->name ?? '-',
-                'harga_barang' => $pb->price,
-                'stok_awal' => $initialStock,
+                'harga_barang' => (float) ($pb->price ?? 0),
+                'stok_awal' => (int) $initialStock,
                 'harian' => $dailyData,
-                'sisa_stok' => $currentStock, // Should match $pb->stock conceptually if up to today
-                'nilai_persediaan_akhir' => $currentStock * $pb->price,
+                'sisa_stok' => (int) $stockAtEnd,
+                'nilai_persediaan_akhir' => (float) ($stockAtEnd * ($pb->price ?? 0)),
             ];
         }
 
@@ -149,8 +155,21 @@ class ReportController extends Controller
             });
         }
 
+        $allQuery = clone $query;
+        $allProducts = $allQuery->get();
+        $totalStock = $allProducts->sum('stock');
+        $totalAssetValue = $allProducts->sum(function($pb) { return $pb->stock * $pb->price; });
+        $lowStockCount = $allProducts->filter(function($pb) { return $pb->stock <= 5; })->count();
+
+        $summary = [
+            'total_items' => $allProducts->count(),
+            'total_stock' => (int) $totalStock,
+            'total_asset_value' => (float) $totalAssetValue,
+            'total_low_stock' => $lowStockCount,
+        ];
+
         if ($itemsPerPage == -1) {
-            $productBranches = $query->get();
+            $productBranches = $allProducts;
             $paginated = null;
         } else {
             $paginated = $query->paginate($itemsPerPage);
@@ -160,17 +179,21 @@ class ReportController extends Controller
         $report = $productBranches->map(function ($pb) {
             return [
                 'id' => $pb->id,
-                'kode_barang' => $pb->product->sku,
-                'nama_barang' => $pb->product->name,
+                'kode_barang' => $pb->product->sku ?? '-',
+                'nama_barang' => $pb->product->name ?? '-',
+                'brand' => $pb->product->brand ?? '-',
                 'kategori' => $pb->product->category->name ?? '-',
                 'cabang' => $pb->branch->name ?? '-',
-                'sisa_stok' => $pb->stock,
-                'harga_jual' => $pb->price,
-                'nilai_aset' => $pb->stock * $pb->price,
+                'sisa_stok' => (int) $pb->stock,
+                'harga_jual' => (float) $pb->price,
+                'nilai_aset' => (float) ($pb->stock * $pb->price),
             ];
         });
 
-        $response = ['data' => $report];
+        $response = [
+            'data' => $report,
+            'summary' => $summary,
+        ];
         
         if ($paginated) {
             $response['current_page'] = $paginated->currentPage();
@@ -190,88 +213,146 @@ class ReportController extends Controller
         $startDate = $request->query('start_date', Carbon::now()->startOfMonth()->toDateString());
         $endDate = $request->query('end_date', Carbon::now()->endOfMonth()->toDateString());
         $branchId = $request->query('branch_id');
-
-        $start = Carbon::parse($startDate)->startOfDay();
-        $end = Carbon::parse($endDate)->endOfDay();
-
-        // Calculate total qty sold per product_branch
-        $salesData = DB::table('sale_items')
-            ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
-            ->whereBetween('sales.created_at', [$start, $end]);
-
-        if ($branchId) {
-            $salesData->where('sales.branch_id', $branchId);
-        }
-
-        $salesData = $salesData->select('sale_items.product_branch_id', DB::raw('SUM(sale_items.qty) as total_sold'))
-            ->groupBy('sale_items.product_branch_id')
-            ->get()
-            ->keyBy('product_branch_id');
-
+        $categoryId = $request->query('category_id');
+        $speedFilter = $request->query('speed_status'); // fast, medium, slow, dead
         $search = $request->query('search');
         $page = (int) $request->query('page', 1);
         $itemsPerPage = (int) $request->query('itemsPerPage', 15);
 
-        // Get all product branches to include those that didn't sell (Slow moving)
+        $start = Carbon::parse($startDate)->startOfDay();
+        $end = Carbon::parse($endDate)->endOfDay();
+
+        // Calculate total qty and revenue sold per product_branch
+        $salesQuery = DB::table('sale_items')
+            ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
+            ->whereBetween('sales.created_at', [$start, $end])
+            ->where('sales.status', 'completed');
+
+        if ($branchId) {
+            $salesQuery->where('sales.branch_id', $branchId);
+        }
+
+        $salesData = $salesQuery->select(
+            'sale_items.product_branch_id',
+            DB::raw('SUM(sale_items.qty) as total_sold'),
+            DB::raw('SUM(sale_items.subtotal) as total_revenue')
+        )
+        ->groupBy('sale_items.product_branch_id')
+        ->get()
+        ->keyBy('product_branch_id');
+
+        // Query product branches with product & category info
         $query = ProductBranch::with(['product.category', 'branch']);
         if ($branchId) {
             $query->where('branch_id', $branchId);
         }
+        if ($categoryId) {
+            $query->whereHas('product', function($q) use ($categoryId) {
+                $q->where('category_id', $categoryId);
+            });
+        }
         if ($search) {
             $query->whereHas('product', function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('sku', 'like', "%{$search}%");
+                  ->orWhere('sku', 'like', "%{$search}%")
+                  ->orWhere('barcode', 'like', "%{$search}%")
+                  ->orWhere('brand', 'like', "%{$search}%");
             });
         }
+
         $productBranches = $query->get();
 
-        $report = [];
+        $allReport = [];
+        $summary = [
+            'total_items' => 0,
+            'fast_moving' => 0,
+            'medium_moving' => 0,
+            'slow_moving' => 0,
+            'dead_stock' => 0,
+            'total_sales_revenue' => 0,
+            'total_idle_asset_value' => 0, // Nilai modal dead stock & slow moving
+        ];
+
         foreach ($productBranches as $pb) {
-            $totalSold = isset($salesData[$pb->id]) ? (int)$salesData[$pb->id]->total_sold : 0;
-            
-            $report[] = [
+            $soldInfo = $salesData->get($pb->id);
+            $totalSold = $soldInfo ? (int) $soldInfo->total_sold : 0;
+            $totalRevenue = $soldInfo ? (float) $soldInfo->total_revenue : 0;
+            $costPrice = (float) ($pb->cost_price ?? 0);
+            $stock = (int) ($pb->stock ?? 0);
+            $assetValue = $stock * $costPrice;
+
+            // Standar Klasifikasi FSN (Fast, Slow, Non-Moving/Dead Stock)
+            if ($totalSold >= 10) {
+                $speedCategory = 'Fast Moving';
+                $summary['fast_moving']++;
+            } elseif ($totalSold >= 2) {
+                $speedCategory = 'Medium Moving';
+                $summary['medium_moving']++;
+            } elseif ($totalSold === 1) {
+                $speedCategory = 'Slow Moving';
+                $summary['slow_moving']++;
+                $summary['total_idle_asset_value'] += $assetValue;
+            } else {
+                // totalSold === 0
+                $speedCategory = $stock > 0 ? 'Dead Stock' : 'Non-Active';
+                if ($stock > 0) {
+                    $summary['dead_stock']++;
+                    $summary['total_idle_asset_value'] += $assetValue;
+                } else {
+                    $summary['slow_moving']++;
+                }
+            }
+
+            $summary['total_sales_revenue'] += $totalRevenue;
+
+            $itemData = [
                 'id' => $pb->id,
-                'kode_barang' => $pb->product->sku,
-                'nama_barang' => $pb->product->name,
+                'kode_barang' => $pb->product->sku ?? '-',
+                'nama_barang' => $pb->product->name ?? 'Produk',
+                'brand' => $pb->product->brand ?? '-',
                 'kategori' => $pb->product->category->name ?? '-',
                 'cabang' => $pb->branch->name ?? '-',
                 'terjual' => $totalSold,
-                'sisa_stok' => $pb->stock
+                'total_omset' => $totalRevenue,
+                'sisa_stok' => $stock,
+                'cost_price' => $costPrice,
+                'nilai_aset' => $assetValue,
+                'kategori_kecepatan' => $speedCategory,
             ];
+
+            // Apply speed status filter if present
+            if ($speedFilter) {
+                if ($speedFilter === 'fast' && $speedCategory !== 'Fast Moving') continue;
+                if ($speedFilter === 'medium' && $speedCategory !== 'Medium Moving') continue;
+                if ($speedFilter === 'slow' && $speedCategory !== 'Slow Moving') continue;
+                if ($speedFilter === 'dead' && $speedCategory !== 'Dead Stock') continue;
+            }
+
+            $allReport[] = $itemData;
         }
 
-        // Sort descending by total sold
-        usort($report, function($a, $b) {
+        $summary['total_items'] = count($productBranches);
+
+        // Sort descending by total sold, then by stock
+        usort($allReport, function($a, $b) {
+            if ($b['terjual'] === $a['terjual']) {
+                return $b['sisa_stok'] <=> $a['sisa_stok'];
+            }
             return $b['terjual'] <=> $a['terjual'];
         });
 
-        // Determine fast vs slow. Let's say top 30% are fast, bottom 30% are slow, middle are average.
-        // Or simple: top 10 = fast, bottom 10 = slow.
-        $totalItems = count($report);
-        foreach ($report as $index => &$item) {
-            if ($totalItems > 0) {
-                $percentile = ($index + 1) / $totalItems;
-                if ($percentile <= 0.3) {
-                    $item['kategori_kecepatan'] = 'Fast Moving';
-                } else if ($percentile >= 0.7 || $item['terjual'] == 0) {
-                    $item['kategori_kecepatan'] = 'Slow Moving';
-                } else {
-                    $item['kategori_kecepatan'] = 'Average';
-                }
-            } else {
-                $item['kategori_kecepatan'] = 'Average';
-            }
-        }
+        $totalFiltered = count($allReport);
 
-        $total = count($report);
-        
         if ($itemsPerPage != -1) {
-            $report = array_slice($report, ($page - 1) * $itemsPerPage, $itemsPerPage);
+            $pagedData = array_slice($allReport, ($page - 1) * $itemsPerPage, $itemsPerPage);
+        } else {
+            $pagedData = $allReport;
         }
 
         return response()->json([
-            'data' => $report,
-            'total' => $total,
+            'data' => $pagedData,
+            'total' => $totalFiltered,
+            'summary' => $summary,
         ]);
     }
 
@@ -310,8 +391,11 @@ class ReportController extends Controller
             // Newest stock first (Recent arrivals)
             $query->orderBy('entry_date', 'desc');
         } elseif ($filter === 'fefo') {
-            // Expiring soon first
-            $query->whereNotNull('expiration_date')->orderBy('expiration_date', 'asc');
+            // Expiring soon first - strictly only products with valid expiration date
+            $query->whereNotNull('expiration_date')
+                ->where('expiration_date', '!=', '')
+                ->where('expiration_date', '!=', '0000-00-00')
+                ->orderBy('expiration_date', 'asc');
         } else {
             // Default sort by entry_date desc
             $query->orderBy('entry_date', 'desc');
@@ -329,41 +413,98 @@ class ReportController extends Controller
 
         $now = Carbon::now();
 
+        // Calculate summary across all active batches
+        $allBatches = (clone $query)->get();
+        $totalQty = $allBatches->sum('qty');
+        $totalAssetValue = $allBatches->sum(function($b) { return $b->qty * $b->cost_price; });
+        $expiringSoonCount = $allBatches->filter(function($b) use ($now) {
+            if (!$b->expiration_date || $b->expiration_date === '0000-00-00') return false;
+            $exp = Carbon::parse($b->expiration_date);
+            $days = $now->diffInDays($exp, false);
+            return $days <= 30; // 30 days or already expired
+        })->count();
+
+        $summary = [
+            'total_batches' => $allBatches->count(),
+            'total_qty' => (int) $totalQty,
+            'total_asset_value' => (float) $totalAssetValue,
+            'expiring_soon' => $expiringSoonCount,
+        ];
+
         $report = collect($batches)->map(function ($batch) use ($now) {
             $productBranch = $batch->productBranch;
             $product = $productBranch ? $productBranch->product : null;
             $branch = $productBranch ? $productBranch->branch : null;
 
-            // Calculate age in days
+            // Calculate age in integer days and hours
             $entryDate = Carbon::parse($batch->entry_date);
-            $ageDays = $entryDate->diffInDays($now);
+            $diffAge = $entryDate->diff($now);
+            $days = (int) $diffAge->days;
+            $hours = (int) $diffAge->h;
+            $minutes = (int) $diffAge->i;
 
-            // Calculate days to expire
+            $ageParts = [];
+            if ($days > 0) {
+                $ageParts[] = "{$days} hari";
+            }
+            if ($hours > 0) {
+                $ageParts[] = "{$hours} jam";
+            }
+            if (empty($ageParts)) {
+                $ageParts[] = $minutes > 0 ? "{$minutes} menit" : "Baru saja";
+            }
+            $umurFormat = implode(' ', $ageParts);
+
+            // Calculate days & hours to expire
             $daysToExpire = null;
-            if ($batch->expiration_date) {
+            $expiredFormat = null;
+            if ($batch->expiration_date && $batch->expiration_date !== '0000-00-00') {
                 $expDate = Carbon::parse($batch->expiration_date);
-                $daysToExpire = $now->diffInDays($expDate, false); // negative if already expired
+                $isPast = $now->greaterThan($expDate);
+                $diffExp = $now->diff($expDate);
+                $expDays = (int) $diffExp->days;
+                $expHours = (int) $diffExp->h;
+                $expMinutes = (int) $diffExp->i;
+
+                $expParts = [];
+                if ($expDays > 0) {
+                    $expParts[] = "{$expDays} hari";
+                }
+                if ($expHours > 0) {
+                    $expParts[] = "{$expHours} jam";
+                }
+                if (empty($expParts)) {
+                    $expParts[] = $expMinutes > 0 ? "{$expMinutes} menit" : "Hari ini";
+                }
+                $expLabel = implode(' ', $expParts);
+                $expiredFormat = $isPast ? "Expired ({$expLabel} lalu)" : "Sisa {$expLabel}";
+                $daysToExpire = $isPast ? -$expDays : $expDays;
             }
 
             return [
                 'id' => $batch->id,
                 'kode_barang' => $product ? $product->sku : '-',
                 'nama_barang' => $product ? $product->name : '-',
+                'brand' => $product ? ($product->brand ?? '-') : '-',
                 'kategori' => ($product && $product->category) ? $product->category->name : '-',
                 'cabang' => $branch ? $branch->name : '-',
-                'qty_sisa' => $batch->qty,
-                'harga_beli' => $batch->cost_price,
-                'nilai_aset' => $batch->qty * $batch->cost_price,
+                'qty_sisa' => (int) $batch->qty,
+                'harga_beli' => (float) $batch->cost_price,
+                'nilai_aset' => (float) ($batch->qty * $batch->cost_price),
                 'tanggal_masuk' => $batch->entry_date,
-                'umur_stok_hari' => $ageDays,
+                'umur_stok_hari' => $days,
+                'umur_sisa_jam' => $hours,
+                'umur_format' => $umurFormat,
                 'tanggal_expired' => $batch->expiration_date,
                 'sisa_hari_expired' => $daysToExpire,
+                'expired_format' => $expiredFormat,
             ];
         });
 
         $response = [
             'data' => $report,
             'total' => $total,
+            'summary' => $summary,
         ];
 
         if ($paginator) {

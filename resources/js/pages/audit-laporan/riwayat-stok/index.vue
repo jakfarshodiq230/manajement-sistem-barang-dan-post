@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import * as XLSX from 'xlsx'
 
 const data = ref([])
@@ -40,8 +40,7 @@ const years = Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - 2 
 const fetchBranches = async () => {
   try {
     const res = await $api('/apps/branches')
-
-    branches.value = res.data || res
+    branches.value = res.data || res || []
   } catch (error) {
     console.error(error)
   }
@@ -51,9 +50,7 @@ const fetchReport = async () => {
   isLoading.value = true
   try {
     const params = {}
-    if (selectedBranch.value) {
-      params.branch_id = selectedBranch.value
-    }
+    if (selectedBranch.value) params.branch_id = selectedBranch.value
     
     // Add date range based on selected month and year
     const startStr = `${selectedYear.value}-${String(selectedMonth.value).padStart(2, '0')}-01`
@@ -64,14 +61,12 @@ const fetchReport = async () => {
     params.end_date = endStr
     params.page = page.value
     params.itemsPerPage = itemsPerPage.value
-    if (search.value) {
-      params.search = search.value
-    }
+    if (search.value) params.search = search.value
 
     const res = await $api('/apps/reports/stock-history', { query: params })
 
-    dates.value = res.dates
-    data.value = res.data
+    dates.value = res.dates || []
+    data.value = res.data || []
     if (res.last_page !== undefined) {
       totalPages.value = res.last_page
       totalItems.value = res.total
@@ -88,7 +83,12 @@ const handleSearch = () => {
   searchTimeout = setTimeout(() => {
     page.value = 1
     fetchReport()
-  }, 500)
+  }, 450)
+}
+
+const onFilterChange = () => {
+  page.value = 1
+  fetchReport()
 }
 
 const exportExcel = async () => {
@@ -109,36 +109,36 @@ const exportExcel = async () => {
     if (search.value) params.search = search.value
 
     const res = await $api('/apps/reports/stock-history', { query: params })
-    const allData = res.data
-    const allDates = res.dates
+    const allData = res.data || []
+    const allDates = res.dates || []
 
     const exportData = allData.map((item, index) => {
-    const row = {
-      'No': index + 1,
-      'Kode Barang': item.kode_barang,
-      'Nama Barang': item.nama_barang,
-      'Kategori': item.kategori,
-      'Cabang': item.cabang,
-      'Harga Barang': item.harga_barang,
-      'Stok Awal': item.stok_awal,
-    }
+      const row = {
+        'No': index + 1,
+        'Kode Barang': item.kode_barang,
+        'Nama Barang': item.nama_barang,
+        'Kategori': item.kategori,
+        'Cabang': item.cabang,
+        'Harga Barang': item.harga_barang,
+        'Stok Awal': item.stok_awal,
+      }
 
-    allDates.forEach(date => {
-      row[`${formatDate(date)} (Masuk)`] = item.harian[date]?.in || 0
-      row[`${formatDate(date)} (Keluar)`] = item.harian[date]?.out || 0
+      allDates.forEach(date => {
+        row[`${formatDate(date)} (Masuk)`] = item.harian[date]?.in || 0
+        row[`${formatDate(date)} (Keluar)`] = item.harian[date]?.out || 0
+      })
+
+      row['Sisa Stok Akhir'] = item.sisa_stok
+      row['Nilai Persediaan Akhir'] = item.nilai_persediaan_akhir
+
+      return row
     })
 
-    row['Sisa Stok Akhir'] = item.sisa_stok
-    row['Nilai Persediaan Akhir'] = item.nilai_persediaan_akhir
+    const worksheet = XLSX.utils.json_to_sheet(exportData)
+    const workbook = XLSX.utils.book_new()
 
-    return row
-  })
-
-  const worksheet = XLSX.utils.json_to_sheet(exportData)
-  const workbook = XLSX.utils.book_new()
-
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Stok")
-  XLSX.writeFile(workbook, `Laporan_Riwayat_Stok_${selectedMonth.value}_${selectedYear.value}.xlsx`)
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Stok")
+    XLSX.writeFile(workbook, `Laporan_Riwayat_Stok_${selectedMonth.value}_${selectedYear.value}.xlsx`)
   } catch (error) {
     console.error("Export failed", error)
   } finally {
@@ -152,10 +152,12 @@ onMounted(async () => {
 })
 
 const formatCurrency = value => {
+  if (!value || isNaN(value)) return 'Rp 0'
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(value)
 }
 
@@ -166,13 +168,19 @@ const formatDate = dateString => {
 
 <template>
   <div class="pa-4">
+    <!-- Header -->
     <div class="d-flex align-center justify-space-between mb-4">
-      <h2 class="text-h5 font-weight-bold">
-        Laporan Riwayat Stok
-      </h2>
+      <div>
+        <h2 class="text-h4 font-weight-bold mb-1">
+          Laporan Riwayat Mutasi Stok Harian
+        </h2>
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          Kartu stok akuntansi pergerakan kuantitas masuk (pembelian/retur/inbound) dan keluar (penjualan/mutasi) per tanggal.
+        </p>
+      </div>
       <VBtn
         color="success"
-        prepend-icon="ri-file-excel-line"
+        prepend-icon="ri-file-excel-2-line"
         :disabled="isLoading || data.length === 0"
         @click="exportExcel"
       >
@@ -180,217 +188,159 @@ const formatDate = dateString => {
       </VBtn>
     </div>
 
-    <VCard>
-      <VCardText class="d-flex flex-wrap gap-4 align-center">
+    <!-- Filter Card -->
+    <VCard elevation="2">
+      <VCardText class="d-flex flex-wrap gap-4 align-center py-4">
         <VSelect
           v-model="selectedMonth"
           :items="months"
           item-title="title"
           item-value="value"
           density="compact"
-          style="max-width: 150px"
+          label="Bulan"
+          style="max-width: 140px"
           hide-details
-          @update:model-value="fetchReport"
+          @update:model-value="onFilterChange"
         />
 
         <VSelect
           v-model="selectedYear"
           :items="years"
           density="compact"
-          style="max-width: 120px"
+          label="Tahun"
+          style="max-width: 110px"
           hide-details
-          @update:model-value="fetchReport"
+          @update:model-value="onFilterChange"
         />
 
-        <VSpacer />
-        
         <VAutocomplete
           v-model="selectedBranch"
           :items="branches"
           item-title="name"
           item-value="id"
           placeholder="Semua Cabang"
+          label="Cabang"
           clearable
           density="compact"
-          style="max-width: 250px"
-          @update:model-value="fetchReport"
+          style="max-width: 220px"
+          hide-details
+          @update:model-value="onFilterChange"
         />
 
         <VTextField
           v-model="search"
           density="compact"
-          placeholder="Cari Produk..."
-          append-inner-icon="ri-search-line"
-          style="max-width: 300px;"
+          placeholder="Cari Produk / SKU..."
+          prepend-inner-icon="ri-search-line"
+          style="max-width: 260px;"
+          clearable
+          hide-details
           @update:model-value="handleSearch"
         />
+
+        <VSpacer />
+
+        <VBtn
+          prepend-icon="ri-refresh-line"
+          variant="tonal"
+          color="secondary"
+          size="small"
+          :loading="isLoading"
+          @click="fetchReport"
+        >
+          Muat Ulang
+        </VBtn>
       </VCardText>
 
-      <VCardText
-        class="px-0 pt-0 pb-0"
-        style="overflow-x: auto;"
-      >
+      <VDivider />
+
+      <!-- Scrollable Matrix Table -->
+      <div style="overflow-x: auto;">
         <VTable
           class="text-no-wrap text-caption"
           density="compact"
           hover
         >
           <thead>
-            <tr>
-              <th
-                rowspan="2"
-                class="text-uppercase text-center border-b font-weight-bold bg-green-lighten-4"
-              >
-                No
-              </th>
-              <th
-                rowspan="2"
-                class="text-uppercase text-center border-b font-weight-bold bg-green-lighten-4"
-              >
-                Kode Barang
-              </th>
-              <th
-                rowspan="2"
-                class="text-uppercase text-center border-b font-weight-bold bg-green-lighten-4"
-              >
-                Nama Barang
-              </th>
-              <th
-                rowspan="2"
-                class="text-uppercase text-center border-b font-weight-bold bg-green-lighten-4"
-              >
-                Kategori
-              </th>
-              <th
-                rowspan="2"
-                class="text-uppercase text-center border-b font-weight-bold bg-green-lighten-4"
-              >
-                Cabang
-              </th>
-              <th
-                rowspan="2"
-                class="text-uppercase text-center border-b font-weight-bold bg-green-lighten-4"
-              >
-                Harga Barang
-              </th>
-              <th
-                rowspan="2"
-                class="text-uppercase text-center border-b font-weight-bold bg-green-lighten-4"
-              >
-                Stok Awal
-              </th>
+            <tr class="bg-primary text-white">
+              <th rowspan="2" class="text-center font-weight-bold border-b text-white" style="width: 45px;">No</th>
+              <th rowspan="2" class="text-left font-weight-bold border-b text-white">Kode SKU</th>
+              <th rowspan="2" class="text-left font-weight-bold border-b text-white">Nama Produk</th>
+              <th rowspan="2" class="text-left font-weight-bold border-b text-white">Kategori</th>
+              <th rowspan="2" class="text-left font-weight-bold border-b text-white">Cabang</th>
+              <th rowspan="2" class="text-right font-weight-bold border-b text-white">Harga</th>
+              <th rowspan="2" class="text-center font-weight-bold border-b text-white">Stok Awal</th>
               <th
                 v-if="dates.length"
                 :colspan="dates.length * 2"
-                class="text-uppercase text-center border-b font-weight-bold bg-green-lighten-3"
+                class="text-center font-weight-bold border-b text-white bg-primary-darken-1"
               >
-                Periode Harian
+                Pergerakan Mutasi Harian
               </th>
-              <th
-                rowspan="2"
-                class="text-uppercase text-center border-b font-weight-bold bg-green-lighten-4"
-              >
-                Sisa Stok
-              </th>
-              <th
-                rowspan="2"
-                class="text-uppercase text-center border-b font-weight-bold bg-green-lighten-4"
-              >
-                Nilai Persediaan Akhir
-              </th>
+              <th rowspan="2" class="text-center font-weight-bold border-b text-white">Sisa Stok</th>
+              <th rowspan="2" class="text-right font-weight-bold border-b text-white">Nilai Akhir</th>
             </tr>
-            <tr>
-              <template
-                v-for="d in dates"
-                :key="d"
-              >
-                <th
-                  class="text-center font-weight-bold border-b bg-green-lighten-5"
-                  colspan="2"
-                >
+            <tr class="bg-grey-100">
+              <template v-for="d in dates" :key="d">
+                <th class="text-center font-weight-bold border-b text-primary" colspan="2">
                   {{ formatDate(d) }}
                 </th>
               </template>
             </tr>
-            <tr>
-              <th
-                colspan="7"
-                class="border-b bg-grey-lighten-4"
-              />
-              <template
-                v-for="d in dates"
-                :key="d + '-sub'"
-              >
-                <th class="text-center border-b bg-blue-lighten-5">
-                  Msk
-                </th>
-                <th class="text-center border-b bg-red-lighten-5">
-                  Klr
-                </th>
+            <tr class="bg-grey-50">
+              <th colspan="7" class="border-b" />
+              <template v-for="d in dates" :key="d + '-sub'">
+                <th class="text-center border-b text-success font-weight-bold" style="min-width: 38px;">Msk</th>
+                <th class="text-center border-b text-error font-weight-bold" style="min-width: 38px;">Klr</th>
               </template>
-              <th
-                colspan="2"
-                class="border-b bg-grey-lighten-4"
-              />
+              <th colspan="2" class="border-b" />
             </tr>
           </thead>
           <tbody>
             <tr v-if="isLoading">
-              <td
-                :colspan="9 + (dates.length * 2)"
-                class="text-center py-4"
-              >
-                Memuat data...
+              <td :colspan="9 + (dates.length * 2)" class="text-center py-6 text-medium-emphasis">
+                <VProgressCircular indeterminate color="primary" size="24" class="me-2" />
+                Memuat data mutasi...
               </td>
             </tr>
             <tr v-else-if="data.length === 0">
-              <td
-                :colspan="7 + dates.length * 2 + 2"
-                class="text-center py-4 text-disabled"
-              >
-                Belum ada data stok pada periode ini.
+              <td :colspan="9 + (dates.length * 2)" class="text-center py-6 text-medium-emphasis">
+                Belum ada data riwayat stok pada periode yang dipilih.
               </td>
             </tr>
             <tr
               v-for="(item, index) in data"
               :key="item.id"
             >
-              <td class="text-center border-b">
+              <td class="text-center border-b text-medium-emphasis">
                 {{ (page - 1) * itemsPerPage + index + 1 }}
               </td>
-              <td>{{ item.kode_barang }}</td>
-              <td class="font-weight-medium">
-                {{ item.nama_barang }}
-              </td>
+              <td><code>{{ item.kode_barang }}</code></td>
+              <td class="font-weight-medium text-subtitle-2">{{ item.nama_barang }}</td>
               <td>{{ item.kategori }}</td>
               <td>{{ item.cabang }}</td>
-              <td class="text-right">
-                {{ formatCurrency(item.harga_barang) }}
-              </td>
-              <td class="text-center font-weight-bold">
-                {{ item.stok_awal }}
-              </td>
-              <template
-                v-for="d in dates"
-                :key="d + '-data'"
-              >
-                <td class="text-center text-success font-weight-medium">
+              <td class="text-right">{{ formatCurrency(item.harga_barang) }}</td>
+              <td class="text-center font-weight-bold bg-grey-50">{{ item.stok_awal }}</td>
+              <template v-for="d in dates" :key="d + '-data'">
+                <td class="text-center font-weight-medium" :class="item.harian[d]?.in > 0 ? 'text-success font-weight-bold bg-green-50' : 'text-disabled'">
                   {{ item.harian[d]?.in || 0 }}
                 </td>
-                <td class="text-center text-error font-weight-medium">
+                <td class="text-center font-weight-medium" :class="item.harian[d]?.out > 0 ? 'text-error font-weight-bold bg-red-50' : 'text-disabled'">
                   {{ item.harian[d]?.out || 0 }}
                 </td>
               </template>
-              <td class="text-center font-weight-bold text-primary">
+              <td class="text-center font-weight-bold text-primary bg-grey-50">
                 {{ item.sisa_stok }}
               </td>
-              <td class="text-right font-weight-bold">
+              <td class="text-right font-weight-bold text-success">
                 {{ formatCurrency(item.nilai_persediaan_akhir) }}
               </td>
             </tr>
           </tbody>
         </VTable>
-      </VCardText>
+      </div>
+
+      <!-- Pagination Footer -->
       <VCardText class="d-flex align-center justify-end flex-wrap gap-4 pt-4 pb-4 border-t">
         <div class="d-flex align-center gap-2">
           <span class="text-sm text-medium-emphasis">Item per halaman:</span>
@@ -400,7 +350,7 @@ const formatDate = dateString => {
             variant="plain"
             density="compact"
             hide-details
-            style="width: 70px"
+            style="width: 75px"
             @update:model-value="page = 1; fetchReport()"
           />
         </div>
@@ -409,7 +359,7 @@ const formatDate = dateString => {
           {{ data.length > 0 ? (page - 1) * itemsPerPage + 1 : 0 }}-{{ Math.min(page * itemsPerPage, totalItems) }} dari {{ totalItems }}
         </span>
 
-        <div class="d-flex align-center">
+        <div class="d-flex align-center gap-1">
           <VBtn
             icon
             variant="text"
@@ -418,7 +368,7 @@ const formatDate = dateString => {
             :disabled="page === 1"
             @click="page = 1; fetchReport()"
           >
-            <VIcon icon="ri-skip-left-line" size="24" />
+            <VIcon icon="ri-skip-left-line" size="20" />
           </VBtn>
           <VBtn
             icon
@@ -428,7 +378,7 @@ const formatDate = dateString => {
             :disabled="page === 1"
             @click="page--; fetchReport()"
           >
-            <VIcon icon="ri-arrow-left-s-line" size="24" />
+            <VIcon icon="ri-arrow-left-s-line" size="20" />
           </VBtn>
           <VBtn
             icon
@@ -438,7 +388,7 @@ const formatDate = dateString => {
             :disabled="page === totalPages || totalPages === 0"
             @click="page++; fetchReport()"
           >
-            <VIcon icon="ri-arrow-right-s-line" size="24" />
+            <VIcon icon="ri-arrow-right-s-line" size="20" />
           </VBtn>
           <VBtn
             icon
@@ -448,7 +398,7 @@ const formatDate = dateString => {
             :disabled="page === totalPages || totalPages === 0"
             @click="page = totalPages; fetchReport()"
           >
-            <VIcon icon="ri-skip-right-line" size="24" />
+            <VIcon icon="ri-skip-right-line" size="20" />
           </VBtn>
         </div>
       </VCardText>

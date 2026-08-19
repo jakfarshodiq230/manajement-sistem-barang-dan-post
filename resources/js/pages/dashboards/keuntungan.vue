@@ -1,7 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { $api } from '@/utils/api'
-
 import VueApexCharts from 'vue3-apexcharts'
 import { useTheme } from 'vuetify'
 
@@ -21,6 +20,7 @@ const analyticsData = ref({
 const isLoading = ref(true)
 
 const fetchAnalytics = async () => {
+  isLoading.value = true
   try {
     const res = await $api('/apps/dashboards/profit')
     if (res.success) {
@@ -38,6 +38,7 @@ onMounted(() => {
 })
 
 const formatCurrency = value => {
+  if (value === null || value === undefined || isNaN(value)) return 'Rp 0'
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
@@ -46,8 +47,7 @@ const formatCurrency = value => {
 }
 
 const getMargin = () => {
-  if (analyticsData.value.total_revenue == 0) return 0
-  
+  if (!analyticsData.value.total_revenue || analyticsData.value.total_revenue === 0) return 0
   return ((analyticsData.value.total_profit / analyticsData.value.total_revenue) * 100).toFixed(1)
 }
 
@@ -60,11 +60,12 @@ const chartOptions = computed(() => {
       parentHeightOffset: 0,
       toolbar: { show: false },
     },
-    colors: [currentTheme.primary],
+    colors: [currentTheme.success],
     plotOptions: {
       bar: {
-        borderRadius: 4,
-        columnWidth: '40%',
+        borderRadius: 6,
+        columnWidth: '45%',
+        distributed: false,
       },
     },
     dataLabels: {
@@ -74,10 +75,16 @@ const chartOptions = computed(() => {
       categories: analyticsData.value.chart_data?.categories || [],
       axisBorder: { show: false },
       axisTicks: { show: false },
+      labels: {
+        style: { colors: currentTheme['on-surface'] },
+      },
     },
     yaxis: {
       labels: {
-        formatter: value => formatCurrency(value),
+        style: { colors: currentTheme['on-surface'] },
+        formatter: value => {
+          return new Intl.NumberFormat('id-ID', { notation: 'compact', compactDisplay: 'short' }).format(value)
+        },
       },
     },
     grid: {
@@ -86,6 +93,7 @@ const chartOptions = computed(() => {
       xaxis: { lines: { show: false } },
     },
     tooltip: {
+      theme: vuetifyTheme.current.value.dark ? 'dark' : 'light',
       y: {
         formatter: value => formatCurrency(value),
       },
@@ -95,137 +103,190 @@ const chartOptions = computed(() => {
 
 const chartSeries = computed(() => [
   {
-    name: 'Keuntungan Bersih',
+    name: 'Keuntungan Bersih (Profit)',
     data: analyticsData.value.chart_data?.series || [],
   },
 ])
 </script>
 
 <template>
-  <VRow>
-    <VCol
-      cols="12"
-      md="4"
-    >
-      <VCard>
-        <VCardText class="d-flex flex-column pb-4">
-          <h6 class="text-h6 font-weight-medium mb-1 text-center">
-            Laba Bersih Hari Ini
-          </h6>
-          <h2 class="text-h2 text-success text-center mt-3">
-            {{ formatCurrency(analyticsData.profit_today) }}
-          </h2>
-        </VCardText>
-      </VCard>
-    </VCol>
+  <div class="pa-4">
+    <!-- Header -->
+    <div class="d-flex align-center justify-space-between mb-4">
+      <div>
+        <h2 class="text-h4 font-weight-bold mb-1">
+          Dashboard Keuntungan & Margin
+        </h2>
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          Analisis laba bersih riil (Omzet - HPP Modal), persentase margin laba, dan performa profitabilitas.
+        </p>
+      </div>
 
-    <VCol
-      cols="12"
-      md="4"
-    >
-      <VCard>
-        <VCardText class="d-flex flex-column pb-4">
-          <h6 class="text-h6 font-weight-medium mb-1 text-center">
-            Laba Bersih Bulan Ini
-          </h6>
-          <h2 class="text-h2 text-info text-center mt-3">
-            {{ formatCurrency(analyticsData.profit_this_month) }}
-          </h2>
-        </VCardText>
-      </VCard>
-    </VCol>
-    
-    <VCol
-      cols="12"
-      md="4"
-    >
-      <VCard>
-        <VCardText class="d-flex flex-column pb-4">
-          <h6 class="text-h6 font-weight-medium mb-1 text-center">
-            Margin Keuntungan Keseluruhan
-          </h6>
-          <h2 class="text-h2 text-primary text-center mt-3">
-            {{ getMargin() }}%
-          </h2>
-        </VCardText>
-      </VCard>
-    </VCol>
+      <VBtn
+        color="secondary"
+        variant="tonal"
+        prepend-icon="ri-refresh-line"
+        :loading="isLoading"
+        @click="fetchAnalytics"
+      >
+        Muat Ulang
+      </VBtn>
+    </div>
 
-    <VCol cols="12">
-      <VCard>
-        <VCardText class="d-flex align-center justify-space-between pb-4">
-          <div>
-            <h6 class="text-h6 font-weight-medium mb-1">
-              Total Laba Bersih (Keseluruhan Waktu)
-            </h6>
-            <h1 class="text-h1 text-success mt-2">
-              {{ formatCurrency(analyticsData.total_profit) }}
-            </h1>
-            <p class="text-sm text-medium-emphasis mt-1">
-              Dihitung dari Gross Revenue - Harga Modal (COGS)
-            </p>
+    <!-- Summary KPI Row -->
+    <VRow class="mb-4">
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-success" :loading="isLoading">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-success font-weight-bold">LABA HARI INI</div>
+              <div class="text-h4 font-weight-bold text-success mt-1">{{ formatCurrency(analyticsData.profit_today) }}</div>
+            </div>
+            <VAvatar color="success" variant="tonal" size="44">
+              <VIcon icon="ri-calendar-check-line" size="24" />
+            </VAvatar>
           </div>
-          <VAvatar
-            color="success"
-            variant="tonal"
-            rounded
-            size="80"
-          >
-            <VIcon
-              icon="ri-money-dollar-circle-line"
-              size="50"
-            />
+          <div class="text-caption text-medium-emphasis mt-2">Penjualan hari ini dikurangi HPP</div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-info" :loading="isLoading">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-info font-weight-bold">LABA BULAN INI</div>
+              <div class="text-h4 font-weight-bold text-info mt-1">{{ formatCurrency(analyticsData.profit_this_month) }}</div>
+            </div>
+            <VAvatar color="info" variant="tonal" size="44">
+              <VIcon icon="ri-line-chart-line" size="24" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Akumulasi laba bulan berjalan</div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-primary" :loading="isLoading">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-primary font-weight-bold">MARGIN KEUNTUNGAN</div>
+              <div class="text-h4 font-weight-bold text-primary mt-1">{{ getMargin() }}%</div>
+            </div>
+            <VAvatar color="primary" variant="tonal" size="44">
+              <VIcon icon="ri-percent-line" size="24" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Rasio profit terhadap omzet</div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-warning" :loading="isLoading">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-warning font-weight-bold">TOTAL OMZET KESELURUHAN</div>
+              <div class="text-h4 font-weight-bold text-warning mt-1">{{ formatCurrency(analyticsData.total_revenue) }}</div>
+            </div>
+            <VAvatar color="warning" variant="tonal" size="44">
+              <VIcon icon="ri-wallet-3-line" size="24" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Gross revenue all-time</div>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- Highlight Total Net Profit Card -->
+    <VCard elevation="2" class="mb-4 bg-primary text-white" :loading="isLoading">
+      <VCardText class="d-flex flex-wrap align-center justify-space-between pa-6">
+        <div>
+          <div class="text-subtitle-1 text-white-50 font-weight-medium mb-1">
+            TOTAL AKUMULASI LABA BERSIH (KESELURUHAN WAKTU)
+          </div>
+          <div class="text-h2 font-weight-bold text-white my-2">
+            {{ formatCurrency(analyticsData.total_profit) }}
+          </div>
+          <div class="d-flex align-center gap-2 text-caption text-white">
+            <VIcon icon="ri-checkbox-circle-fill" size="16" />
+            <span>Dihitung dari Total Gross Revenue dikurangi Total Beban Pokok Penjualan (HPP/COGS).</span>
+          </div>
+        </div>
+        <VAvatar color="white" variant="tonal" size="80" class="d-none d-sm-flex">
+          <VIcon icon="ri-money-dollar-circle-line" size="48" color="white" />
+        </VAvatar>
+      </VCardText>
+    </VCard>
+
+    <!-- Monthly Profit Bar Chart -->
+    <VCard elevation="2" class="mb-4" :loading="isLoading">
+      <VCardItem class="pb-2">
+        <template #prepend>
+          <VAvatar color="success" variant="tonal" size="36" class="me-2">
+            <VIcon icon="ri-bar-chart-grouped-line" size="20" />
           </VAvatar>
-        </VCardText>
-      </VCard>
-    </VCol>
+        </template>
+        <VCardTitle class="text-h6 font-weight-bold">Grafik Pertumbuhan Laba Bersih (6 Bulan Terakhir)</VCardTitle>
+        <VCardSubtitle>Tren performa profitabilitas bulanan usaha Anda</VCardSubtitle>
+      </VCardItem>
+      <VDivider />
 
-    <VCol cols="12">
-      <VCard title="Grafik Keuntungan 6 Bulan Terakhir">
-        <VCardText>
-          <VueApexCharts
-            v-if="!isLoading"
-            type="bar"
-            height="350"
-            :options="chartOptions"
-            :series="chartSeries"
-          />
-        </VCardText>
-      </VCard>
-    </VCol>
+      <VCardText class="pt-4">
+        <VueApexCharts
+          v-if="!isLoading"
+          type="bar"
+          height="350"
+          :options="chartOptions"
+          :series="chartSeries"
+        />
+      </VCardText>
+    </VCard>
 
-    <VCol cols="12">
-      <VCard title="Catatan Rumus & Perolehan Angka">
-        <VCardText>
-          <VAlert
-            color="info"
-            variant="tonal"
-            class="mb-4"
-            icon="ri-information-line"
-          >
-            Angka keuntungan pada dasbor ini hanya dihitung dari transaksi penjualan yang memiliki status <strong>Selesai (Completed)</strong>. Transaksi yang masih tertunda atau dibatalkan tidak dimasukkan ke dalam perhitungan.
-          </VAlert>
-          
-          <ul class="d-flex flex-column gap-3 ms-4 text-body-1">
-            <li>
-              <strong>Laba Bersih (Profit)</strong> = <code>Total Pendapatan (Harga Jual)</code> - <code>Total Harga Modal (HPP / COGS)</code><br>
-              <span class="text-medium-emphasis text-sm">Contoh: Jika barang terjual seharga Rp100.000 dengan modal Rp70.000, maka Laba Bersih = Rp30.000. Sistem secara otomatis menjumlahkan semua barang yang terjual.</span>
-            </li>
-            <li>
-              <strong>Laba Bersih Hari Ini</strong> = Diambil dari total transaksi yang diselesaikan tepat pada tanggal hari ini.
-            </li>
-            <li>
-              <strong>Laba Bersih Bulan Ini</strong> = Diambil dari total transaksi yang diselesaikan pada bulan dan tahun saat ini berjalan.
-            </li>
-            <li>
-              <strong>Margin Keuntungan</strong> = <code>(Total Laba Bersih / Total Pendapatan Keseluruhan) &times; 100%</code><br>
-              <span class="text-medium-emphasis text-sm">Margin ini menunjukkan persentase rasio rata-rata keuntungan kotor bisnis Anda dari total omset yang didapat.</span>
-            </li>
-          </ul>
-        </VCardText>
-      </VCard>
-    </VCol>
-  </VRow>
+    <!-- Accounting Formula Explanation Card -->
+    <VCard elevation="2">
+      <VCardItem class="pb-2">
+        <template #prepend>
+          <VAvatar color="info" variant="tonal" size="36" class="me-2">
+            <VIcon icon="ri-information-line" size="20" />
+          </VAvatar>
+        </template>
+        <VCardTitle class="text-h6 font-weight-bold">Metodologi & Standar Perhitungan Akuntansi</VCardTitle>
+        <VCardSubtitle>Rumus baku yang diterapkan oleh sistem untuk menjaga akurasi laporan laba</VCardSubtitle>
+      </VCardItem>
+      <VDivider />
+
+      <VCardText class="pa-4">
+        <VRow>
+          <VCol cols="12" md="4">
+            <div class="pa-3 bg-grey-50 rounded border">
+              <div class="font-weight-bold text-subtitle-2 mb-1 text-primary">1. Laba Bersih (Net Profit)</div>
+              <div class="text-caption text-medium-emphasis">
+                <code>Laba Bersih = Omzet - HPP (COGS)</code>
+              </div>
+              <div class="text-caption text-disabled mt-1">HPP dihitung otomatis per item berdasarkan harga modal beli saat batch masuk.</div>
+            </div>
+          </VCol>
+          <VCol cols="12" md="4">
+            <div class="pa-3 bg-grey-50 rounded border">
+              <div class="font-weight-bold text-subtitle-2 mb-1 text-primary">2. Margin Keuntungan (%)</div>
+              <div class="text-caption text-medium-emphasis">
+                <code>Margin = (Laba Bersih / Omzet) &times; 100%</code>
+              </div>
+              <div class="text-caption text-disabled mt-1">Mengukur efisiensi laba dari setiap rupiah pendapatan yang dihasilkan.</div>
+            </div>
+          </VCol>
+          <VCol cols="12" md="4">
+            <div class="pa-3 bg-grey-50 rounded border">
+              <div class="font-weight-bold text-subtitle-2 mb-1 text-primary">3. Nilai Persediaan Sisa</div>
+              <div class="text-caption text-medium-emphasis">
+                <code>Aset Sisa = Sisa Qty &times; Harga Beli</code>
+              </div>
+              <div class="text-caption text-disabled mt-1">Barang yang belum terjual tetap tercatat sebagai modal aset persediaan aktif.</div>
+            </div>
+          </VCol>
+        </VRow>
+      </VCardText>
+    </VCard>
+  </div>
 </template>
 
 <route lang="yaml">

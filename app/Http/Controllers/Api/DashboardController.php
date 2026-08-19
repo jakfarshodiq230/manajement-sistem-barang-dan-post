@@ -350,14 +350,33 @@ class DashboardController extends Controller
 
     public function audit(Request $request)
     {
-        $itemsPerPage = $request->query('itemsPerPage', 10);
+        $itemsPerPage = (int) $request->query('itemsPerPage', 10);
+        $search = $request->query('search');
+        $event = $request->query('event');
 
-        // Fetch activity logs using Spatie Activitylog with pagination
-        $logs = DB::table('activity_log')
+        $query = DB::table('activity_log')
             ->leftJoin('users', 'activity_log.causer_id', '=', 'users.id')
-            ->select('activity_log.*', 'users.name as user_name')
-            ->orderBy('activity_log.created_at', 'desc')
-            ->paginate($itemsPerPage);
+            ->select('activity_log.*', 'users.name as user_name');
+
+        if ($event) {
+            $query->where('activity_log.description', $event);
+        }
+
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('activity_log.description', 'like', "%{$search}%")
+                  ->orWhere('activity_log.subject_type', 'like', "%{$search}%")
+                  ->orWhere('users.name', 'like', "%{$search}%");
+            });
+        }
+
+        $logs = (clone $query)->orderBy('activity_log.created_at', 'desc')->paginate($itemsPerPage);
+
+        // Summary counts
+        $totalLogs = DB::table('activity_log')->count();
+        $totalCreated = DB::table('activity_log')->where('description', 'created')->count();
+        $totalUpdated = DB::table('activity_log')->where('description', 'updated')->count();
+        $totalDeleted = DB::table('activity_log')->where('description', 'deleted')->count();
 
         return response()->json([
             'success' => true,
@@ -366,6 +385,12 @@ class DashboardController extends Controller
                 'total' => $logs->total(),
                 'current_page' => $logs->currentPage(),
                 'last_page' => $logs->lastPage(),
+                'summary' => [
+                    'total' => $totalLogs,
+                    'created' => $totalCreated,
+                    'updated' => $totalUpdated,
+                    'deleted' => $totalDeleted,
+                ]
             ]
         ]);
     }
