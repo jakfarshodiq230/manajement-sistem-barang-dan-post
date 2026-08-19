@@ -48,18 +48,83 @@ class UserController extends Controller
     {
         $q = $request->query('q', '');
         $role = $request->query('role');
+        $branchId = $request->query('branch_id');
         $plan = $request->query('plan');
         $status = $request->query('status');
-        $itemsPerPage = $request->query('itemsPerPage', 10);
-        
+        $itemsPerPage = (int) $request->query('itemsPerPage', 10);
+        if ($itemsPerPage <= 0) $itemsPerPage = 10;
+        $sortBy = $request->query('sortBy', 'id');
+        $orderBy = $request->query('orderBy', 'desc');
+
         $query = User::query();
 
-        if ($q) {
-            $query->where(function($query) use ($q) {
-                $query->where('name', 'like', "%{$q}%")
-                      ->orWhere('email', 'like', "%{$q}%");
+        // 1. Search Query
+        if (!empty($q)) {
+            $query->where(function($sub) use ($q) {
+                $sub->where('name', 'like', "%{$q}%")
+                    ->orWhere('email', 'like', "%{$q}%")
+                    ->orWhere('phone', 'like', "%{$q}%");
             });
         }
+
+        // 2. Filter by Role
+        if (!empty($role)) {
+            $query->where(function($qBuilder) use ($role) {
+                $qBuilder->whereHas('roles', function($rQuery) use ($role) {
+                    $rQuery->where('name', $role);
+                })->orWhereExists(function($sub) use ($role) {
+                    $sub->select(\DB::raw(1))
+                        ->from('model_has_roles')
+                        ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
+                        ->whereColumn('model_has_roles.model_id', 'users.id')
+                        ->where('model_has_roles.model_type', 'App\\Models\\User')
+                        ->where('roles.name', $role);
+                });
+            });
+        }
+
+        // 3. Filter by Branch
+        if (!empty($branchId)) {
+            $query->where(function($bQuery) use ($branchId) {
+                $bQuery->where('branch_id', $branchId)
+                    ->orWhereExists(function($sub) use ($branchId) {
+                        $sub->select(\DB::raw(1))
+                            ->from('model_has_roles')
+                            ->whereColumn('model_has_roles.model_id', 'users.id')
+                            ->where('model_has_roles.model_type', 'App\\Models\\User')
+                            ->where('model_has_roles.branch_id', $branchId);
+                    });
+            });
+        }
+
+        // 4. Filter by Status
+        if (!empty($status)) {
+            $statusLower = strtolower((string)$status);
+            if (in_array($statusLower, ['active', 'aktif', '1'])) {
+                $query->where(function($sQuery) {
+                    $sQuery->where('status', 'Active')
+                           ->orWhere('status', 'aktif')
+                           ->orWhere('status', 1)
+                           ->orWhere('status', '1')
+                           ->orWhereNull('status');
+                });
+            } elseif (in_array($statusLower, ['inactive', 'nonaktif', '0'])) {
+                $query->where(function($sQuery) {
+                    $sQuery->where('status', 'Inactive')
+                           ->orWhere('status', 'nonaktif')
+                           ->orWhere('status', 0)
+                           ->orWhere('status', '0');
+                });
+            } elseif (in_array($statusLower, ['pending'])) {
+                $query->where('status', 'Pending');
+            }
+        }
+
+        // 5. Sorting
+        $allowedSorts = ['id', 'name', 'email', 'status', 'created_at'];
+        $dbSort = in_array($sortBy, $allowedSorts) ? $sortBy : ($sortBy === 'fullName' ? 'name' : 'id');
+        $dbOrder = in_array(strtolower($orderBy), ['asc', 'desc']) ? strtolower($orderBy) : 'desc';
+        $query->orderBy($dbSort, $dbOrder);
 
         $paginator = $query->paginate($itemsPerPage);
 
@@ -67,11 +132,29 @@ class UserController extends Controller
             // Load all branch-role assignments for this user from pivot table
             $assignments = \DB::table('model_has_roles as mhr')
                 ->join('roles', 'mhr.role_id', '=', 'roles.id')
-                ->join('branches', 'mhr.branch_id', '=', 'branches.id')
+                ->leftJoin('branches', 'mhr.branch_id', '=', 'branches.id')
                 ->where('mhr.model_type', 'App\\Models\\User')
                 ->where('mhr.model_id', $user->id)
-                ->select('branches.id as branch_id', 'branches.name as branch_name', 'roles.id as role_id', 'roles.name as role_name')
+                ->select(
+                    'branches.id as branch_id',
+                    \DB::raw('COALESCE(branches.name, "Semua Cabang (Global)") as branch_name'),
+                    'roles.id as role_id',
+                    'roles.name as role_name'
+                )
                 ->get();
+
+            // Also check standard Spatie user->roles
+            $allRoleNames = $assignments->pluck('role_name')->merge($user->roles->pluck('name'))->unique()->values()->toArray();
+
+            $rawStatus = (string) $user->status;
+            $statusLabel = 'Active';
+            if ($rawStatus === '0' || strtolower($rawStatus) === 'inactive' || strtolower($rawStatus) === 'nonaktif') {
+                $statusLabel = 'Inactive';
+            } elseif (strtolower($rawStatus) === 'pending') {
+                $statusLabel = 'Pending';
+            } else {
+                $statusLabel = 'Active';
+            }
 
             return [
                 'id' => $user->id,
@@ -79,7 +162,7 @@ class UserController extends Controller
                 'fullName' => $user->name,
                 'username' => strtolower(str_replace(' ', '', $user->name)),
                 'email' => $user->email,
-                'role' => $assignments->pluck('role_name')->unique()->values()->toArray(),
+                'role' => $allRoleNames,
                 'assignments' => $assignments->map(fn($a) => [
                     'branch_id'   => $a->branch_id,
                     'branch_name' => $a->branch_name,
@@ -87,14 +170,32 @@ class UserController extends Controller
                     'role_name'   => $a->role_name,
                 ])->values()->toArray(),
                 'currentPlan' => 'basic',
-                'status' => 'Active',
-                'avatar' => '',
+                'status' => $statusLabel,
+                'avatar' => $user->avatar ?: '',
             ];
         });
+
+        $totalActiveUsers = User::where(function($q) {
+            $q->where('status', 1)
+              ->orWhere('status', '1')
+              ->orWhere('status', 'Active')
+              ->orWhere('status', 'aktif')
+              ->orWhereNull('status');
+        })->count();
+
+        $totalBranches = \App\Models\Branch::count();
+        $totalRoles = \Spatie\Permission\Models\Role::count();
+        $totalUsersCount = User::count();
 
         return response()->json([
             'users' => $users,
             'totalUsers' => $paginator->total(),
+            'stats' => [
+                'totalUsers' => $totalUsersCount,
+                'activeUsers' => $totalActiveUsers,
+                'totalBranches' => $totalBranches,
+                'totalRoles' => $totalRoles,
+            ],
         ]);
     }
 

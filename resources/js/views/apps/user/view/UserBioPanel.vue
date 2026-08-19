@@ -1,4 +1,6 @@
 <script setup>
+import UserInfoEditDialog from '@/components/dialogs/UserInfoEditDialog.vue'
+
 const props = defineProps({
   userData: {
     type: Object,
@@ -8,42 +10,28 @@ const props = defineProps({
 
 const isUserInfoEditDialogVisible = ref(false)
 
-
 const resolveUserRoleVariant = role => {
   if (!role) return { color: 'primary', icon: 'ri-user-line' }
   const roleStr = Array.isArray(role) ? role[0] : role
-  const roleLowerCase = String(roleStr).toLowerCase()
+  const roleLower = String(roleStr).toLowerCase()
 
-  if (roleLowerCase === 'subscriber')
-    return {
-      color: 'primary',
-      icon: 'ri-user-line',
-    }
-  if (roleLowerCase === 'author')
-    return {
-      color: 'warning',
-      icon: 'ri-settings-2-line',
-    }
-  if (roleLowerCase === 'maintainer')
-    return {
-      color: 'success',
-      icon: 'ri-database-2-line',
-    }
-  if (roleLowerCase === 'editor')
-    return {
-      color: 'info',
-      icon: 'ri-pencil-line',
-    }
-  if (roleLowerCase === 'admin')
-    return {
-      color: 'error',
-      icon: 'ri-server-line',
-    }
+  if (roleLower.includes('super admin') || roleLower.includes('admin'))
+    return { color: 'primary', icon: 'ri-shield-star-line' }
+  if (roleLower.includes('kasir'))
+    return { color: 'success', icon: 'ri-shopping-cart-2-line' }
+  if (roleLower.includes('gudang'))
+    return { color: 'warning', icon: 'ri-building-2-line' }
+  if (roleLower.includes('owner'))
+    return { color: 'error', icon: 'ri-vip-crown-line' }
+  if (roleLower.includes('manager'))
+    return { color: 'info', icon: 'ri-user-settings-line' }
   
-  return {
-    color: 'primary',
-    icon: 'ri-user-line',
-  }
+  return { color: 'secondary', icon: 'ri-user-line' }
+}
+
+const avatarText = name => {
+  if (!name) return 'U'
+  return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
 }
 </script>
 
@@ -51,14 +39,15 @@ const resolveUserRoleVariant = role => {
   <VRow>
     <!-- SECTION User Details -->
     <VCol cols="12">
-      <VCard v-if="props.userData">
-        <VCardText class="text-center pt-12 pb-6">
+      <VCard elevation="2" v-if="props.userData" class="border">
+        <VCardText class="text-center pt-8 pb-6">
           <!-- 👉 Avatar -->
           <VAvatar
             rounded="lg"
-            :size="120"
+            :size="110"
             :color="!props.userData.avatar ? 'primary' : undefined"
             :variant="!props.userData.avatar ? 'tonal' : undefined"
+            class="border mb-2"
           >
             <VImg
               v-if="props.userData.avatar"
@@ -66,96 +55,107 @@ const resolveUserRoleVariant = role => {
             />
             <span
               v-else
-              class="text-5xl font-weight-medium"
+              class="text-h3 font-weight-bold"
             >
-              {{ avatarText(props.userData.fullName) }}
+              {{ avatarText(props.userData.fullName || props.userData.name) }}
             </span>
           </VAvatar>
 
           <!-- 👉 User fullName -->
-          <h5 class="text-h5 mt-4">
-            {{ props.userData.fullName }}
-          </h5>
+          <h4 class="text-h5 font-weight-bold mt-3 mb-1">
+            {{ props.userData.fullName || props.userData.name }}
+          </h4>
+          <div class="text-caption text-disabled">
+            ID Akun: #{{ props.userData.id }}
+          </div>
 
           <!-- 👉 Role chip -->
           <VChip
             :color="resolveUserRoleVariant(props.userData.role).color"
             size="small"
-            class="text-capitalize mt-4"
+            variant="elevated"
+            class="font-weight-bold text-capitalize mt-3"
           >
-            {{ props.userData.role }}
+            <VIcon :icon="resolveUserRoleVariant(props.userData.role).icon" size="14" class="me-1" />
+            {{ Array.isArray(props.userData.role) ? props.userData.role.join(', ') : props.userData.role }}
           </VChip>
         </VCardText>
 
+        <VDivider />
+
         <!-- 👉 Details -->
-        <VCardText class="pb-6">
-          <h5 class="text-h5">
-            Details
-          </h5>
+        <VCardText class="pa-6">
+          <div class="d-flex align-center justify-space-between mb-4">
+            <h6 class="text-subtitle-1 font-weight-bold mb-0">
+              Informasi Biodata & Akun
+            </h6>
+            <VBtn
+              size="x-small"
+              variant="tonal"
+              color="primary"
+              prepend-icon="ri-edit-line"
+              @click="isUserInfoEditDialogVisible = true"
+            >
+              Edit Profil
+            </VBtn>
+          </div>
 
-          <VDivider class="my-4" />
-
-          <!-- 👉 User Details list -->
-          <VList class="card-list">
-            <VListItem>
-              <VListItemTitle class="text-sm">
-                <span class="font-weight-medium">Username:</span>
-                <span class="text-body-1">
-                  @{{ props.userData.username }}
-                </span>
-              </VListItemTitle>
+          <VList class="card-list" density="compact">
+            <VListItem class="px-0 py-1">
+              <template #prepend>
+                <VIcon icon="ri-user-line" size="18" class="me-3 text-primary" />
+              </template>
+              <VListItemTitle class="text-caption text-medium-emphasis">Username</VListItemTitle>
+              <div class="text-body-2 font-weight-medium">@{{ props.userData.username }}</div>
             </VListItem>
 
-            <VListItem>
-              <VListItemTitle class="text-sm">
-                <span class="font-weight-medium">
-                  Email:
-                </span>
-                <span class="text-body-1">{{ props.userData.email }}</span>
-              </VListItemTitle>
+            <VListItem class="px-0 py-1">
+              <template #prepend>
+                <VIcon icon="ri-mail-line" size="18" class="me-3 text-info" />
+              </template>
+              <VListItemTitle class="text-caption text-medium-emphasis">Email Resmi</VListItemTitle>
+              <div class="text-body-2 font-weight-medium">{{ props.userData.email }}</div>
             </VListItem>
 
-            <VListItem>
-              <VListItemTitle class="text-sm">
-                <span class="font-weight-medium">Role: </span>
-                <span class="text-capitalize text-body-1">{{ Array.isArray(props.userData.role) ? props.userData.role.join("", "") : props.userData.role }}</span>
-              </VListItemTitle>
+            <VListItem class="px-0 py-1">
+              <template #prepend>
+                <VIcon icon="ri-store-2-line" size="18" class="me-3 text-warning" />
+              </template>
+              <VListItemTitle class="text-caption text-medium-emphasis">Penugasan Cabang</VListItemTitle>
+              <div class="text-body-2 font-weight-medium">
+                {{ props.userData.assignments && props.userData.assignments.length > 0 ? props.userData.assignments.map(a => a.branch_name).join(', ') : 'Gudang Pusat / Semua Cabang' }}
+              </div>
             </VListItem>
 
-            <VListItem>
-              <VListItemTitle class="text-sm">
-                <span class="font-weight-medium">Cabang: </span>
-                <span class="text-capitalize text-body-1">
-                  {{ props.userData.assignments && props.userData.assignments.length > 0 ? props.userData.assignments.map(a => a.branch_name).join("", "") : "-" }}
-                </span>
-              </VListItemTitle>
+            <VListItem class="px-0 py-1">
+              <template #prepend>
+                <VIcon icon="ri-checkbox-circle-line" size="18" class="me-3 text-success" />
+              </template>
+              <VListItemTitle class="text-caption text-medium-emphasis">Status Akun</VListItemTitle>
+              <VChip
+                :color="(props.userData.status === 'Active' || props.userData.status === 1 || props.userData.status === '1') ? 'success' : 'error'"
+                size="x-small"
+                variant="elevated"
+                class="font-weight-bold mt-1"
+              >
+                {{ (props.userData.status === 'Active' || props.userData.status === 1 || props.userData.status === '1') ? 'Aktif' : 'Nonaktif' }}
+              </VChip>
             </VListItem>
 
-            <VListItem>
-              <VListItemTitle class="text-sm">
-                <span class="font-weight-medium">Status: </span>
-                <VChip
-                  :color="props.userData.status === 'Active' ? 'success' : 'error'"
-                  size="small"
-                  class="text-capitalize"
-                >
-                  {{ props.userData.status === 'Active' ? 'Aktif' : 'Nonaktif' }}
-                </VChip>
-              </VListItemTitle>
+            <VListItem class="px-0 py-1">
+              <template #prepend>
+                <VIcon icon="ri-phone-line" size="18" class="me-3 text-success" />
+              </template>
+              <VListItemTitle class="text-caption text-medium-emphasis">No. Telepon / WhatsApp</VListItemTitle>
+              <div class="text-body-2 font-weight-medium">{{ props.userData.phone || '-' }}</div>
             </VListItem>
 
-            <VListItem>
-              <VListItemTitle class="text-sm">
-                <span class="font-weight-medium">No. HP: </span>
-                <span class="text-body-1">{{ props.userData.phone || "-" }}</span>
-              </VListItemTitle>
-            </VListItem>
-
-            <VListItem>
-              <VListItemTitle class="text-sm">
-                <span class="font-weight-medium">Alamat: </span>
-                <span class="text-body-1">{{ props.userData.address || "-" }}</span>
-              </VListItemTitle>
+            <VListItem class="px-0 py-1">
+              <template #prepend>
+                <VIcon icon="ri-map-pin-line" size="18" class="me-3 text-error" />
+              </template>
+              <VListItemTitle class="text-caption text-medium-emphasis">Alamat Domisili</VListItemTitle>
+              <div class="text-body-2 font-weight-medium text-wrap">{{ props.userData.address || '-' }}</div>
             </VListItem>
           </VList>
         </VCardText>
@@ -173,14 +173,6 @@ const resolveUserRoleVariant = role => {
 
 <style lang="scss" scoped>
 .card-list {
-  --v-card-list-gap: 0.5rem;
-}
-
-.current-plan {
-  border: 2px solid rgb(var(--v-theme-primary));
-}
-
-.text-capitalize {
-  text-transform: capitalize !important;
+  --v-card-list-gap: 0.25rem;
 }
 </style>

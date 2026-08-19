@@ -1,9 +1,17 @@
 <script setup>
+import { ref, computed, onMounted } from 'vue'
 import AddNewUserDrawer from '@/views/apps/user/list/AddNewUserDrawer.vue'
+import { paginationMeta } from '@/utils/paginationMeta'
+
+definePage({
+  meta: {
+    public: true,
+  },
+})
 
 const searchQuery = ref('')
 const selectedRole = ref()
-const selectedPlan = ref()
+const selectedBranch = ref()
 const selectedStatus = ref()
 
 // Data table options
@@ -30,7 +38,7 @@ onMounted(async () => {
     ])
 
     availableBranches.value = branchData.data || branchData
-    availableRoles.value = roleData.map(r => r.role)
+    availableRoles.value = (roleData.data || roleData).map(r => r.role || r.name)
   } catch(e) { console.error(e) }
 })
 
@@ -72,31 +80,12 @@ const updateOptions = options => {
 
 // Headers
 const headers = [
-  {
-    title: 'User',
-    key: 'user',
-  },
-  {
-    title: 'Email',
-    key: 'email',
-  },
-  {
-    title: 'Role',
-    key: 'role',
-  },
-  {
-    title: 'Plan',
-    key: 'plan',
-  },
-  {
-    title: 'Status',
-    key: 'status',
-  },
-  {
-    title: 'Actions',
-    key: 'actions',
-    sortable: false,
-  },
+  { title: 'Pengguna', key: 'user' },
+  { title: 'Email Akun', key: 'email' },
+  { title: 'Peran (Role)', key: 'role' },
+  { title: 'Cabang / Toko', key: 'assignments', sortable: false },
+  { title: 'Status', key: 'status' },
+  { title: 'Aksi', key: 'actions', sortable: false, align: 'end' },
 ]
 
 const {
@@ -106,8 +95,8 @@ const {
   query: {
     q: searchQuery,
     status: selectedStatus,
-    plan: selectedPlan,
     role: selectedRole,
+    branch_id: selectedBranch,
     itemsPerPage,
     page,
     sortBy,
@@ -115,132 +104,125 @@ const {
   },
 }))
 
-const users = computed(() => usersData.value.users)
-const totalUsers = computed(() => usersData.value.totalUsers)
+const users = computed(() => usersData.value?.users || [])
+const totalUsers = computed(() => usersData.value?.stats?.totalUsers ?? usersData.value?.totalUsers ?? 0)
+const activeUsersCount = computed(() => usersData.value?.stats?.activeUsers ?? users.value.filter(u => u.status === 'Active').length)
+const totalBranchesCount = computed(() => usersData.value?.stats?.totalBranches ?? availableBranches.value.length)
+const totalRolesCount = computed(() => usersData.value?.stats?.totalRoles ?? availableRoles.value.length)
 
-// 👉 search filters (roles loaded dynamically via onMounted)
+// Search filters
 const roles = computed(() => availableRoles.value.map(r => ({ title: r, value: r })))
 
-const plans = [
-  {
-    title: 'Basic',
-    value: 'basic',
-  },
-  {
-    title: 'Company',
-    value: 'company',
-  },
-  {
-    title: 'Enterprise',
-    value: 'enterprise',
-  },
-  {
-    title: 'Team',
-    value: 'team',
-  },
-]
-
 const status = [
-  {
-    title: 'Pending',
-    value: 'Pending',
-  },
-  {
-    title: 'Active',
-    value: 'Active',
-  },
-  {
-    title: 'Inactive',
-    value: 'Inactive',
-  },
+  { title: 'Semua Status', value: null },
+  { title: 'Aktif (Active)', value: 'Active' },
+  { title: 'Nonaktif (Inactive)', value: 'Inactive' },
+  { title: 'Pending', value: 'Pending' },
 ]
 
 const roleColors = ['primary', 'success', 'warning', 'info', 'error', 'secondary']
 
 const resolveUserRoleVariant = role => {
-  // Deterministic color from role name
-  const idx = (role || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % roleColors.length
-  
-  return { color: roleColors[idx], icon: 'ri-shield-user-line' }
+  const n = String(role || '').toLowerCase()
+  if (n.includes('super') || n.includes('owner')) return { color: 'error', icon: 'ri-shield-flash-line' }
+  if (n.includes('pusat')) return { color: 'primary', icon: 'ri-admin-line' }
+  if (n.includes('cabang')) return { color: 'info', icon: 'ri-store-2-line' }
+  if (n.includes('kasir')) return { color: 'success', icon: 'ri-bank-card-line' }
+  if (n.includes('gudang')) return { color: 'warning', icon: 'ri-archive-line' }
+  if (n.includes('manager')) return { color: 'secondary', icon: 'ri-user-star-line' }
+  return { color: 'primary', icon: 'ri-shield-user-line' }
 }
 
 const resolveUserStatusVariant = stat => {
-  const statLowerCase = stat.toLowerCase()
-  if (statLowerCase === 'pending')
-    return 'warning'
-  if (statLowerCase === 'active')
-    return 'success'
-  if (statLowerCase === 'inactive')
-    return 'secondary'
-  
+  const s = String(stat || '').toLowerCase()
+  if (s === 'active' || s === 'aktif') return 'success'
+  if (s === 'inactive' || s === 'nonaktif') return 'secondary'
+  if (s === 'pending') return 'warning'
   return 'primary'
 }
 
 const isAddNewUserDrawerVisible = ref(false)
 
 const addNewUser = async userData => {
-
-  // userListStore.addUser(userData)
   await $api('/apps/users', {
     method: 'POST',
     body: userData,
   })
-
-  // Refetch User
   fetchUsers()
 }
 
 const deleteUser = async id => {
   await $api(`/apps/users/${ id }`, { method: 'DELETE' })
-
-  // Delete from selectedRows
   const index = selectedRows.value.findIndex(row => row === id)
   if (index !== -1)
     selectedRows.value.splice(index, 1)
-
-  // Refetch User
   fetchUsers()
 }
 
-const widgetData = ref([
+const widgetData = computed(() => [
   {
-    title: 'Session',
-    value: '21,459',
-    change: 29,
-    desc: 'Total Users',
+    title: 'Total Pengguna',
+    value: totalUsers.value,
+    desc: 'Akun Terdaftar di Sistem',
     icon: 'ri-group-line',
     iconColor: 'primary',
   },
   {
-    title: 'Paid Users',
-    value: '4,567',
-    change: 18,
-    desc: 'Last Week Analytics',
-    icon: 'ri-user-add-line',
-    iconColor: 'error',
-  },
-  {
-    title: 'Active Users',
-    value: '19,860',
-    change: -14,
-    desc: 'Last Week Analytics',
+    title: 'Pengguna Aktif',
+    value: activeUsersCount.value,
+    desc: 'Status Akun Aktif',
     icon: 'ri-user-follow-line',
     iconColor: 'success',
   },
   {
-    title: 'Pending Users',
-    value: '237',
-    change: 42,
-    desc: 'Last Week Analytics',
-    icon: 'ri-user-search-line',
+    title: 'Total Cabang',
+    value: totalBranchesCount.value,
+    desc: 'Toko & Cabang Terhubung',
+    icon: 'ri-store-2-line',
+    iconColor: 'info',
+  },
+  {
+    title: 'Peran & Hak Akses',
+    value: totalRolesCount.value,
+    desc: 'Struktur Peran RBAC',
+    icon: 'ri-shield-user-line',
     iconColor: 'warning',
   },
 ])
 </script>
 
 <template>
-  <section>
-    <!-- 👉 Widgets -->
+  <section class="user-list-page">
+    <!-- Header Banner -->
+    <div class="d-flex justify-space-between align-center flex-wrap gap-4 mb-6">
+      <div>
+        <div class="d-flex align-center gap-2 mb-1">
+          <VChip color="primary" variant="tonal" size="small" class="font-weight-bold">
+            <VIcon icon="ri-user-line" size="14" class="me-1" />
+            MANAJEMEN AKUN
+          </VChip>
+        </div>
+        <h1 class="text-h4 font-weight-extrabold text-high-emphasis mb-1">
+          Daftar Akun Pengguna
+        </h1>
+        <p class="text-body-1 text-medium-emphasis mb-0">
+          Kelola seluruh akun pengguna, peran, status aktivitas, dan penugasan cabang toko.
+        </p>
+      </div>
+
+      <div class="d-flex gap-3">
+        <VBtn
+          color="primary"
+          class="font-weight-bold text-none"
+          prepend-icon="ri-user-add-line"
+          @click="isAddNewUserDrawerVisible = true"
+        >
+          Tambah Pengguna Baru
+        </VBtn>
+      </div>
+    </div>
+
+    <!-- 👉 Real KPI Widgets -->
     <div class="d-flex mb-6">
       <VRow>
         <template
@@ -252,28 +234,23 @@ const widgetData = ref([
             md="3"
             sm="6"
           >
-            <VCard>
+            <VCard class="rounded-xl border elevation-1">
               <VCardText>
-                <div class="d-flex justify-space-between">
+                <div class="d-flex justify-space-between align-center">
                   <div class="d-flex flex-column gap-y-1">
-                    <span class="text-base text-high-emphasis">{{ data.title }}</span>
-                    <h4 class="text-h4 d-flex align-center gap-2">
+                    <span class="text-body-2 font-weight-medium text-medium-emphasis">{{ data.title }}</span>
+                    <h4 class="text-h4 font-weight-bold text-high-emphasis mb-0">
                       {{ data.value }}
-                      <span
-                        class="text-base font-weight-regular"
-                        :class="data.change > 0 ? 'text-success' : 'text-error'"
-                      >({{ prefixWithPlus(data.change) }}%)</span>
                     </h4>
-
-                    <p class="text-sm mb-0">
+                    <p class="text-caption text-medium-emphasis mb-0">
                       {{ data.desc }}
                     </p>
                   </div>
                   <VAvatar
                     :color="data.iconColor"
                     variant="tonal"
-                    rounded
-                    size="42"
+                    rounded="lg"
+                    size="48"
                   >
                     <VIcon
                       :icon="data.icon"
@@ -288,52 +265,73 @@ const widgetData = ref([
       </VRow>
     </div>
 
-    <VCard class="mb-6">
-      <VCardItem class="pb-4">
-        <VCardTitle>Filters</VCardTitle>
+    <!-- Filter Card -->
+    <VCard class="mb-6 rounded-xl border elevation-1">
+      <VCardItem class="pb-2">
+        <VCardTitle class="text-subtitle-1 font-weight-bold d-flex align-center gap-2">
+          <VIcon icon="ri-filter-3-line" size="20" color="primary" />
+          Filter Pengguna & Penugasan
+        </VCardTitle>
       </VCardItem>
+      
       <VCardText>
         <VRow>
-          <!-- 👉 Select Role -->
+          <!-- 👉 Filter Role -->
           <VCol
             cols="12"
             sm="4"
           >
             <VSelect
               v-model="selectedRole"
-              label="Select Role"
-              placeholder="Select Role"
+              label="Filter Peran (Role)"
+              placeholder="Pilih Peran"
               :items="roles"
               clearable
-              clear-icon="ri-close-line"
+              rounded="lg"
+              density="compact"
+              variant="outlined"
+              prepend-inner-icon="ri-shield-user-line"
+              hide-details
             />
           </VCol>
-          <!-- 👉 Select Plan -->
+          
+          <!-- 👉 Filter Branch -->
           <VCol
             cols="12"
             sm="4"
           >
             <VSelect
-              v-model="selectedPlan"
-              label="Select Plan"
-              placeholder="Select Plan"
-              :items="plans"
+              v-model="selectedBranch"
+              label="Filter Cabang / Toko"
+              placeholder="Semua Cabang"
+              :items="availableBranches"
+              item-title="name"
+              item-value="id"
               clearable
-              clear-icon="ri-close-line"
+              rounded="lg"
+              density="compact"
+              variant="outlined"
+              prepend-inner-icon="ri-store-2-line"
+              hide-details
             />
           </VCol>
-          <!-- 👉 Select Status -->
+          
+          <!-- 👉 Filter Status -->
           <VCol
             cols="12"
             sm="4"
           >
             <VSelect
               v-model="selectedStatus"
-              label="Select Status"
-              placeholder="Select Status"
+              label="Filter Status Akun"
+              placeholder="Pilih Status"
               :items="status"
               clearable
-              clear-icon="ri-close-line"
+              rounded="lg"
+              density="compact"
+              variant="outlined"
+              prepend-inner-icon="ri-checkbox-circle-line"
+              hide-details
             />
           </VCol>
         </VRow>
@@ -341,29 +339,25 @@ const widgetData = ref([
 
       <VDivider />
 
-      <VCardText class="d-flex flex-wrap gap-4 align-center">
-        <!-- 👉 Export button -->
-        <VBtn
-          variant="outlined"
-          color="secondary"
-          prepend-icon="ri-upload-2-line"
-        >
-          Export
-        </VBtn>
-        <VSpacer />
-        <div class="d-flex align-center gap-4 flex-wrap">
+      <VCardText class="d-flex flex-wrap gap-4 align-center py-4">
+        <div class="d-flex align-center gap-4 flex-wrap w-100 justify-space-between">
           <!-- 👉 Search  -->
-          <div class="app-user-search-filter">
+          <div class="app-user-search-filter" style="max-width: 320px; width: 100%;">
             <VTextField
               v-model="searchQuery"
-              placeholder="Search User"
+              placeholder="Cari nama, email, no. telp..."
               density="compact"
+              variant="outlined"
+              rounded="lg"
+              prepend-inner-icon="ri-search-line"
+              hide-details
+              clearable
             />
           </div>
-          <!-- 👉 Add user button -->
-          <VBtn @click="isAddNewUserDrawerVisible = true">
-            Add New User
-          </VBtn>
+          
+          <div class="text-caption text-medium-emphasis">
+            Menampilkan {{ users.length }} dari {{ totalUsers }} pengguna
+          </div>
         </div>
       </VCardText>
 
@@ -377,82 +371,98 @@ const widgetData = ref([
         :items-length="totalUsers"
         :headers="headers"
         show-select
-        class="text-no-wrap rounded-0"
+        class="text-no-wrap"
         @update:options="updateOptions"
       >
         <!-- User -->
         <template #item.user="{ item }">
-          <div class="d-flex align-center">
+          <div class="d-flex align-center py-2">
             <VAvatar
-              size="34"
+              size="38"
               :variant="!item.avatar ? 'tonal' : undefined"
               :color="!item.avatar ? resolveUserRoleVariant(Array.isArray(item.role) ? item.role[0] : item.role).color : undefined"
+              rounded="lg"
               class="me-3"
             >
               <VImg
                 v-if="item.avatar"
                 :src="item.avatar"
               />
-              <span v-else>{{ avatarText(item.fullName) }}</span>
+              <span v-else class="font-weight-bold">{{ avatarText(item.fullName) }}</span>
             </VAvatar>
 
             <div class="d-flex flex-column">
-              <RouterLink
-                :to="{ name: 'apps-user-view-id', params: { id: item.id } }"
-                class="text-link text-base font-weight-medium"
-              >
+              <span class="text-subtitle-2 font-weight-bold text-high-emphasis">
                 {{ item.fullName }}
-              </RouterLink>
-
-              <span class="text-sm text-medium-emphasis">@{{ item.username }}</span>
+              </span>
+              <span class="text-caption text-medium-emphasis">ID: #{{ item.id }}</span>
             </div>
           </div>
         </template>
+        
+        <!-- Email -->
+        <template #item.email="{ item }">
+          <span class="text-body-2 text-medium-emphasis">{{ item.email }}</span>
+        </template>
+
         <!-- Role -->
         <template #item.role="{ item }">
           <div class="d-flex flex-wrap gap-1">
             <template v-if="item.role && item.role.length > 0">
-              <VTooltip
+              <VChip
                 v-for="(roleName, idx) in item.role"
                 :key="idx"
-                :text="item.assignments?.find(a => a.role_name === roleName)?.branch_name || ''"
+                size="small"
+                variant="tonal"
+                :color="resolveUserRoleVariant(roleName).color"
+                class="font-weight-medium"
               >
-                <template #activator="{ props: tooltipProps }">
-                  <VChip
-                    v-bind="tooltipProps"
-                    size="x-small"
-                    :color="resolveUserRoleVariant(roleName).color"
-                    class="text-capitalize"
-                  >
-                    <VIcon
-                      start
-                      size="12"
-                      :icon="resolveUserRoleVariant(roleName).icon"
-                    />
-                    {{ roleName }}
-                  </VChip>
-                </template>
-              </VTooltip>
+                <VIcon
+                  start
+                  size="13"
+                  :icon="resolveUserRoleVariant(roleName).icon"
+                />
+                {{ roleName }}
+              </VChip>
             </template>
             <VChip
               v-else
-              size="x-small"
+              size="small"
               color="secondary"
+              variant="tonal"
             >
-              Unassigned
+              Belum Diatur
             </VChip>
           </div>
         </template>
-        <!-- Plan -->
-        <template #item.plan="{ item }">
-          <span class="text-capitalize text-high-emphasis">{{ item.currentPlan }}</span>
+        
+        <!-- Assignments / Branch -->
+        <template #item.assignments="{ item }">
+          <div class="d-flex flex-wrap gap-1">
+            <template v-if="item.assignments && item.assignments.length > 0">
+              <VChip
+                v-for="(a, idx) in item.assignments"
+                :key="idx"
+                size="small"
+                variant="tonal"
+                color="info"
+                class="font-weight-medium"
+              >
+                <VIcon start size="13" icon="ri-store-2-line" />
+                {{ a.branch_name }}
+              </VChip>
+            </template>
+            <span v-else class="text-caption text-medium-emphasis">Semua Cabang (Global)</span>
+          </div>
         </template>
+
         <!-- Status -->
         <template #item.status="{ item }">
           <VChip
             :color="resolveUserStatusVariant(item.status)"
             size="small"
-            class="text-capitalize"
+            variant="elevated"
+            class="font-weight-bold"
           >
             {{ item.status }}
           </VChip>
@@ -460,70 +470,52 @@ const widgetData = ref([
 
         <!-- Actions -->
         <template #item.actions="{ item }">
-          <IconBtn
-            size="small"
-            @click="deleteUser(item.id)"
-          >
-            <VIcon icon="ri-delete-bin-7-line" />
-          </IconBtn>
-
-          <IconBtn
-            size="small"
-            :to="{ name: 'apps-user-view-id', params: { id: item.id } }"
-          >
-            <VIcon icon="ri-eye-line" />
-          </IconBtn>
-
-          <IconBtn
-            size="small"
-            color="medium-emphasis"
-          >
-            <VIcon icon="ri-more-2-line" />
-
-            <VMenu activator="parent">
-              <VList>
-                <VListItem link>
-                  <template #prepend>
-                    <VIcon icon="ri-download-line" />
-                  </template>
-                  <VListItemTitle>Download</VListItemTitle>
-                </VListItem>
-                <VListItem
-                  link
-                  @click="openAssignmentDialog(item)"
-                >
-                  <template #prepend>
-                    <VIcon icon="ri-shield-user-line" />
-                  </template>
-                  <VListItemTitle>Kelola Jabatan</VListItemTitle>
-                </VListItem>
-              </VList>
-            </VMenu>
-          </IconBtn>
+          <div class="d-flex align-center justify-end gap-1">
+            <IconBtn
+              size="small"
+              color="primary"
+              variant="tonal"
+              title="Kelola Penugasan Cabang"
+              @click="openAssignmentDialog(item)"
+            >
+              <VIcon icon="ri-shield-user-line" size="18" />
+            </IconBtn>
+            
+            <IconBtn
+              size="small"
+              color="error"
+              variant="tonal"
+              title="Hapus Pengguna"
+              @click="deleteUser(item.id)"
+            >
+              <VIcon icon="ri-delete-bin-line" size="18" />
+            </IconBtn>
+          </div>
         </template>
 
         <!-- Pagination -->
         <template #bottom>
           <VDivider />
 
-          <div class="d-flex justify-end flex-wrap gap-x-6 px-2 py-1">
-            <div class="d-flex align-center gap-x-2 text-medium-emphasis text-base">
-              Rows Per Page:
+          <div class="d-flex justify-end flex-wrap gap-x-6 px-4 py-2">
+            <div class="d-flex align-center gap-x-2 text-medium-emphasis text-body-2">
+              Baris per halaman:
               <VSelect
                 v-model="itemsPerPage"
                 class="per-page-select"
                 variant="plain"
+                density="compact"
                 :items="[10, 20, 25, 50, 100]"
+                hide-details
               />
             </div>
 
-            <p class="d-flex align-center text-base text-high-emphasis me-2 mb-0">
+            <p class="d-flex align-center text-body-2 text-high-emphasis me-2 mb-0">
               {{ paginationMeta({ page, itemsPerPage }, totalUsers) }}
             </p>
 
             <div class="d-flex gap-x-2 align-center me-2">
               <VBtn
-                class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
                 density="comfortable"
@@ -533,7 +525,6 @@ const widgetData = ref([
               />
 
               <VBtn
-                class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
                 density="comfortable"
                 variant="text"
@@ -545,9 +536,9 @@ const widgetData = ref([
           </div>
         </template>
       </VDataTableServer>
-      <!-- SECTION -->
     </VCard>
-    <!-- 👉 Add New User -->
+
+    <!-- 👉 Add New User Drawer -->
     <AddNewUserDrawer
       v-model:is-drawer-open="isAddNewUserDrawerVisible"
       @user-data="addNewUser"
@@ -558,25 +549,26 @@ const widgetData = ref([
       v-model="isAssignmentDialogVisible"
       max-width="600"
     >
-      <VCard v-if="editingUser">
-        <VCardTitle class="d-flex align-center pa-4 pb-2">
-          <VIcon
-            icon="ri-shield-user-line"
-            class="me-2"
-            color="primary"
-          />
-          Kelola Jabatan: <strong class="ms-1">{{ editingUser.fullName }}</strong>
-          <VSpacer />
-          <IconBtn @click="isAssignmentDialogVisible = false">
-            <VIcon icon="ri-close-line" />
-          </IconBtn>
-        </VCardTitle>
-        <VDivider />
-        <VCardText class="pt-4">
-          <p class="text-body-2 text-medium-emphasis mb-4">
-            Setiap baris = satu penugasan (Cabang + Jabatan). Tambah baris untuk penugasan di banyak cabang.
-          </p>
+      <VCard v-if="editingUser" class="rounded-2xl pa-6">
+        <VCardItem class="pa-0 mb-4">
+          <div class="d-flex align-center gap-3">
+            <VAvatar color="primary" variant="tonal" size="48" rounded="xl">
+              <VIcon icon="ri-shield-user-line" size="26" />
+            </VAvatar>
+            <div>
+              <h3 class="text-h6 font-weight-bold mb-0">
+                Kelola Penugasan: {{ editingUser.fullName }}
+              </h3>
+              <p class="text-caption text-medium-emphasis mb-0">
+                Atur penugasan cabang dan peran untuk pengguna ini.
+              </p>
+            </div>
+          </div>
+        </VCardItem>
 
+        <VDivider class="mb-4" />
+
+        <VCardText class="pa-0 mb-4">
           <div
             v-for="(assignment, idx) in editingAssignments"
             :key="idx"
@@ -590,6 +582,8 @@ const widgetData = ref([
               item-value="id"
               label="Cabang / Toko"
               density="compact"
+              variant="outlined"
+              rounded="lg"
               hide-details
               style="min-width: 180px"
             />
@@ -597,18 +591,21 @@ const widgetData = ref([
             <VSelect
               v-model="assignment.role_name"
               :items="availableRoles"
-              label="Jabatan"
+              label="Jabatan / Peran"
               density="compact"
+              variant="outlined"
+              rounded="lg"
               hide-details
               style="min-width: 160px"
             />
             <!-- Delete row -->
             <IconBtn
               color="error"
+              variant="tonal"
               @click="removeAssignmentRow(idx)"
             >
               <VIcon
-                icon="ri-delete-bin-7-line"
+                icon="ri-delete-bin-line"
                 size="18"
               />
             </IconBtn>
@@ -619,17 +616,16 @@ const widgetData = ref([
             color="primary"
             size="small"
             prepend-icon="ri-add-line"
-            class="mt-2"
+            class="mt-2 font-weight-bold"
             @click="addAssignmentRow"
           >
-            Tambah Penugasan
+            Tambah Penugasan Cabang
           </VBtn>
         </VCardText>
-        <VDivider />
-        <VCardActions class="pa-4">
-          <VSpacer />
+
+        <VCardActions class="pa-0 d-flex justify-end gap-2">
           <VBtn
-            variant="outlined"
+            variant="tonal"
             color="secondary"
             @click="isAssignmentDialogVisible = false"
           >
@@ -637,9 +633,10 @@ const widgetData = ref([
           </VBtn>
           <VBtn
             color="primary"
+            class="font-weight-bold"
             @click="saveAssignments"
           >
-            Simpan
+            Simpan Penugasan
           </VBtn>
         </VCardActions>
       </VCard>
