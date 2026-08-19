@@ -1,47 +1,28 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useSnackbarStore } from '@/stores/snackbar'
 import ReceivableDetailDrawer from './ReceivableDetailDrawer.vue'
-import { $api } from '@/utils/api'
 
 const receivables = ref([])
 const isLoading = ref(false)
 const totalItems = ref(0)
-const options = ref({ page: 1, itemsPerPage: 10 })
+const page = ref(1)
+const itemsPerPage = ref(10)
 
 const selectedStatus = ref('')
 const selectedBranch = ref(null)
 const branches = ref([])
-
-const fetchBranches = async () => {
-  try {
-    const data = await ('/apps/branches')
-    branches.value = data.data || data
-  } catch (error) {
-    console.error(error)
-  }
-}
-
-onMounted(() => {
-  fetchBranches()
-})
 const searchQuery = ref('')
 let searchTimeout = null
 
-watch(searchQuery, () => {
-  if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    options.value.page = 1
-    fetchReceivables()
-  }, 500)
+const summary = ref({
+  total_due: 0,
+  total_paid: 0,
+  total_remaining: 0,
+  total_overdue: 0,
+  count_unpaid: 0,
+  count_paid: 0,
 })
-
-const statusOptions = [
-  { title: 'Semua Status', value: '' },
-  { title: 'Belum Lunas (Unpaid)', value: 'unpaid' },
-  { title: 'Lunas Sebagian (Partial)', value: 'partial' },
-  { title: 'Lunas (Paid)', value: 'paid' },
-]
 
 const isDetailDrawerVisible = ref(false)
 const selectedReceivableId = ref(null)
@@ -52,284 +33,447 @@ const voidPin = ref('')
 
 const snackbar = useSnackbarStore()
 
+const formatCurrency = value => {
+  if (!value || isNaN(value)) return 'Rp 0'
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value)
+}
+
+const formatDate = dateString => {
+  if (!dateString) return '-'
+  return new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+const fetchBranches = async () => {
+  try {
+    const res = await $api('/apps/branches')
+    branches.value = res.data || res || []
+  } catch (error) {
+    console.error('Failed to fetch branches:', error)
+  }
+}
+
 const fetchReceivables = async () => {
   isLoading.value = true
   try {
-    const data = await $api('/apps/receivables', {
-      params: {
-        page: options.value.page,
-        itemsPerPage: options.value.itemsPerPage,
-        status: selectedStatus.value || undefined,
-      },
-    })
+    const params = {
+      page: page.value,
+      itemsPerPage: itemsPerPage.value,
+    }
 
-    receivables.value = data.data || data
-    totalItems.value = data.total || (data.data ? data.data.length : data.length)
+    if (selectedStatus.value) params.status = selectedStatus.value
+    if (selectedBranch.value) params.branch_id = selectedBranch.value
+    if (searchQuery.value) params.search = searchQuery.value
+
+    const res = await $api('/apps/receivables', { query: params })
+
+    receivables.value = res.data || res || []
+    if (res.total !== undefined) {
+      totalItems.value = res.total
+    }
+    if (res.summary) {
+      summary.value = res.summary
+    }
   } catch (error) {
-    console.error(error)
+    console.error('Failed to fetch receivables:', error)
     snackbar.show('Gagal mengambil data piutang', 'error')
   } finally {
     isLoading.value = false
   }
 }
 
-watch(selectedStatus, () => {
-  options.value.page = 1
+watch(searchQuery, () => {
+  if (searchTimeout) clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    page.value = 1
+    fetchReceivables()
+  }, 450)
+})
+
+watch([selectedStatus, selectedBranch], () => {
+  page.value = 1
   fetchReceivables()
 })
 
-onMounted(() => {
+onMounted(async () => {
+  await fetchBranches()
   fetchReceivables()
 })
 
 const tableHeaders = [
-  { title: 'NO NOTA', key: 'sale.invoice_number' },
+  { title: 'NO. NOTA', key: 'sale.invoice_number' },
   { title: 'CABANG', key: 'sale.branch.name' },
-  { title: 'PETUGAS', key: 'sale.user.name' },
   { title: 'PELANGGAN', key: 'customer.name' },
+  { title: 'TOTAL TAGIHAN', key: 'amount_due', align: 'end' },
+  { title: 'SUDAH BAYAR', key: 'amount_paid', align: 'end' },
+  { title: 'SISA PIUTANG', key: 'remaining', sortable: false, align: 'end' },
   { title: 'JATUH TEMPO', key: 'due_date' },
-  { title: 'SISA HUTANG', key: 'remaining', sortable: false },
   { title: 'STATUS', key: 'status', align: 'center' },
   { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
 ]
 
-const formatCurrency = value => {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(value || 0)
+const isOverdue = item => {
+  if (!item || item.status === 'paid' || !item.due_date) return false
+  const today = new Date().toISOString().split('T')[0]
+  return item.due_date < today
 }
 
-const formatDate = dateString => {
-  if (!dateString) return '-'
-  
-  return new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-const getStatusColor = status => {
-  switch (status) {
-  case 'paid': return 'success'
-  case 'partial': return 'warning'
-  default: return 'error'
+const getStatusBadge = item => {
+  if (item.status === 'paid') {
+    return { text: 'LUNAS', color: 'success', icon: 'ri-check-double-line' }
   }
-}
-
-const getStatusText = status => {
-  switch (status) {
-  case 'paid': return 'LUNAS'
-  case 'partial': return 'SEBAGIAN'
-  default: return 'BELUM LUNAS'
+  if (isOverdue(item)) {
+    return { text: 'JATUH TEMPO', color: 'error', icon: 'ri-alarm-warning-line' }
   }
+  if (item.status === 'partial') {
+    return { text: 'SEBAGIAN', color: 'warning', icon: 'ri-time-line' }
+  }
+  return { text: 'BELUM LUNAS', color: 'error', icon: 'ri-close-circle-line' }
 }
 
-const isOverdue = (dueDate, status) => {
-  if (status === 'paid') return false
-  const today = new Date()
-
-  today.setHours(0, 0, 0, 0)
-
-  const due = new Date(dueDate)
-  
-  return due < today
-}
-
-const viewDetails = id => {
-  selectedReceivableId.value = id
+const openDetail = receivable => {
+  selectedReceivableId.value = receivable.id
   isDetailDrawerVisible.value = true
 }
 
-const onPaymentSaved = () => {
+const handlePaymentSaved = () => {
   fetchReceivables()
 }
 
-const confirmDelete = item => {
-  receivableToDelete.value = item
+const confirmDelete = receivable => {
+  receivableToDelete.value = receivable
   voidPin.value = ''
   isConfirmDeleteVisible.value = true
 }
 
-const executeDeleteReceivable = async () => {
+const executeDelete = async () => {
   if (!receivableToDelete.value) return
   if (!voidPin.value) {
-    snackbar.show('Silakan masukkan PIN Anda', 'error')
-    
+    snackbar.show('Silakan masukkan PIN Supervisor/Kepala Cabang', 'error')
     return
   }
-  
+
   isLoading.value = true
   try {
-    await $api(`/apps/receivables/${receivableToDelete.value.id}`, {
+    const res = await $api(`/apps/receivables/${receivableToDelete.value.id}`, {
       method: 'DELETE',
       body: { pin: voidPin.value },
     })
 
-    snackbar.show('Piutang dan Penjualan berhasil dibatalkan, stok telah dikembalikan.', 'success')
+    snackbar.show(res.message || 'Transaksi piutang berhasil dibatalkan dan stok dikembalikan.', 'success')
     isConfirmDeleteVisible.value = false
+    receivableToDelete.value = null
     fetchReceivables()
   } catch (error) {
     console.error(error)
-
-    const errorMsg = error.response?._data?.message || 'Gagal menghapus piutang.'
-
-    snackbar.show(errorMsg, 'error')
+    const err = error.response?._data?.message || 'Gagal membatalkan transaksi piutang.'
+    snackbar.show(err, 'error')
   } finally {
     isLoading.value = false
-    receivableToDelete.value = null
   }
 }
 </script>
 
 <template>
-  <div>
-    <p class="text-2xl mb-6">
-      Manajemen Piutang
-    </p>
+  <div class="pa-4">
+    <!-- Header -->
+    <div class="d-flex align-center justify-space-between mb-4">
+      <div>
+        <h2 class="text-h4 font-weight-bold mb-1">
+          Buku Piutang Usaha (Receivables)
+        </h2>
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          Kelola penagihan penjualan tempo/kredit, cicilan pembayaran pelanggan, dan pemantauan jatuh tempo.
+        </p>
+      </div>
+    </div>
 
-    <!-- Card -->
-    <VCard>
-      <!-- Card Header -->
-      <VCardText class="d-flex flex-wrap gap-4 align-center">
+    <!-- Summary KPI Cards -->
+    <VRow class="mb-4">
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-medium-emphasis font-weight-medium">TOTAL PIUTANG AKTIF</div>
+              <div class="text-h5 font-weight-bold text-primary mt-1">{{ formatCurrency(summary.total_due) }}</div>
+            </div>
+            <VAvatar color="primary" variant="tonal" size="42">
+              <VIcon icon="ri-file-list-3-line" size="22" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">{{ summary.count_unpaid }} Tagihan Belum Lunas</div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-warning">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-medium-emphasis font-weight-medium">SISA BELUM DIBAYAR</div>
+              <div class="text-h5 font-weight-bold text-warning mt-1">{{ formatCurrency(summary.total_remaining) }}</div>
+            </div>
+            <VAvatar color="warning" variant="tonal" size="42">
+              <VIcon icon="ri-hand-coin-line" size="22" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Menunggu Pelunasan</div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-medium-emphasis font-weight-medium">TOTAL SUDAH TERTAGIH</div>
+              <div class="text-h5 font-weight-bold text-success mt-1">{{ formatCurrency(summary.total_paid) }}</div>
+            </div>
+            <VAvatar color="success" variant="tonal" size="42">
+              <VIcon icon="ri-money-dollar-circle-line" size="22" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">{{ summary.count_paid }} Tagihan Selesai / Lunas</div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-error">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-error font-weight-bold">PIUTANG JATUH TEMPO</div>
+              <div class="text-h5 font-weight-bold text-error mt-1">{{ formatCurrency(summary.total_overdue) }}</div>
+            </div>
+            <VAvatar color="error" variant="tonal" size="42">
+              <VIcon icon="ri-alarm-warning-line" size="22" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-error font-weight-medium mt-2">Perlu Follow-up Penagihan Segera</div>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- Filter & Table Card -->
+    <VCard elevation="2">
+      <!-- Filter Bar -->
+      <VCardText class="d-flex flex-wrap align-center py-4 gap-4">
+        <VTextField
+          v-model="searchQuery"
+          placeholder="Cari No Nota / Pelanggan / HP..."
+          prepend-inner-icon="ri-search-line"
+          density="compact"
+          hide-details
+          style="max-width: 280px;"
+          clearable
+        />
+
         <VSelect
           v-model="selectedStatus"
-          :items="statusOptions"
-          label="Filter Status"
+          :items="[
+            { title: 'Semua Status', value: '' },
+            { title: 'Belum Lunas (Unpaid)', value: 'unpaid' },
+            { title: 'Lunas Sebagian (Partial)', value: 'partial' },
+            { title: 'Lunas (Paid)', value: 'paid' },
+          ]"
+          item-title="title"
+          item-value="value"
+          label="Status Pembayaran"
           density="compact"
-          style="max-width: 250px;"
+          style="max-width: 200px"
           hide-details
         />
-        
+
+        <VAutocomplete
+          v-model="selectedBranch"
+          :items="branches"
+          item-title="name"
+          item-value="id"
+          placeholder="Semua Cabang"
+          label="Cabang"
+          density="compact"
+          style="max-width: 200px"
+          hide-details
+          clearable
+        />
+
         <VSpacer />
+
+        <VBtn
+          variant="tonal"
+          color="secondary"
+          size="small"
+          prepend-icon="ri-refresh-line"
+          :loading="isLoading"
+          @click="fetchReceivables"
+        >
+          Muat Ulang
+        </VBtn>
       </VCardText>
 
       <VDivider />
 
       <!-- Data Table -->
       <VDataTableServer
-        v-model:options="options"
+        v-model:items-per-page="itemsPerPage"
+        v-model:page="page"
         :headers="tableHeaders"
         :items="receivables"
         :items-length="totalItems"
         :loading="isLoading"
         class="text-no-wrap"
+        hover
         @update:options="fetchReceivables"
       >
+        <!-- Invoice Number -->
         <template #item.sale.invoice_number="{ item }">
-          <span class="font-weight-bold">{{ item.sale?.invoice_number || '-' }}</span>
+          <a
+            href="#"
+            class="font-weight-bold text-primary text-decoration-none"
+            @click.prevent="openDetail(item)"
+          >
+            {{ item.sale?.invoice_number || '-' }}
+          </a>
+          <div class="text-caption text-disabled">{{ item.sale?.date }}</div>
         </template>
-        
+
+        <!-- Branch -->
         <template #item.sale.branch.name="{ item }">
-          {{ item.sale?.branch?.name || '-' }}
-        </template>
-        
-        <template #item.sale.user.name="{ item }">
-          {{ item.sale?.user?.name || '-' }}
+          <span>{{ item.sale?.branch?.name || '-' }}</span>
         </template>
 
+        <!-- Customer -->
         <template #item.customer.name="{ item }">
-          {{ item.customer?.name || '-' }}
+          <div class="font-weight-medium">{{ item.customer?.name || '-' }}</div>
+          <div class="text-caption text-disabled">{{ item.customer?.phone || '-' }}</div>
         </template>
 
+        <!-- Total Tagihan -->
+        <template #item.amount_due="{ item }">
+          <span class="font-weight-medium">{{ formatCurrency(item.amount_due) }}</span>
+        </template>
+
+        <!-- Sudah Bayar -->
+        <template #item.amount_paid="{ item }">
+          <span class="text-success font-weight-medium">{{ formatCurrency(item.amount_paid) }}</span>
+        </template>
+
+        <!-- Sisa Piutang -->
+        <template #item.remaining="{ item }">
+          <span :class="item.status === 'paid' ? 'text-disabled' : 'text-error font-weight-bold'">
+            {{ formatCurrency(Number(item.amount_due) - Number(item.amount_paid)) }}
+          </span>
+        </template>
+
+        <!-- Due Date -->
         <template #item.due_date="{ item }">
-          <div :class="{'text-error font-weight-bold': isOverdue(item.due_date, item.status)}">
+          <div :class="isOverdue(item) ? 'text-error font-weight-bold' : ''">
             {{ formatDate(item.due_date) }}
-            <VIcon
-              v-if="isOverdue(item.due_date, item.status)"
-              icon="ri-error-warning-line"
-              size="small"
-              class="ml-1"
-            />
+            <VChip
+              v-if="isOverdue(item)"
+              color="error"
+              size="x-small"
+              class="ms-1"
+              variant="flat"
+            >
+              Lewat
+            </VChip>
           </div>
         </template>
 
-        <template #item.remaining="{ item }">
-          <span class="font-weight-bold text-error">
-            {{ formatCurrency(item.amount_due - item.amount_paid) }}
-          </span>
-        </template>
-        
+        <!-- Status -->
         <template #item.status="{ item }">
           <VChip
-            :color="getStatusColor(item.status)"
+            :color="getStatusBadge(item).color"
             size="small"
-            class="font-weight-bold"
+            variant="elevated"
+            class="font-weight-medium"
           >
-            {{ getStatusText(item.status) }}
+            <VIcon
+              :icon="getStatusBadge(item).icon"
+              size="14"
+              class="me-1"
+            />
+            {{ getStatusBadge(item).text }}
           </VChip>
         </template>
 
+        <!-- Actions -->
         <template #item.actions="{ item }">
-          <div class="d-flex align-center gap-2">
-            <VBtn 
-              size="small" 
-              :color="item.status === 'paid' ? 'secondary' : 'primary'" 
-              variant="tonal" 
-              @click="viewDetails(item.id)"
-            >
-              {{ item.status === 'paid' ? 'Detail' : 'Bayar/Detail' }}
-            </VBtn>
+          <div class="d-flex gap-1 justify-center align-center">
             <VBtn
-              v-if="$can('delete', 'Kasir (POS)')"
-              icon="ri-delete-bin-line"
-              color="error"
               size="small"
+              color="primary"
+              variant="elevated"
+              prepend-icon="ri-hand-coin-line"
+              @click="openDetail(item)"
+            >
+              Bayar / Detail
+            </VBtn>
+
+            <VBtn
+              v-if="item.status !== 'paid'"
+              icon
+              size="small"
+              color="error"
               variant="text"
               @click="confirmDelete(item)"
-            />
+            >
+              <VIcon icon="ri-delete-bin-line" />
+              <VTooltip activator="parent" location="top">Batalkan Transaksi Piutang</VTooltip>
+            </VBtn>
+          </div>
+        </template>
+
+        <template #no-data>
+          <div class="pa-4 text-center text-medium-emphasis">
+            Tidak ada catatan piutang usaha yang cocok dengan filter.
           </div>
         </template>
       </VDataTableServer>
     </VCard>
 
+    <!-- Detail & Payment Drawer -->
     <ReceivableDetailDrawer
       v-model:is-drawer-open="isDetailDrawerVisible"
       :receivable-id="selectedReceivableId"
-      @payment-saved="onPaymentSaved"
+      @payment-saved="handlePaymentSaved"
     />
 
-    <!-- Void Confirmation Dialog -->
+    <!-- Void / Cancel Confirmation Dialog -->
     <VDialog
       v-model="isConfirmDeleteVisible"
-      max-width="500"
+      max-width="450"
     >
       <VCard>
-        <VCardTitle class="text-error bg-error-lighten-4 pa-4">
-          Konfirmasi Pembatalan Piutang
+        <VCardTitle class="px-6 pt-6 pb-2 text-error d-flex align-center gap-2">
+          <VIcon icon="ri-alert-line" />
+          <span>Batalkan Transaksi Piutang</span>
         </VCardTitle>
-        <VCardText class="pa-6">
-          <p class="text-body-1">
-            Apakah Anda yakin ingin menghapus piutang dan membatalkan transaksi dari <strong>{{ receivableToDelete?.customer?.name }}</strong> (Bon: {{ receivableToDelete?.sale?.invoice_number }})?
+        <VCardText class="px-6 py-2">
+          <p class="text-body-2 mb-3">
+            Membatalkan piutang untuk nota <strong>{{ receivableToDelete?.sale?.invoice_number }}</strong> akan menghapus seluruh data cicilan dan <strong>mengembalikan stok produk ke sistem</strong>.
           </p>
-          <VAlert
-            type="warning"
-            variant="tonal"
-            class="mt-4 text-caption mb-4"
-          >
-            Tindakan ini akan <strong>menghapus bersih data piutang ini (termasuk cicilan/DP)</strong>, membatalkan transaksi penjualan secara utuh, dan mengembalikan stok barang ke gudang secara otomatis. Data yang dihapus tidak bisa dikembalikan.
-          </VAlert>
-          
           <VTextField
             v-model="voidPin"
             type="password"
-            label="Masukkan PIN Kasir Anda"
-            placeholder="****"
-            variant="outlined"
+            label="PIN Otorisasi Supervisor / Kasir"
+            placeholder="Masukkan 6 digit PIN"
             density="compact"
             autofocus
-            @keyup.enter="executeDeleteReceivable"
           />
         </VCardText>
-        <VCardActions class="pa-4 pt-0 justify-end">
+        <VCardActions class="px-6 pb-4 justify-end gap-2">
           <VBtn
-            color="secondary"
             variant="outlined"
+            color="secondary"
             @click="isConfirmDeleteVisible = false"
           >
             Batal
           </VBtn>
           <VBtn
             color="error"
-            prepend-icon="ri-delete-bin-line"
-            :disabled="!voidPin"
-            @click="executeDeleteReceivable"
+            variant="elevated"
+            :loading="isLoading"
+            @click="executeDelete"
           >
-            Ya, Hapus & Batalkan Transaksi
+            Konfirmasi Batalkan
           </VBtn>
         </VCardActions>
       </VCard>
@@ -340,5 +484,5 @@ const executeDeleteReceivable = async () => {
 <route lang="yaml">
 meta:
   action: read
-  subject: Data Piutang
+  subject: Piutang
 </route>

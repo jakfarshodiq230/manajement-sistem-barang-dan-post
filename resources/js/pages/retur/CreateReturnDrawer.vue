@@ -56,14 +56,15 @@ const fetchTransactions = async () => {
   
   isLoading.value = true
   try {
-    let endpoint = referenceType.value === 'sale' ? '/apps/sales' : '/apps/purchase-orders'
-    const data = await $api(`${endpoint}?branch_id=${branchId.value}`)
+    let endpoint = referenceType.value === 'sale' ? '/apps/sales?itemsPerPage=-1' : '/apps/purchase-orders?itemsPerPage=-1'
+    const res = await $api(`${endpoint}&branch_id=${branchId.value}`)
+    const list = res.data || res || []
     
     // Filter completed transactions
     if (referenceType.value === 'sale') {
-      availableTransactions.value = data.data || data
+      availableTransactions.value = list
     } else {
-      availableTransactions.value = data.filter(po => po.status === 'completed')
+      availableTransactions.value = list.filter(po => po.status === 'completed' || po.approval_status === 'approved')
     }
   } catch (err) {
     console.error(err)
@@ -107,8 +108,9 @@ watch(referenceId, async newVal => {
 // Helper if purchase order items only have product_id, we need to map to product_branch_id
 const getProductBranchId = async productId => {
   try {
-    const data = await $api(`/apps/product-branches?branch_id=${branchId.value}`)
-    const pb = data.find(p => p.product_id === productId)
+    const res = await $api(`/apps/product-branches?branch_id=${branchId.value}&itemsPerPage=-1`)
+    const items = res.data || res || []
+    const pb = items.find(p => p.product_id === productId)
     
     return pb ? pb.id : null
   } catch(e) {

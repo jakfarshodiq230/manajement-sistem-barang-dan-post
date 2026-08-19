@@ -17,7 +17,16 @@ class StockTransfer extends Model
         'status',
         'notes',
         'created_by',
-        'approved_by'
+        'prepared_by',
+        'prepared_at',
+        'approved_by',
+        'received_by',
+        'received_at',
+    ];
+
+    protected $casts = [
+        'prepared_at' => 'datetime',
+        'received_at' => 'datetime',
     ];
 
     public function getActivitylogOptions(): \Spatie\Activitylog\LogOptions
@@ -40,9 +49,19 @@ class StockTransfer extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function preparedBy()
+    {
+        return $this->belongsTo(User::class, 'prepared_by');
+    }
+
     public function approvedBy()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function receivedBy()
+    {
+        return $this->belongsTo(User::class, 'received_by');
     }
 
     public function items()

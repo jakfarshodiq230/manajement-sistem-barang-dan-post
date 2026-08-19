@@ -136,15 +136,29 @@ class ReturnController extends Controller
         }
     }
 
-    public function show(ReturnTransaction $returnTransaction)
+    public function show($id)
     {
-        $returnTransaction->load(['branch', 'user', 'approver', 'items.productBranch.product']);
+        $returnTransaction = ReturnTransaction::with([
+            'branch',
+            'user',
+            'approver',
+            'items.productBranch.product',
+            'purchaseOrder',
+            'sale'
+        ])->findOrFail($id);
+
         return response()->json($returnTransaction);
     }
 
-    public function approve(Request $request, ReturnTransaction $returnTransaction)
+    public function approve(Request $request, $id)
     {
-        // Should be Kepala Cabang
+        $returnTransaction = ReturnTransaction::with([
+            'items.productBranch.product',
+            'purchaseOrder',
+            'sale',
+            'branch'
+        ])->findOrFail($id);
+
         if ($returnTransaction->status !== 'pending') {
             return response()->json(['message' => 'Retur sudah diproses sebelumnya'], 400);
         }
@@ -153,15 +167,17 @@ class ReturnController extends Controller
         try {
             $returnTransaction->update([
                 'status' => 'completed',
-                'approved_by' => $request->user()->id
+                'approved_by' => $request->user()->id,
+                'approved_at' => now(),
             ]);
 
-            // Process Stock
+            // Process Stock based on reference_type
             foreach ($returnTransaction->items as $item) {
                 $pb = ProductBranch::find($item->product_branch_id);
-                
-                if ($returnTransaction->return_type === 'pengembalian_uang') {
-                    // Sale Return: Customer returns item to us. Stock INCREASES.
+                if (!$pb) continue;
+
+                if ($returnTransaction->reference_type === 'sale') {
+                    // Retur Penjualan: Pelanggan mengembalikan barang ke toko -> Stok toko BERTAMBAH (IN)
                     $stockMethod = $pb->product->stock_method ?? 'fifo';
                     $activeBatchQuery = \App\Models\ProductBatch::where('product_branch_id', $pb->id)->where('qty', '>', 0);
                     
@@ -176,7 +192,6 @@ class ReturnController extends Controller
                     $activeBatch = $activeBatchQuery->first();
                     
                     if (!$activeBatch) {
-                        // Fallback to the newest batch if all are empty
                         $activeBatch = \App\Models\ProductBatch::where('product_branch_id', $pb->id)->orderBy('id', 'desc')->first();
                     }
                     
@@ -186,29 +201,34 @@ class ReturnController extends Controller
                         \App\Models\ProductBatch::create([
                             'product_branch_id' => $pb->id,
                             'qty' => $item->qty,
-                            'cost_price' => $pb->cost_price,
-                            'price' => $pb->price,
-                            'min_nego_price' => $pb->min_nego_price,
+                            'cost_price' => $pb->cost_price ?? 0,
+                            'price' => $pb->price ?? 0,
+                            'min_nego_price' => $pb->min_nego_price ?? 0,
                             'entry_date' => now(),
                         ]);
                     }
                     
                     $pb->increment('stock', $item->qty);
                     
+                    $saleInvoice = $returnTransaction->sale ? $returnTransaction->sale->invoice_number : '';
+                    $refLabel = $saleInvoice ? " (Faktur: {$saleInvoice})" : '';
+
                     StockMovement::create([
                         'product_branch_id' => $pb->id,
                         'type' => 'in',
                         'quantity' => $item->qty,
-                        'unit_cost' => $pb->cost_price,
-                        'notes' => "Retur Penjualan (Refund): {$returnTransaction->return_number}",
+                        'unit_cost' => $pb->cost_price ?? 0,
+                        'notes' => "Retur Penjualan: {$returnTransaction->return_number}{$refLabel}",
                         'user_id' => $request->user()->id,
                         'reference_type' => ReturnTransaction::class,
                         'reference_id' => $returnTransaction->id
                     ]);
-                } else if ($returnTransaction->return_type === 'tukar_barang') {
-                    // Purchase Return: We return defective item to supplier. Stock DECREASES.
+
+                } else if ($returnTransaction->reference_type === 'purchase') {
+                    // Retur Pembelian: Toko kembalikan barang cacat ke supplier -> Stok toko BERKURANG (OUT)
                     if ($pb->stock < $item->qty) {
-                        throw new \Exception("Stok tidak mencukupi untuk diretur ke supplier (Produk ID: {$pb->product_id})");
+                        $prodName = $pb->product ? $pb->product->name : "ID {$pb->product_id}";
+                        throw new \Exception("Stok tidak mencukupi untuk diretur ke supplier untuk '{$prodName}' (Sisa stok: {$pb->stock}, Diminta retur: {$item->qty})");
                     }
                     
                     // Deduct from batches using FIFO/FEFO/LIFO
@@ -240,17 +260,21 @@ class ReturnController extends Controller
                     }
 
                     if ($qtyToDeduct > 0) {
-                         throw new \Exception("Stok Batch tidak mencukupi untuk diretur ke supplier (Produk ID: {$pb->product_id})");
+                        $prodName = $pb->product ? $pb->product->name : "ID {$pb->product_id}";
+                        throw new \Exception("Stok Batch tidak mencukupi untuk diretur ke supplier untuk '{$prodName}' (Sisa kurang: {$qtyToDeduct})");
                     }
                     
                     $pb->decrement('stock', $item->qty);
                     
+                    $poNumber = $returnTransaction->purchaseOrder ? $returnTransaction->purchaseOrder->po_number : '';
+                    $refLabel = $poNumber ? " (PO: {$poNumber})" : '';
+
                     StockMovement::create([
                         'product_branch_id' => $pb->id,
                         'type' => 'out',
                         'quantity' => $item->qty,
-                        'unit_cost' => $pb->cost_price,
-                        'notes' => "Retur Pembelian (Tukar Barang): {$returnTransaction->return_number}",
+                        'unit_cost' => $pb->cost_price ?? 0,
+                        'notes' => "Retur Pembelian ke Supplier: {$returnTransaction->return_number}{$refLabel}",
                         'user_id' => $request->user()->id,
                         'reference_type' => ReturnTransaction::class,
                         'reference_id' => $returnTransaction->id
@@ -261,7 +285,7 @@ class ReturnController extends Controller
             DB::commit();
             return response()->json([
                 'message' => 'Retur berhasil disetujui dan stok telah disesuaikan',
-                'return_transaction' => $returnTransaction
+                'return_transaction' => $returnTransaction->load(['items.productBranch.product', 'branch', 'user', 'approver'])
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -269,11 +293,13 @@ class ReturnController extends Controller
         }
     }
 
-    public function destroy(ReturnTransaction $returnTransaction)
+    public function destroy($id)
     {
         if (!request()->user()->can('Retur Barang Delete')) {
             abort(403, 'Unauthorized action.');
         }
+
+        $returnTransaction = ReturnTransaction::findOrFail($id);
 
         if ($returnTransaction->status === 'completed') {
             return response()->json(['message' => 'Tidak dapat menghapus retur yang sudah selesai'], 400);

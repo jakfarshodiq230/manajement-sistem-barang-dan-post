@@ -89,6 +89,24 @@ const changeAmount = computed(() => {
   return diff > 0 ? diff : 0
 })
 
+const setQuickCash = val => {
+  if (val === 'exact') {
+    paidAmountRaw.value = totalAmount.value
+  } else {
+    paidAmountRaw.value = val
+  }
+}
+
+const quickCashSuggestions = computed(() => {
+  const tot = totalAmount.value || 0
+  const baseNominals = [10000, 20000, 50000, 100000, 200000, 500000]
+  const valid = baseNominals.filter(n => n >= tot)
+  if (valid.length === 0) {
+    valid.push(Math.ceil(tot / 100000) * 100000)
+  }
+  return valid.slice(0, 4)
+})
+
 const isErrorDialogVisible = ref(false)
 const errorMessage = ref('')
 
@@ -210,7 +228,7 @@ const fetchProducts = async (branchId, resetPage = false) => {
   if (resetPage) page.value = 1
   isLoading.value = true
   try {
-    let url = `/apps/product-branches?branch_id=${branchId}&paginate=true&has_stock=true&page=${page.value}`
+    let url = `/apps/product-branches?branch_id=${branchId}&paginate=true&has_stock=true&per_page=6&page=${page.value}`
     if (search.value) url += `&search=${encodeURIComponent(search.value)}`
     if (selectedCategory.value) url += `&category_id=${selectedCategory.value}`
     
@@ -305,23 +323,37 @@ const addToCart = (productBranch, batch = null) => {
     item.batch_id === (batch ? batch.id : null),
   )
 
+  const availableStock = batch ? batch.qty : productBranch.stock
+
+  if (availableStock <= 0) {
+    snackbar.show('Stok produk habis!', 'error')
+    return
+  }
+
   if (existingItem) {
-    const maxQty = batch ? batch.qty : productBranch.stock
+    const maxQty = availableStock
     if (existingItem.qty < maxQty) {
       existingItem.qty++
+      if (maxQty - existingItem.qty <= 3 && maxQty - existingItem.qty > 0) {
+        snackbar.show(`Peringatan: Sisa stok ${productBranch.product?.name || ''} tersisa ${maxQty - existingItem.qty}`, 'warning')
+      }
     } else {
-      snackbar.show(`Stok ${batch ? 'batch' : 'cabang'} tidak mencukupi`, 'warning')
+      snackbar.show(`Stok ${batch ? 'batch' : 'cabang'} tidak mencukupi (Maksimal: ${maxQty})`, 'warning')
     }
   } else {
     const minNego = batch ? batch.min_nego_price : (productBranch.active_batch ? productBranch.active_batch.min_nego_price : productBranch.min_nego_price)
     const sellingPrice = batch ? batch.price : (productBranch.active_batch ? productBranch.active_batch.price : productBranch.price)
     
+    if (availableStock <= 3) {
+      snackbar.show(`Peringatan: Stok ${productBranch.product?.name || 'produk'} menipis (Sisa: ${availableStock})`, 'warning')
+    }
+
     cart.value.push({
       product_branch_id: productBranch.id,
       batch_id: batch ? batch.id : null,
       name: productBranch.product.name + (batch ? ` (Batch #${batch.id})` : ''),
       qty: 1,
-      max_stock: batch ? batch.qty : productBranch.stock,
+      max_stock: availableStock,
       cost_price: Math.round(productBranch.cost_price),
       min_nego_price: Math.round(minNego || 0),
       original_price: Math.round(sellingPrice || 0),
@@ -648,7 +680,7 @@ const startNewTransaction = () => {
         class="d-flex flex-column"
       >
         <VCard class="flex-grow-1 d-flex flex-column">
-          <VCardText class="pb-2">
+          <VCardText class="pb-3">
             <VRow>
               <VCol
                 cols="12"
@@ -656,10 +688,11 @@ const startNewTransaction = () => {
               >
                 <VTextField
                   v-model="search"
-                  placeholder="Cari produk..."
+                  placeholder="Cari nama produk, SKU, barcode (Tekan F2)..."
                   density="compact"
                   prepend-inner-icon="ri-search-line"
                   hide-details
+                  clearable
                 />
               </VCol>
               <VCol
@@ -671,95 +704,173 @@ const startNewTransaction = () => {
                   :items="categories"
                   item-title="name"
                   item-value="id"
-                  placeholder="Semua Kategori"
+                  placeholder="Pilih Kategori Produk"
                   density="compact"
                   clearable
                   hide-details
                 />
               </VCol>
             </VRow>
+
+            <!-- Quick Category Filter with Left/Right Arrows (No Scrollbar) -->
+            <VSlideGroup
+              show-arrows
+              class="pt-2"
+            >
+              <VSlideGroupItem>
+                <VChip
+                  size="small"
+                  :color="!selectedCategory ? 'primary' : 'secondary'"
+                  :variant="!selectedCategory ? 'elevated' : 'tonal'"
+                  class="ma-1 cursor-pointer font-weight-bold"
+                  @click="selectedCategory = null"
+                >
+                  <VIcon icon="ri-apps-line" size="14" class="me-1" />
+                  Semua Kategori
+                </VChip>
+              </VSlideGroupItem>
+              <VSlideGroupItem
+                v-for="cat in categories"
+                :key="cat.id"
+              >
+                <VChip
+                  size="small"
+                  :color="selectedCategory === cat.id ? 'primary' : 'secondary'"
+                  :variant="selectedCategory === cat.id ? 'elevated' : 'tonal'"
+                  class="ma-1 cursor-pointer font-weight-medium"
+                  @click="selectedCategory = selectedCategory === cat.id ? null : cat.id"
+                >
+                  {{ cat.name }}
+                </VChip>
+              </VSlideGroupItem>
+            </VSlideGroup>
           </VCardText>
           
           <VDivider />
 
-          <VCardText class="flex-grow-1 bg-var-theme-background pa-4">
+          <VCardText class="flex-grow-1 bg-var-theme-background pa-3 d-flex flex-column justify-space-between">
             <div
               v-if="isLoading"
-              class="d-flex justify-center align-center h-100"
+              class="d-flex justify-center align-center h-100 py-12"
             >
               <VProgressCircular
                 indeterminate
                 color="primary"
+                size="48"
               />
             </div>
             
-            <div v-else-if="products.length > 0">
-              <VRow>
-                <VCol
-                  v-for="item in products"
-                  :key="item.id"
-                  cols="12"
-                  sm="6"
-                  md="4"
-                  lg="3"
-                >
-                  <VCard 
-                    class="h-100 cursor-pointer product-card transition-all"
-                    :class="{'opacity-50 pointer-events-none': item.stock <= 3}"
-                    elevation="2"
-                    @click="item.stock > 3 ? handleProductClick(item) : null"
+            <div v-else-if="products.length > 0" class="d-flex flex-column flex-grow-1">
+              <!-- Scrollable Product Grid (6 Items per page) -->
+              <div class="product-scroll-area overflow-y-auto pe-1 flex-grow-1" style="max-height: calc(100vh - 320px); min-height: 400px;">
+                <VRow class="g-3">
+                  <VCol
+                    v-for="item in products"
+                    :key="item.id"
+                    cols="12"
+                    sm="6"
+                    md="4"
                   >
-                    <div
-                      class="bg-primary-lighten-4 pa-4 d-flex justify-center align-center"
-                      style="height: 120px;"
+                    <VCard 
+                      class="h-100 cursor-pointer product-card transition-all rounded-lg overflow-hidden position-relative"
+                      :class="{'opacity-50 pointer-events-none': item.stock <= 0}"
+                      elevation="2"
+                      hover
+                      @click="item.stock > 0 ? handleProductClick(item) : null"
                     >
-                      <VIcon
-                        icon="ri-box-3-line"
-                        size="48"
-                        color="primary"
-                      />
-                    </div>
-                    <VCardText class="pa-3 text-center">
-                      <h6
-                        class="text-subtitle-2 font-weight-bold mb-1 text-truncate"
-                        :title="item.product?.name"
-                      >
-                        {{ item.product?.name }}
-                      </h6>
-                      <div class="text-caption text-disabled mb-2">
-                        {{ item.product?.sku }}
+                      <!-- Stock Method Badge Top Left -->
+                      <div class="position-absolute top-0 start-0 pa-2 z-index-1">
+                        <VChip
+                          v-if="item.product?.stock_method"
+                          size="x-small"
+                          :color="item.product.stock_method === 'FEFO' ? 'error' : (item.product.stock_method === 'LIFO' ? 'info' : 'primary')"
+                          variant="elevated"
+                          class="font-weight-bold shadow-sm"
+                        >
+                          {{ item.product.stock_method }}
+                        </VChip>
                       </div>
-                      <div class="text-primary font-weight-bold mb-1">
-                        {{ formatRupiah(item.price) }}
-                      </div>
+
+                      <!-- Product Image or Modern Placeholder -->
                       <div
-                        v-if="item.min_nego_price > 0 && item.min_nego_price < item.price"
-                        class="text-caption text-warning mb-2"
+                        class="d-flex justify-center align-center bg-primary-lighten-5 position-relative"
+                        style="height: 125px; overflow: hidden;"
                       >
-                        Batas Nego: {{ formatRupiah(item.min_nego_price) }}
+                        <VImg
+                          v-if="item.product?.image"
+                          :src="`/storage/${item.product.image}`"
+                          cover
+                          height="125"
+                        />
+                        <div v-else class="text-center">
+                          <VAvatar color="primary" variant="tonal" size="52" rounded="lg">
+                            <VIcon
+                              icon="ri-box-3-line"
+                              size="30"
+                              color="primary"
+                            />
+                          </VAvatar>
+                        </div>
                       </div>
-                      <VChip
-                        size="x-small"
-                        :color="item.stock > 3 ? 'success' : 'error'"
-                      >
-                        {{ item.stock > 3 ? `Stok: ${item.stock}` : `Sisa Stok: ${item.stock} (Tidak bisa dijual)` }}
-                      </VChip>
-                    </VCardText>
-                  </VCard>
-                </VCol>
-              </VRow>
-              <div class="d-flex justify-center mt-6">
+
+                      <VCardText class="pa-3 text-center">
+                        <h6
+                          class="text-subtitle-2 font-weight-bold mb-1 text-truncate"
+                          :title="item.product?.name"
+                        >
+                          {{ item.product?.name }}
+                        </h6>
+                        
+                        <div class="d-flex justify-center align-center gap-1 text-caption text-disabled mb-2">
+                          <span>{{ item.product?.sku || 'NO-SKU' }}</span>
+                          <span v-if="item.product?.unit">• {{ item.product.unit }}</span>
+                        </div>
+
+                        <div class="text-primary font-weight-bold text-subtitle-1 mb-1">
+                          {{ formatRupiah(item.price) }}
+                        </div>
+
+                        <div
+                          v-if="item.min_nego_price > 0 && item.min_nego_price < item.price"
+                          class="text-caption text-warning mb-2"
+                        >
+                          Min. Nego: {{ formatRupiah(item.min_nego_price) }}
+                        </div>
+
+                        <VChip
+                          size="x-small"
+                          :color="item.stock > 3 ? 'success' : (item.stock > 0 ? 'warning' : 'error')"
+                          :variant="item.stock > 3 ? 'tonal' : 'elevated'"
+                          class="font-weight-bold"
+                        >
+                          <VIcon
+                            v-if="item.stock <= 3 && item.stock > 0"
+                            icon="ri-alert-line"
+                            size="12"
+                            class="me-1"
+                          />
+                          {{ item.stock > 3 ? `Stok: ${item.stock} ${item.product?.unit || ''}` : (item.stock > 0 ? `Sisa ${item.stock}` : 'Habis (0)') }}
+                        </VChip>
+                      </VCardText>
+                    </VCard>
+                  </VCol>
+                </VRow>
+              </div>
+
+              <!-- Pinned Bottom Pagination -->
+              <div class="d-flex justify-center pt-3 border-t mt-2">
                 <VPagination
                   v-model="page"
                   :length="totalPages"
                   :total-visible="5"
+                  rounded="circle"
                 />
               </div>
             </div>
             
             <div
               v-else
-              class="d-flex flex-column justify-center align-center h-100 text-disabled"
+              class="d-flex flex-column justify-center align-center h-100 text-disabled py-12"
             >
               <VIcon
                 icon="ri-inbox-line"
@@ -772,55 +883,65 @@ const startNewTransaction = () => {
         </VCard>
       </VCol>
 
-      <!-- Kanan: Keranjang (Cart) -->
+      <!-- Kanan: Keranjang (Cart) Sticky & Compact -->
       <VCol
         cols="12"
         md="4"
         class="d-flex flex-column"
+        style="position: sticky; top: 16px; z-index: 10;"
       >
-        <VCard class="flex-grow-1 d-flex flex-column">
-          <VCardItem class="bg-primary text-white py-3">
-            <VCardTitle class="text-white d-flex align-center">
-              <VIcon
-                icon="ri-shopping-cart-2-line"
-                class="me-2"
-              />
-              Keranjang Belanja
+        <VCard class="d-flex flex-column rounded-lg overflow-hidden border elevation-2">
+          <VCardItem class="bg-primary text-white py-2 px-4">
+            <VCardTitle class="text-white d-flex align-center justify-space-between text-subtitle-1">
+              <div class="d-flex align-center font-weight-bold">
+                <VIcon
+                  icon="ri-shopping-cart-2-line"
+                  class="me-2"
+                />
+                Keranjang Belanja
+              </div>
+              <VChip v-if="cart.length > 0" color="white" size="x-small" variant="elevated" class="text-primary font-weight-bold">
+                {{ cart.length }} Item
+              </VChip>
             </VCardTitle>
           </VCardItem>
 
-          <VCardText class="flex-grow-1 pa-0">
+          <!-- List Belanja Scrollable (Internal Scroll - Tidak Memanjang ke Bawah) -->
+          <div
+            class="overflow-y-auto pa-0 bg-surface"
+            style="max-height: 230px; min-height: 120px;"
+          >
             <VList
               v-if="cart.length > 0"
               lines="two"
+              class="pa-0"
             >
               <template
                 v-for="(item, index) in cart"
                 :key="index"
               >
-                <VListItem class="py-3">
-                  <div class="d-flex justify-space-between w-100 mb-2">
+                <VListItem class="py-2 px-3">
+                  <div class="d-flex justify-space-between w-100 mb-1">
                     <div
-                      class="font-weight-bold text-truncate pe-2"
-                      style="max-width: 70%;"
+                      class="font-weight-bold text-truncate pe-2 text-body-2"
+                      style="max-width: 75%;"
                     >
                       {{ item.name }}
                     </div>
                     <IconBtn
-                      v-if="$can('delete', 'Kasir (POS)')"
                       size="x-small"
                       color="error"
                       @click="removeFromCart(index)"
                     >
-                      <VIcon icon="ri-delete-bin-line" />
+                      <VIcon icon="ri-delete-bin-line" size="18" />
                     </IconBtn>
                   </div>
                   
                   <div class="d-flex align-center justify-space-between gap-2">
                     <!-- Qty Control -->
                     <div
-                      class="d-flex align-center border rounded pa-1"
-                      style="width: 100px;"
+                      class="d-flex align-center border rounded pa-0"
+                      style="width: 88px; height: 32px;"
                     >
                       <VBtn
                         size="x-small"
@@ -828,7 +949,7 @@ const startNewTransaction = () => {
                         icon="ri-subtract-line"
                         @click="item.qty > 1 ? item.qty-- : null"
                       />
-                      <div class="text-center flex-grow-1 font-weight-medium">
+                      <div class="text-center flex-grow-1 font-weight-bold text-caption">
                         {{ item.qty }}
                       </div>
                       <VBtn
@@ -839,7 +960,7 @@ const startNewTransaction = () => {
                       />
                     </div>
                     <!-- Price Input (Nego) -->
-                    <div class="flex-grow-1 ms-4">
+                    <div class="flex-grow-1 ms-2">
                       <VTextField
                         :model-value="formatInputRupiah(item.price)"
                         type="text"
@@ -856,13 +977,14 @@ const startNewTransaction = () => {
                   <div
                     v-if="Number(item.price) < Number(item.min_nego_price > 0 ? item.min_nego_price : item.original_price)"
                     class="text-caption text-error mt-1 d-flex align-center"
+                    style="font-size: 11px;"
                   >
                     <VIcon
                       icon="ri-error-warning-line"
-                      size="small"
+                      size="12"
                       class="me-1"
                     />
-                    Harga di bawah batas nego ({{ formatRupiah(item.min_nego_price > 0 ? item.min_nego_price : item.original_price) }})!
+                    Di bawah batas nego ({{ formatRupiah(item.min_nego_price > 0 ? item.min_nego_price : item.original_price) }})!
                   </div>
                 </VListItem>
                 <VDivider v-if="index < cart.length - 1" />
@@ -872,21 +994,22 @@ const startNewTransaction = () => {
             <div
               v-else
               class="d-flex flex-column justify-center align-center h-100 text-disabled pa-6"
+              style="min-height: 130px;"
             >
               <VIcon
                 icon="ri-shopping-bag-3-line"
-                size="48"
+                size="40"
                 class="mb-2"
                 opacity="0.3"
               />
-              <p>Keranjang kosong</p>
+              <p class="text-caption mb-0">Keranjang belanja kosong</p>
             </div>
-          </VCardText>
+          </div>
 
           <VDivider />
 
           <!-- Checkout Summary -->
-          <VCardText class="bg-var-theme-background">
+          <VCardText class="bg-var-theme-background pa-3">
             <div class="d-flex justify-space-between mb-2">
               <span class="text-body-1">Subtotal Barang</span>
               <span class="font-weight-medium">{{ formatRupiah(subtotal) }}</span>
@@ -1076,6 +1199,32 @@ const startNewTransaction = () => {
               v-if="(transactionType === 'lunas' || dpAmountRaw > 0) && paymentMethod === 'cash'"
               class="mt-4"
             >
+              <!-- Quick Cash Buttons -->
+              <div class="mb-3">
+                <div class="text-caption text-medium-emphasis mb-2">Pilihan Nominal Cepat:</div>
+                <div class="d-flex flex-wrap gap-2">
+                  <VBtn
+                    size="small"
+                    variant="tonal"
+                    color="primary"
+                    prepend-icon="ri-check-double-line"
+                    @click="setQuickCash('exact')"
+                  >
+                    Uang Pas ({{ formatRupiah(totalAmount) }})
+                  </VBtn>
+                  <VBtn
+                    v-for="nom in quickCashSuggestions"
+                    :key="nom"
+                    size="small"
+                    variant="outlined"
+                    color="secondary"
+                    @click="setQuickCash(nom)"
+                  >
+                    {{ formatRupiah(nom) }}
+                  </VBtn>
+                </div>
+              </div>
+
               <VRow>
                 <VCol
                   cols="12"

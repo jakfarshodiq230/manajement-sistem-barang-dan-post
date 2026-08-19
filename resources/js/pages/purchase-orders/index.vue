@@ -66,7 +66,7 @@ const fetchData = async () => {
       $api('/apps/purchase-orders', { query: params }),
       $api('/apps/branches'),
       $api('/apps/suppliers?all=true'),
-      $api('/apps/products'),
+      $api('/apps/products', { query: { itemsPerPage: 100 } }),
       $api('/apps/purchase-orders', { query: { itemsPerPage: -1 } }) // To get counts
     ])
 

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, watch, onMounted } from 'vue'
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import { useSnackbarStore } from '@/stores/snackbar'
 
@@ -30,9 +30,66 @@ const destination_branch_id = ref(null)
 const notes = ref('')
 const snackbar = useSnackbarStore()
 
+// Dynamic Product Search
+const productOptions = ref([])
+const isSearchingProduct = ref(false)
+let searchTimeout = null
+
 const items = ref([
   { product_id: null, qty: 1 },
 ])
+
+const fetchProducts = async (search = '') => {
+  isSearchingProduct.value = true
+  try {
+    const params = {
+      itemsPerPage: 60,
+    }
+    if (search) {
+      params.search = search
+    }
+
+    const res = await $api('/apps/products', { query: params })
+    const fetched = res.data || res || []
+
+    // Merge with currently selected products so they don't disappear from dropdown
+    const selectedIds = items.value.map(i => i.product_id).filter(Boolean)
+    const existingSelected = productOptions.value.filter(p => selectedIds.includes(p.id))
+
+    const map = new Map()
+    existingSelected.forEach(p => map.set(p.id, p))
+    fetched.forEach(p => map.set(p.id, p))
+
+    productOptions.value = Array.from(map.values())
+  } catch (error) {
+    console.error('Failed to load products:', error)
+  } finally {
+    isSearchingProduct.value = false
+  }
+}
+
+const onProductSearchInput = val => {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    fetchProducts(val || '')
+  }, 350)
+}
+
+watch(() => props.isDrawerOpen, isOpen => {
+  if (isOpen) {
+    if (productOptions.value.length === 0) {
+      fetchProducts('')
+    }
+  }
+})
+
+onMounted(() => {
+  if (props.masterProducts && props.masterProducts.length > 0) {
+    productOptions.value = [...props.masterProducts]
+  } else {
+    fetchProducts('')
+  }
+})
 
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
@@ -57,12 +114,12 @@ const onSubmit = () => {
   refForm.value?.validate().then(({ valid }) => {
     if (valid) {
       if (source_branch_id.value === destination_branch_id.value) {
-        snackbar.show('Cabang asal dan tujuan tidak boleh sama!', 'warning')
+        snackbar.show('Cabang asal dan cabang tujuan tidak boleh sama!', 'warning')
         return
       }
 
       if (items.value.some(i => !i.product_id || i.qty < 1)) {
-        snackbar.show('Mohon lengkapi semua baris barang (Produk dan Qty harus lebih dari 0).', 'warning')
+        snackbar.show('Mohon lengkapi semua baris barang (Produk dan Qty harus minimal 1).', 'warning')
         return
       }
 
@@ -85,20 +142,27 @@ const handleDrawerModelValueUpdate = val => {
 <template>
   <VNavigationDrawer
     temporary
-    :width="700"
+    :width="720"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
     @update:model-value="handleDrawerModelValueUpdate"
   >
     <AppDrawerHeaderSection
-      title="Buat Mutasi Stok Baru"
+      title="Buat Pengajuan Mutasi Stok"
       @cancel="closeNavigationDrawer"
     />
 
     <PerfectScrollbar :options="{ wheelPropagation: false }">
       <VCard flat>
         <VCardText>
+          <div class="mb-4 pa-3 bg-primary-lighten-5 rounded border border-primary">
+            <p class="text-caption text-primary mb-0 font-weight-medium">
+              <VIcon icon="ri-information-line" size="14" class="me-1" />
+              Permintaan barang dapat diajukan ke Gudang Pusat ataupun antar Cabang. Cari barang dengan mengetik Nama atau SKU pada kolom pencarian.
+            </p>
+          </div>
+
           <VForm
             ref="refForm"
             v-model="isFormValid"
@@ -108,40 +172,51 @@ const handleDrawerModelValueUpdate = val => {
               <VCol cols="12" md="6">
                 <VAutocomplete
                   v-model="source_branch_id"
-                  :rules="[v => !!v || 'Cabang asal wajib dipilih']"
+                  :rules="[v => !!v || 'Cabang / Unit asal wajib dipilih']"
                   :items="props.branches"
                   item-title="name"
                   item-value="id"
-                  label="Cabang Asal (Sumber Barang)"
+                  label="Cabang / Gudang Asal (Sumber Barang)"
+                  placeholder="Pilih Pusat atau Cabang Asal"
+                  prepend-inner-icon="ri-store-2-line"
                 />
               </VCol>
 
               <VCol cols="12" md="6">
                 <VAutocomplete
                   v-model="destination_branch_id"
-                  :rules="[v => !!v || 'Cabang tujuan wajib dipilih']"
+                  :rules="[v => !!v || 'Cabang pemohon wajib dipilih']"
                   :items="props.branches"
                   item-title="name"
                   item-value="id"
-                  label="Cabang Tujuan"
+                  label="Cabang Pemohon (Tujuan Penerimaan)"
+                  placeholder="Pilih Cabang Pemohon"
+                  prepend-inner-icon="ri-store-3-line"
                 />
               </VCol>
 
               <VCol cols="12">
                 <VTextarea
                   v-model="notes"
-                  label="Catatan Mutasi"
+                  label="Catatan / Instruksi Permintaan"
                   rows="2"
-                  placeholder="Instruksi pengiriman, alasan mutasi, dll."
+                  placeholder="Contoh: Permintaan restock darurat, dijemput hari Kamis siang..."
+                  prepend-inner-icon="ri-file-text-line"
                 />
               </VCol>
 
               <VCol cols="12">
-                <VDivider class="my-4" />
-                <div class="d-flex justify-space-between align-center mb-4">
-                  <h6 class="text-h6 font-weight-medium">
-                    Daftar Barang Mutasi
-                  </h6>
+                <VDivider class="my-2" />
+                <div class="d-flex justify-space-between align-center my-3">
+                  <div>
+                    <h6 class="text-subtitle-1 font-weight-bold d-flex align-center gap-1">
+                      <VIcon icon="ri-box-3-line" size="18" color="primary" />
+                      Daftar Barang yang Diminta
+                    </h6>
+                    <span class="text-caption text-medium-emphasis">
+                      Ketik Nama atau SKU untuk mencari dari seluruh data barang
+                    </span>
+                  </div>
                   <VBtn
                     size="small"
                     variant="tonal"
@@ -155,44 +230,60 @@ const handleDrawerModelValueUpdate = val => {
                 <div
                   v-for="(item, index) in items"
                   :key="index"
-                  class="d-flex align-center gap-4 mb-4"
+                  class="d-flex align-center gap-3 mb-3 pa-2 rounded bg-grey-50 border"
                 >
                   <div class="flex-grow-1">
                     <VAutocomplete
                       v-model="item.product_id"
-                      :items="props.masterProducts"
+                      :items="productOptions"
                       :item-title="prod => prod.sku ? `[${prod.sku}] ${prod.name}` : prod.name"
                       item-value="id"
                       label="Cari Produk (Nama / SKU)"
+                      placeholder="Ketik untuk mencari barang..."
                       density="compact"
                       clearable
-                    />
+                      :loading="isSearchingProduct"
+                      :rules="[v => !!v || 'Pilih produk']"
+                      @update:search="onProductSearchInput"
+                    >
+                      <template #no-data>
+                        <div class="pa-2 text-caption text-medium-emphasis">
+                          {{ isSearchingProduct ? 'Mencari data barang...' : 'Ketik nama barang / SKU untuk mencari...' }}
+                        </div>
+                      </template>
+                    </VAutocomplete>
                   </div>
-                  <div style="width: 120px;">
+                  <div style="width: 130px;">
                     <VTextField
-                      v-model="item.qty"
+                      v-model.number="item.qty"
                       type="number"
-                      label="Qty Mutasi"
+                      label="Qty Diminta"
                       density="compact"
-                      :rules="[v => v > 0 || 'Minimal 1']"
+                      min="1"
+                      :rules="[v => v > 0 || 'Min. 1']"
                     />
                   </div>
                   <div>
                     <IconBtn
                       size="small"
                       color="error"
+                      variant="text"
                       :disabled="items.length === 1"
                       @click="removeItem(index)"
                     >
-                      <VIcon icon="ri-close-line" />
+                      <VIcon icon="ri-delete-bin-line" />
                     </IconBtn>
                   </div>
                 </div>
               </VCol>
 
-              <VCol cols="12" class="mt-4">
-                <VBtn type="submit" class="me-3">
-                  Buat Pengajuan
+              <VCol cols="12" class="mt-4 d-flex gap-2">
+                <VBtn
+                  type="submit"
+                  color="primary"
+                  prepend-icon="ri-send-plane-line"
+                >
+                  Kirim Pengajuan Mutasi
                 </VBtn>
                 <VBtn
                   type="reset"

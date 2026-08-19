@@ -6,35 +6,49 @@ use App\Http\Controllers\Controller;
 use App\Models\StockTransfer;
 use App\Models\StockTransferItem;
 use App\Models\ProductBranch;
+use App\Models\ProductBatch;
 use App\Models\StockMovement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class StockTransferController extends Controller
 {
     public function index(Request $request)
     {
-        $query = StockTransfer::with(['sourceBranch', 'destinationBranch', 'createdBy', 'approvedBy', 'items.product']);
+        $query = StockTransfer::with([
+            'sourceBranch',
+            'destinationBranch',
+            'createdBy',
+            'preparedBy',
+            'approvedBy',
+            'receivedBy',
+            'items.product'
+        ]);
 
         $search = $request->query('search');
         $itemsPerPage = $request->query('itemsPerPage', 15);
         $page = $request->query('page', 1);
 
-        if ($request->has('source_branch_id')) {
+        if ($request->has('source_branch_id') && $request->source_branch_id) {
             $query->where('source_branch_id', $request->source_branch_id);
         }
 
-        if ($request->has('destination_branch_id')) {
+        if ($request->has('destination_branch_id') && $request->destination_branch_id) {
             $query->where('destination_branch_id', $request->destination_branch_id);
         }
 
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
+        if ($request->has('status') && $request->status) {
+            if ($request->status === 'rejected_cancelled') {
+                $query->whereIn('status', ['rejected', 'cancelled']);
+            } else {
+                $query->where('status', $request->status);
+            }
         }
 
         if ($search) {
-            $query->where('reference_number', 'like', "%{$search}%");
+            $query->where('reference_no', 'like', "%{$search}%");
         }
 
         $query->orderBy('created_at', 'desc');
@@ -89,7 +103,7 @@ class StockTransferController extends Controller
             ]);
 
             foreach ($request->items as $item) {
-                // Verify source stock (must bypass global scopes so cross-branch transfers work)
+                // Verify source stock exists (bypass global scopes for cross-branch queries)
                 $sourceProductBranch = ProductBranch::withoutGlobalScopes()
                     ->where('branch_id', $request->source_branch_id)
                     ->where('product_id', $item['product_id'])
@@ -100,7 +114,8 @@ class StockTransferController extends Controller
                 }
                 
                 if ($sourceProductBranch->stock < $item['qty']) {
-                    throw new \Exception("Stok tidak mencukupi untuk produk ID " . $item['product_id'] . " di cabang asal (Sisa stok: " . $sourceProductBranch->stock . ").");
+                    $prodName = $sourceProductBranch->product->name ?? "ID " . $item['product_id'];
+                    throw new \Exception("Stok tidak mencukupi untuk '{$prodName}' di cabang asal (Sisa stok: " . $sourceProductBranch->stock . ").");
                 }
 
                 StockTransferItem::create([
@@ -113,90 +128,117 @@ class StockTransferController extends Controller
             DB::commit();
 
             return response()->json([
-                'message' => 'Mutasi stok berhasil dibuat dan menunggu persetujuan.',
-                'data' => $transfer->load('items')
+                'message' => 'Permintaan mutasi stok berhasil dibuat dan menunggu konfirmasi cabang asal.',
+                'data' => $transfer->load(['items.product', 'sourceBranch', 'destinationBranch'])
             ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Mutasi Stok Error: ' . $e->getMessage() . ' Trace: ' . $e->getTraceAsString());
+            Log::error('Mutasi Stok Store Error: ' . $e->getMessage());
             return response()->json(['message' => 'Gagal membuat mutasi stok', 'error' => $e->getMessage()], 400);
         }
     }
 
     public function show($id)
     {
-        $transfer = StockTransfer::with(['sourceBranch', 'destinationBranch', 'createdBy', 'approvedBy', 'items.product'])->findOrFail($id);
+        $transfer = StockTransfer::with([
+            'sourceBranch',
+            'destinationBranch',
+            'createdBy',
+            'preparedBy',
+            'approvedBy',
+            'receivedBy',
+            'items.product'
+        ])->findOrFail($id);
+
+        // Include source current stock for each item for fulfillment verification
+        foreach ($transfer->items as $item) {
+            $sourceProductBranch = ProductBranch::withoutGlobalScopes()
+                ->where('branch_id', $transfer->source_branch_id)
+                ->where('product_id', $item->product_id)
+                ->first();
+            $item->source_current_stock = $sourceProductBranch ? $sourceProductBranch->stock : 0;
+        }
+
         return response()->json($transfer);
     }
 
-    public function approve(Request $request, $id)
+    /**
+     * Tahap 2: Cabang Asal / Pusat menyetujui request & menyiapkan barang.
+     * Mendukung verifikasi per item (checklist ada/kosong, isi qty kirim, dan alasan batal).
+     */
+    public function prepare(Request $request, $id)
     {
+        $user = $request->user();
+        if ($user && !$user->hasRole(['Super Admin', 'Dev', 'Admin Pusat', 'Admin Cabang']) && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate')) {
+            return response()->json(['message' => 'Anda tidak memiliki hak akses (permission) untuk memvalidasi / menyiapkan mutasi stok.'], 403);
+        }
+
         try {
             DB::beginTransaction();
 
-            $transfer = StockTransfer::with(['items', 'sourceBranch', 'destinationBranch'])->findOrFail($id);
+            $transfer = StockTransfer::with(['items.product', 'sourceBranch', 'destinationBranch'])->findOrFail($id);
 
             if ($transfer->status !== 'pending') {
-                return response()->json(['message' => 'Mutasi stok ini tidak dalam status pending.'], 400);
+                return response()->json(['message' => 'Mutasi stok ini tidak dalam status pending (hanya status pending yang dapat disiapkan).'], 400);
             }
 
+            $inputItems = $request->input('items', []);
+            $inputItemsById = collect($inputItems)->keyBy('id');
+
+            $totalPrepared = 0;
+            $sourceName = $transfer->sourceBranch ? $transfer->sourceBranch->name : 'Cabang Asal';
+            $destName = $transfer->destinationBranch ? $transfer->destinationBranch->name : 'Cabang Tujuan';
+
             foreach ($transfer->items as $item) {
+                $payload = $inputItemsById->get($item->id);
+                
+                // If payload specifies is_available === false or qty_prepared === 0
+                $isAvailable = $payload ? (bool) ($payload['is_available'] ?? true) : true;
+                $qtyPrepared = $payload ? (int) ($payload['qty_prepared'] ?? $item->qty) : (int) $item->qty;
+                $cancelReason = $payload ? ($payload['cancel_reason'] ?? 'Barang Kosong / Habis di Unit Asal') : null;
+
+                if (!$isAvailable || $qtyPrepared <= 0) {
+                    // Mark this item as cancelled / out of stock
+                    $item->qty_prepared = 0;
+                    $item->status = 'cancelled';
+                    $item->cancel_reason = $cancelReason ?: 'Barang Kosong / Habis di Unit Asal';
+                    $item->batches_data = [];
+                    $item->save();
+                    continue;
+                }
+
                 // 1. Deduct from source branch
                 $sourceProductBranch = ProductBranch::withoutGlobalScopes()
                     ->where('branch_id', $transfer->source_branch_id)
                     ->where('product_id', $item->product_id)
                     ->first();
 
-                if (!$sourceProductBranch || $sourceProductBranch->stock < $item->qty) {
-                    throw new \Exception("Stok tidak mencukupi untuk dipindahkan pada produk ID " . $item->product_id);
+                if (!$sourceProductBranch || $sourceProductBranch->stock < $qtyPrepared) {
+                    $prodName = $item->product->name ?? "ID " . $item->product_id;
+                    $available = $sourceProductBranch ? $sourceProductBranch->stock : 0;
+                    throw new \Exception("Stok tidak mencukupi untuk '{$prodName}' di unit asal (Diminta disiapkan: {$qtyPrepared}, Sisa stok: {$available}). Anda dapat mengurangi jumlah kirim atau tandai barang kosong.");
                 }
 
-                $sourceProductBranch->stock -= $item->qty;
+                $sourceProductBranch->stock -= $qtyPrepared;
                 $sourceProductBranch->save();
 
-                $sourceName = $transfer->sourceBranch ? $transfer->sourceBranch->name : 'Cabang Asal';
-                $destName = $transfer->destinationBranch ? $transfer->destinationBranch->name : 'Cabang Tujuan';
-
+                // Record stock movement OUT at source
                 StockMovement::create([
                     'product_branch_id' => $sourceProductBranch->id,
                     'type' => 'out',
-                    'quantity' => $item->qty,
+                    'quantity' => $qtyPrepared,
                     'unit_cost' => $sourceProductBranch->cost_price ?? 0,
-                    'notes' => "Mutasi keluar ke {$destName} (Ref: {$transfer->reference_no})",
+                    'notes' => "Disiapkan untuk mutasi ke {$destName} (Ref: {$transfer->reference_no})",
                 ]);
 
-                // 2. Add to destination branch
-                $destinationProductBranch = ProductBranch::withoutGlobalScopes()->firstOrCreate(
-                    [
-                        'branch_id' => $transfer->destination_branch_id,
-                        'product_id' => $item->product_id,
-                    ],
-                    [
-                        'id' => (string) Str::uuid(),
-                        'stock' => 0,
-                        'price' => $sourceProductBranch->price, // copy price from source
-                        'cost_price' => $sourceProductBranch->cost_price,
-                        'min_stock' => 0,
-                        'is_active' => true
-                    ]
-                );
-
-                $destinationProductBranch->stock += $item->qty;
-                // Update cost price if it was 0
-                if ($destinationProductBranch->cost_price == 0 && $sourceProductBranch->cost_price > 0) {
-                    $destinationProductBranch->cost_price = $sourceProductBranch->cost_price;
-                }
-                $destinationProductBranch->save();
-
-                // 3. Handle Batches (FIFO/LIFO/FEFO Transfer)
-                $remainingQty = $item->qty;
+                // 2. Handle Batches at source (FIFO / LIFO / FEFO)
+                $remainingQty = $qtyPrepared;
                 $transferredBatches = [];
                 
-                // Get stock method from product
                 $stockMethod = $sourceProductBranch->product->stock_method ?? 'fifo';
                 
-                $batchQuery = \App\Models\ProductBatch::where('product_branch_id', $sourceProductBranch->id)
+                $batchQuery = ProductBatch::where('product_branch_id', $sourceProductBranch->id)
                     ->where('qty', '>', 0);
                     
                 if ($stockMethod === 'fefo') {
@@ -220,6 +262,7 @@ class StockTransferController extends Controller
                         $remainingQty -= $deduct;
                         
                         $transferredBatches[] = [
+                            'batch_id' => $batch->id,
                             'entry_date' => $batch->entry_date,
                             'expiration_date' => $batch->expiration_date,
                             'cost_price' => $batch->cost_price,
@@ -228,20 +271,148 @@ class StockTransferController extends Controller
                     }
                 } else {
                     $transferredBatches[] = [
+                        'batch_id' => null,
                         'entry_date' => date('Y-m-d'),
                         'expiration_date' => null,
-                        'cost_price' => $sourceProductBranch->cost_price,
-                        'qty' => $item->qty,
+                        'cost_price' => $sourceProductBranch->cost_price ?? 0,
+                        'qty' => $qtyPrepared,
                     ];
                 }
 
-                foreach ($transferredBatches as $tBatch) {
-                    // Find or create a matching batch at destination
-                    $destBatchQuery = \App\Models\ProductBatch::where('product_branch_id', $destinationProductBranch->id)
-                        ->where('entry_date', $tBatch['entry_date'])
-                        ->where('cost_price', $tBatch['cost_price']);
+                // Save allocated batch details to transfer item
+                $item->qty_prepared = $qtyPrepared;
+                $item->status = 'prepared';
+                $item->cancel_reason = null;
+                $item->batches_data = $transferredBatches;
+                $item->save();
+
+                $totalPrepared += $qtyPrepared;
+            }
+
+            $userId = $request->user()->id ?? null;
+
+            // If all items were cancelled (totalPrepared === 0)
+            if ($totalPrepared === 0) {
+                $transfer->update([
+                    'status' => 'rejected',
+                    'approved_by' => $userId,
+                    'notes' => ($transfer->notes ? $transfer->notes . ' | ' : '') . 'Dibatalkan: Semua barang kosong di unit asal.',
+                ]);
+
+                DB::commit();
+
+                return response()->json([
+                    'message' => 'Semua barang kosong / tidak tersedia. Permintaan mutasi otomatis ditolak/dibatalkan.',
+                    'data' => $transfer->fresh(['sourceBranch', 'destinationBranch', 'items.product'])
+                ]);
+            }
+
+            $transfer->update([
+                'status' => 'ready_for_pickup',
+                'prepared_by' => $userId,
+                'prepared_at' => now(),
+                'approved_by' => $userId, // backwards compatibility
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Barang berhasil disiapkan. Status sekarang: Siap Dijemput.',
+                'data' => $transfer->fresh(['sourceBranch', 'destinationBranch', 'preparedBy', 'items.product'])
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Mutasi Stok Prepare Error: ' . $e->getMessage());
+            return response()->json(['message' => 'Gagal menyiapkan barang mutasi stok', 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    // Alias for approve (backwards compatible)
+    public function approve(Request $request, $id)
+    {
+        return $this->prepare($request, $id);
+    }
+
+    /**
+     * Tahap 3: Cabang Pemohon menjemput barang di unit asal dan konfirmasi penerimaan.
+     * Stok masuk ke Cabang Pemohon (Destination Branch) dan status berubah menjadi 'completed'.
+     */
+    public function receive(Request $request, $id)
+    {
+        $user = $request->user();
+        if ($user && !$user->hasRole(['Super Admin', 'Dev', 'Admin Pusat', 'Admin Cabang']) && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate')) {
+            return response()->json(['message' => 'Anda tidak memiliki hak akses (permission) untuk mengonfirmasi penerimaan mutasi stok.'], 403);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $transfer = StockTransfer::with(['items.product', 'sourceBranch', 'destinationBranch'])->findOrFail($id);
+
+            if (!in_array($transfer->status, ['ready_for_pickup', 'approved'])) {
+                return response()->json(['message' => 'Hanya mutasi yang sudah disiapkan / siap dijemput yang dapat dikonfirmasi penerimaannya.'], 400);
+            }
+
+            $sourceName = $transfer->sourceBranch ? $transfer->sourceBranch->name : 'Cabang Asal';
+            $destName = $transfer->destinationBranch ? $transfer->destinationBranch->name : 'Cabang Tujuan';
+
+            foreach ($transfer->items as $item) {
+                // Skip cancelled / empty items
+                if ($item->status === 'cancelled' || ($item->qty_prepared !== null && $item->qty_prepared <= 0)) {
+                    continue;
+                }
+
+                $qtyToReceive = $item->qty_prepared ?? $item->qty;
+                if ($qtyToReceive <= 0) continue;
+
+                $sourceProductBranch = ProductBranch::withoutGlobalScopes()
+                    ->where('branch_id', $transfer->source_branch_id)
+                    ->where('product_id', $item->product_id)
+                    ->first();
+
+                $sourcePrice = $sourceProductBranch ? $sourceProductBranch->price : 0;
+                $sourceCostPrice = $sourceProductBranch ? $sourceProductBranch->cost_price : 0;
+
+                // Add to destination branch
+                $destinationProductBranch = ProductBranch::withoutGlobalScopes()->firstOrCreate(
+                    [
+                        'branch_id' => $transfer->destination_branch_id,
+                        'product_id' => $item->product_id,
+                    ],
+                    [
+                        'id' => (string) Str::uuid(),
+                        'stock' => 0,
+                        'price' => $sourcePrice,
+                        'cost_price' => $sourceCostPrice,
+                        'min_stock' => 0,
+                        'is_active' => true
+                    ]
+                );
+
+                $destinationProductBranch->stock += $qtyToReceive;
+                if ($destinationProductBranch->cost_price == 0 && $sourceCostPrice > 0) {
+                    $destinationProductBranch->cost_price = $sourceCostPrice;
+                }
+                $destinationProductBranch->save();
+
+                // Add batches to destination branch
+                $batches = $item->batches_data;
+                if (empty($batches) || !is_array($batches)) {
+                    $batches = [[
+                        'entry_date' => date('Y-m-d'),
+                        'expiration_date' => null,
+                        'cost_price' => $sourceCostPrice,
+                        'qty' => $qtyToReceive,
+                    ]];
+                }
+
+                foreach ($batches as $tBatch) {
+                    $destBatchQuery = ProductBatch::where('product_branch_id', $destinationProductBranch->id)
+                        ->where('entry_date', $tBatch['entry_date'] ?? date('Y-m-d'))
+                        ->where('cost_price', $tBatch['cost_price'] ?? 0);
                         
-                    if ($tBatch['expiration_date']) {
+                    if (!empty($tBatch['expiration_date'])) {
                         $destBatchQuery->where('expiration_date', $tBatch['expiration_date']);
                     } else {
                         $destBatchQuery->whereNull('expiration_date');
@@ -250,11 +421,11 @@ class StockTransferController extends Controller
                     $destBatch = $destBatchQuery->first();
                     
                     if (!$destBatch) {
-                        $destBatch = \App\Models\ProductBatch::create([
+                        $destBatch = ProductBatch::create([
                             'product_branch_id' => $destinationProductBranch->id,
                             'qty' => 0,
-                            'entry_date' => $tBatch['entry_date'],
-                            'expiration_date' => $tBatch['expiration_date'],
+                            'entry_date' => $tBatch['entry_date'] ?? date('Y-m-d'),
+                            'expiration_date' => $tBatch['expiration_date'] ?? null,
                             'cost_price' => $tBatch['cost_price'] ?? 0,
                         ]);
                     }
@@ -263,43 +434,164 @@ class StockTransferController extends Controller
                     $destBatch->save();
                 }
 
+                // Record stock movement IN at destination
                 StockMovement::create([
                     'product_branch_id' => $destinationProductBranch->id,
                     'type' => 'in',
-                    'quantity' => $item->qty,
-                    'unit_cost' => $sourceProductBranch->cost_price ?? 0,
-                    'notes' => "Mutasi masuk dari {$sourceName} (Ref: {$transfer->reference_no})",
+                    'quantity' => $qtyToReceive,
+                    'unit_cost' => $sourceCostPrice,
+                    'notes' => "Diterima dari penjemputan di {$sourceName} (Ref: {$transfer->reference_no})",
                 ]);
             }
 
             $transfer->update([
-                'status' => 'approved',
-                'approved_by' => $request->user()->id ?? null
+                'status' => 'completed',
+                'received_by' => $request->user()->id ?? null,
+                'received_at' => now(),
             ]);
 
             DB::commit();
 
-            return response()->json(['message' => 'Mutasi stok berhasil disetujui dan stok telah dipindahkan.']);
+            return response()->json([
+                'message' => 'Barang telah berhasil dijemput dan stok telah masuk ke unit tujuan.',
+                'data' => $transfer->fresh(['sourceBranch', 'destinationBranch', 'receivedBy', 'items.product'])
+            ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Gagal menyetujui mutasi stok', 'error' => $e->getMessage()], 400);
+            Log::error('Mutasi Stok Receive Error: ' . $e->getMessage());
+            return response()->json(['message' => 'Gagal menerima/menjemput barang mutasi', 'error' => $e->getMessage()], 400);
         }
     }
 
     public function reject(Request $request, $id)
     {
+        $user = $request->user();
+        if ($user && !$user->hasRole(['Super Admin', 'Dev', 'Admin Pusat', 'Admin Cabang']) && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate')) {
+            return response()->json(['message' => 'Anda tidak memiliki hak akses untuk menolak mutasi stok.'], 403);
+        }
+
         $transfer = StockTransfer::findOrFail($id);
 
         if ($transfer->status !== 'pending') {
-            return response()->json(['message' => 'Hanya mutasi pending yang bisa ditolak.'], 400);
+            return response()->json(['message' => 'Hanya mutasi berstatus pending yang bisa ditolak.'], 400);
         }
 
         $transfer->update([
             'status' => 'rejected',
-            'approved_by' => $request->user()->id ?? null
+            'approved_by' => $request->user()->id ?? null,
+            'notes' => ($transfer->notes ? $transfer->notes . ' | ' : '') . ($request->reason ? "Alasan Penolakan: {$request->reason}" : 'Permintaan Ditolak.'),
         ]);
 
-        return response()->json(['message' => 'Mutasi stok berhasil ditolak.']);
+        return response()->json(['message' => 'Permintaan mutasi stok berhasil ditolak.']);
+    }
+
+    /**
+     * Membatalkan mutasi stok.
+     * Jika sudah 'ready_for_pickup', kembalikan stok dan batch ke cabang asal.
+     */
+    public function cancel(Request $request, $id)
+    {
+        $user = $request->user();
+        if ($user && !$user->hasRole(['Super Admin', 'Dev', 'Admin Pusat', 'Admin Cabang']) && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate')) {
+            return response()->json(['message' => 'Anda tidak memiliki hak akses untuk membatalkan mutasi stok.'], 403);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $transfer = StockTransfer::with(['items', 'sourceBranch', 'destinationBranch'])->findOrFail($id);
+
+            if (!in_array($transfer->status, ['pending', 'ready_for_pickup', 'approved'])) {
+                return response()->json(['message' => 'Mutasi yang sudah selesai atau ditolak tidak dapat dibatalkan.'], 400);
+            }
+
+            // If stock was already deducted (ready_for_pickup / approved), restore it to source
+            if (in_array($transfer->status, ['ready_for_pickup', 'approved'])) {
+                $destName = $transfer->destinationBranch ? $transfer->destinationBranch->name : 'Cabang Tujuan';
+
+                foreach ($transfer->items as $item) {
+                    // Only restore items that were actually prepared
+                    if ($item->status === 'cancelled' || ($item->qty_prepared !== null && $item->qty_prepared <= 0)) {
+                        continue;
+                    }
+
+                    $qtyToRestore = $item->qty_prepared ?? $item->qty;
+                    if ($qtyToRestore <= 0) continue;
+
+                    $sourceProductBranch = ProductBranch::withoutGlobalScopes()
+                        ->where('branch_id', $transfer->source_branch_id)
+                        ->where('product_id', $item->product_id)
+                        ->first();
+
+                    if ($sourceProductBranch) {
+                        $sourceProductBranch->stock += $qtyToRestore;
+                        $sourceProductBranch->save();
+
+                        // Restore batches if recorded
+                        $batches = $item->batches_data;
+                        if (!empty($batches) && is_array($batches)) {
+                            foreach ($batches as $b) {
+                                if (!empty($b['batch_id'])) {
+                                    $batchModel = ProductBatch::find($b['batch_id']);
+                                    if ($batchModel) {
+                                        $batchModel->qty += $b['qty'];
+                                        $batchModel->save();
+                                        continue;
+                                    }
+                                }
+
+                                // If original batch not found, match or create
+                                $bQuery = ProductBatch::where('product_branch_id', $sourceProductBranch->id)
+                                    ->where('entry_date', $b['entry_date'] ?? date('Y-m-d'))
+                                    ->where('cost_price', $b['cost_price'] ?? 0);
+                                    
+                                if (!empty($b['expiration_date'])) {
+                                    $bQuery->where('expiration_date', $b['expiration_date']);
+                                } else {
+                                    $bQuery->whereNull('expiration_date');
+                                }
+                                
+                                $matchedBatch = $bQuery->first();
+                                if ($matchedBatch) {
+                                    $matchedBatch->qty += $b['qty'];
+                                    $matchedBatch->save();
+                                } else {
+                                    ProductBatch::create([
+                                        'product_branch_id' => $sourceProductBranch->id,
+                                        'qty' => $b['qty'],
+                                        'entry_date' => $b['entry_date'] ?? date('Y-m-d'),
+                                        'expiration_date' => $b['expiration_date'] ?? null,
+                                        'cost_price' => $b['cost_price'] ?? 0,
+                                    ]);
+                                }
+                            }
+                        }
+
+                        // Record movement IN to source
+                        StockMovement::create([
+                            'product_branch_id' => $sourceProductBranch->id,
+                            'type' => 'in',
+                            'quantity' => $qtyToRestore,
+                            'unit_cost' => $sourceProductBranch->cost_price ?? 0,
+                            'notes' => "Pembatalan mutasi ke {$destName} (Ref: {$transfer->reference_no})",
+                        ]);
+                    }
+                }
+            }
+
+            $transfer->update([
+                'status' => 'cancelled',
+            ]);
+
+            DB::commit();
+
+            return response()->json(['message' => 'Mutasi stok berhasil dibatalkan dan stok dikembalikan ke unit asal.']);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Mutasi Stok Cancel Error: ' . $e->getMessage());
+            return response()->json(['message' => 'Gagal membatalkan mutasi stok', 'error' => $e->getMessage()], 400);
+        }
     }
 }

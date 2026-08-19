@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onMounted } from 'vue'
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 
 const props = defineProps({
@@ -37,9 +37,65 @@ const supplier_id = ref(null)
 const date = ref(new Date().toISOString().substr(0, 10))
 const notes = ref('')
 
+// Live product search
+const productOptions = ref([])
+const isSearchingProduct = ref(false)
+let searchTimeout = null
+
 const items = ref([
   { product_id: null, qty: 1, unit_cost: 0 },
 ])
+
+const fetchProducts = async (search = '') => {
+  isSearchingProduct.value = true
+  try {
+    const params = {
+      itemsPerPage: 60,
+    }
+    if (search) {
+      params.search = search
+    }
+
+    const res = await $api('/apps/products', { query: params })
+    const fetched = res.data || res || []
+
+    const selectedIds = items.value.map(i => i.product_id).filter(Boolean)
+    const existingSelected = productOptions.value.filter(p => selectedIds.includes(p.id))
+
+    const map = new Map()
+    existingSelected.forEach(p => map.set(p.id, p))
+    fetched.forEach(p => map.set(p.id, p))
+
+    productOptions.value = Array.from(map.values())
+  } catch (error) {
+    console.error('Failed to load products:', error)
+  } finally {
+    isSearchingProduct.value = false
+  }
+}
+
+const onProductSearchInput = val => {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    fetchProducts(val || '')
+  }, 350)
+}
+
+watch(() => props.isDrawerOpen, isOpen => {
+  if (isOpen) {
+    if (productOptions.value.length === 0) {
+      fetchProducts('')
+    }
+  }
+})
+
+onMounted(() => {
+  if (props.masterProducts && props.masterProducts.length > 0) {
+    productOptions.value = [...props.masterProducts]
+  } else {
+    fetchProducts('')
+  }
+})
 
 watch(() => props.selectedPo, newVal => {
   if (newVal) {
@@ -49,11 +105,16 @@ watch(() => props.selectedPo, newVal => {
     notes.value = newVal.notes || ''
     
     if (newVal.items && newVal.items.length) {
-      items.value = newVal.items.map(item => ({
-        product_id: item.product_id,
-        qty: item.qty,
-        unit_cost: item.unit_cost,
-      }))
+      items.value = newVal.items.map(item => {
+        if (item.product) {
+          productOptions.value.push(item.product)
+        }
+        return {
+          product_id: item.product_id,
+          qty: item.qty,
+          unit_cost: item.unit_cost,
+        }
+      })
     }
   } else {
     branch_id.value = null
@@ -83,13 +144,21 @@ const removeItem = index => {
   }
 }
 
+const onProductSelected = (productId, itemIndex) => {
+  const prod = productOptions.value.find(p => p.id === productId)
+  if (prod && prod.cost_price && items.value[itemIndex]) {
+    if (items.value[itemIndex].unit_cost === 0) {
+      items.value[itemIndex].unit_cost = prod.cost_price
+    }
+  }
+}
+
 const onSubmit = () => {
   refForm.value?.validate().then(({ valid }) => {
     if (valid) {
       // Validate items
       if (items.value.some(i => !i.product_id || i.qty < 1 || i.unit_cost < 0)) {
         alert('Mohon lengkapi semua baris barang dengan benar (Produk, Qty > 0, Harga Modal >= 0).')
-        
         return
       }
 
@@ -113,14 +182,12 @@ const handleDrawerModelValueUpdate = val => {
 const formatNumber = value => {
   if (!value) return ''
   const number = value.toString().replace(/\D/g, '')
-  
   return new Intl.NumberFormat('id-ID').format(number)
 }
 
 const parseNumber = value => {
   if (!value) return 0
   const number = value.toString().replace(/\D/g, '')
-  
   return number ? parseInt(number, 10) : 0
 }
 </script>
@@ -128,7 +195,7 @@ const parseNumber = value => {
 <template>
   <VNavigationDrawer
     temporary
-    :width="700"
+    :width="720"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
@@ -156,6 +223,8 @@ const parseNumber = value => {
                   item-title="name"
                   item-value="id"
                   label="Pilih Cabang (Tujuan Barang)"
+                  placeholder="Pilih Cabang"
+                  prepend-inner-icon="ri-store-2-line"
                 />
               </VCol>
 
@@ -167,6 +236,8 @@ const parseNumber = value => {
                   item-title="name"
                   item-value="id"
                   label="Pilih Supplier"
+                  placeholder="Pilih Supplier"
+                  prepend-inner-icon="ri-truck-line"
                 />
               </VCol>
 
@@ -176,6 +247,7 @@ const parseNumber = value => {
                   type="date"
                   :rules="[v => !!v || 'Tanggal wajib diisi']"
                   label="Tanggal PO"
+                  prepend-inner-icon="ri-calendar-line"
                 />
               </VCol>
 
@@ -184,16 +256,23 @@ const parseNumber = value => {
                   v-model="notes"
                   label="Catatan PO"
                   rows="2"
-                  placeholder="Instruksi pengiriman, dll."
+                  placeholder="Instruksi pengiriman, terms pembayaran, dll."
+                  prepend-inner-icon="ri-file-text-line"
                 />
               </VCol>
 
               <VCol cols="12">
-                <VDivider class="my-4" />
-                <div class="d-flex justify-space-between align-center mb-4">
-                  <h6 class="text-h6 font-weight-medium">
-                    Daftar Barang (Item PO)
-                  </h6>
+                <VDivider class="my-3" />
+                <div class="d-flex justify-space-between align-center mb-3">
+                  <div>
+                    <h6 class="text-subtitle-1 font-weight-bold d-flex align-center gap-1">
+                      <VIcon icon="ri-box-3-line" size="18" color="primary" />
+                      Daftar Barang (Item PO)
+                    </h6>
+                    <span class="text-caption text-medium-emphasis">
+                      Ketik Nama atau SKU untuk mencari barang dari seluruh katalog
+                    </span>
+                  </div>
                   <VBtn
                     size="small"
                     variant="tonal"
@@ -207,25 +286,38 @@ const parseNumber = value => {
                 <div
                   v-for="(item, index) in items"
                   :key="index"
-                  class="d-flex align-center gap-4 mb-4"
+                  class="d-flex align-center gap-3 mb-3 pa-2 rounded bg-grey-50 border"
                 >
                   <div class="flex-grow-1">
                     <VAutocomplete
                       v-model="item.product_id"
-                      :items="props.masterProducts"
+                      :items="productOptions"
                       :item-title="prod => prod.sku ? `[${prod.sku}] ${prod.name}` : prod.name"
                       item-value="id"
                       label="Cari Produk (Nama / SKU)"
+                      placeholder="Ketik nama atau SKU barang..."
                       density="compact"
                       clearable
-                    />
+                      :loading="isSearchingProduct"
+                      :rules="[v => !!v || 'Pilih produk']"
+                      @update:search="onProductSearchInput"
+                      @update:model-value="val => onProductSelected(val, index)"
+                    >
+                      <template #no-data>
+                        <div class="pa-2 text-caption text-medium-emphasis">
+                          {{ isSearchingProduct ? 'Mencari produk...' : 'Ketik nama atau SKU untuk mencari barang...' }}
+                        </div>
+                      </template>
+                    </VAutocomplete>
                   </div>
                   <div style="width: 100px;">
                     <VTextField
-                      v-model="item.qty"
+                      v-model.number="item.qty"
                       type="number"
                       label="Qty"
                       density="compact"
+                      min="1"
+                      :rules="[v => v > 0 || 'Min. 1']"
                     />
                   </div>
                   <div style="width: 180px;">
@@ -241,29 +333,28 @@ const parseNumber = value => {
                     <IconBtn
                       size="small"
                       color="error"
+                      variant="text"
                       :disabled="items.length === 1"
                       @click="removeItem(index)"
                     >
-                      <VIcon icon="ri-close-line" />
+                      <VIcon icon="ri-delete-bin-line" />
                     </IconBtn>
                   </div>
                 </div>
               </VCol>
 
-              <VCol
-                cols="12"
-                class="mt-4"
-              >
+              <VCol cols="12" class="mt-4 d-flex gap-2">
                 <VBtn
                   type="submit"
-                  class="me-3"
+                  color="primary"
+                  prepend-icon="ri-send-plane-line"
                 >
-                  {{ props.selectedPo ? 'Simpan Perubahan' : 'Buat PO' }}
+                  {{ props.selectedPo ? 'Simpan Perubahan' : 'Buat Purchase Order' }}
                 </VBtn>
                 <VBtn
                   type="reset"
                   variant="outlined"
-                  color="error"
+                  color="secondary"
                   @click="closeNavigationDrawer"
                 >
                   Batal

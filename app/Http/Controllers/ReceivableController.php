@@ -17,19 +17,76 @@ class ReceivableController extends Controller
             $query->where('status', $request->status);
         }
 
-        if ($request->has('q') && !empty($request->q)) {
-            $q = $request->q;
-            $query->whereHas('customer', function($q2) use ($q) {
-                $q2->where('name', 'like', "%{$q}%");
-            })->orWhereHas('sale', function($q3) use ($q) {
-                $q3->where('invoice_number', 'like', "%{$q}%");
+        if ($request->has('branch_id') && !empty($request->branch_id)) {
+            $query->whereHas('sale', function($s) use ($request) {
+                $s->where('branch_id', $request->branch_id);
             });
         }
 
-        $itemsPerPage = $request->input('itemsPerPage', 15);
-        $receivables = $query->orderBy('due_date', 'asc')->paginate($itemsPerPage);
+        $search = $request->query('search', $request->query('q'));
+        if (!empty($search)) {
+            $query->where(function($subQuery) use ($search) {
+                $subQuery->whereHas('customer', function($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%")
+                       ->orWhere('phone', 'like', "%{$search}%");
+                })->orWhereHas('sale', function($q3) use ($search) {
+                    $q3->where('invoice_number', 'like', "%{$search}%");
+                });
+            });
+        }
+
+        if ($request->has('start_date') && $request->has('end_date')) {
+            $query->whereBetween('due_date', [$request->start_date, $request->end_date]);
+        }
+
+        // Calculate summary KPI
+        $summaryQuery = clone $query;
+        $summaryQuery->reorder();
+        $allReceivables = $summaryQuery->get();
+
+        $totalDue = $allReceivables->sum('amount_due');
+        $totalPaid = $allReceivables->sum('amount_paid');
+        $totalRemaining = $totalDue - $totalPaid;
+        $today = now()->toDateString();
+        $totalOverdue = $allReceivables->filter(function($r) use ($today) {
+            return $r->status !== 'paid' && $r->due_date && $r->due_date < $today;
+        })->sum(function($r) {
+            return $r->amount_due - $r->amount_paid;
+        });
+
+        $summary = [
+            'total_due' => (float) $totalDue,
+            'total_paid' => (float) $totalPaid,
+            'total_remaining' => (float) $totalRemaining,
+            'total_overdue' => (float) $totalOverdue,
+            'count_unpaid' => $allReceivables->whereIn('status', ['unpaid', 'partial'])->count(),
+            'count_paid' => $allReceivables->where('status', 'paid')->count(),
+        ];
+
+        $itemsPerPage = (int) $request->input('itemsPerPage', 15);
+        $query->orderBy('due_date', 'asc');
+
+        if ($itemsPerPage === -1) {
+            $receivables = $query->get();
+            $paginated = null;
+        } else {
+            $paginated = $query->paginate($itemsPerPage);
+            $receivables = $paginated->items();
+        }
+
+        $response = [
+            'data' => $receivables,
+            'summary' => $summary,
+        ];
+
+        if ($paginated) {
+            $response['current_page'] = $paginated->currentPage();
+            $response['last_page'] = $paginated->lastPage();
+            $response['per_page'] = $paginated->perPage();
+            $response['total'] = $paginated->total();
+        }
         
-        return response()->json($receivables);
+        return response()->json($response);
     }
 
     public function show(Receivable $receivable)

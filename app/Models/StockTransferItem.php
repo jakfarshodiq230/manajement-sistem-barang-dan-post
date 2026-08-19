@@ -13,7 +13,15 @@ class StockTransferItem extends Model
     protected $fillable = [
         'stock_transfer_id',
         'product_id',
-        'qty'
+        'qty',
+        'qty_prepared',
+        'status',
+        'cancel_reason',
+        'batches_data',
+    ];
+
+    protected $casts = [
+        'batches_data' => 'array',
     ];
 
     public function getActivitylogOptions(): \Spatie\Activitylog\LogOptions

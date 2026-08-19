@@ -50,6 +50,9 @@ const fetchData = async () => {
     if (search.value) {
       params.search = search.value
     }
+    if (selectedBranch.value) {
+      params.branch_id = selectedBranch.value
+    }
     
     const [pbData, mData, bData] = await Promise.all([
       $api('/apps/product-branches', { query: params }),
@@ -322,17 +325,32 @@ const confirmDelete = async id => {
           <VCardTitle class="px-0">
             Daftar Inventori
           </VCardTitle>
-          <div style="width: 250px;">
-            <VTextField
-              v-model="search"
-              prepend-inner-icon="ri-search-line"
-              placeholder="Cari produk cabang..."
-              density="compact"
-              hide-details
-              variant="outlined"
-              clearable
-              @update:model-value="handleSearch"
-            />
+          <div class="d-flex align-center gap-3">
+            <div style="width: 220px;">
+              <VAutocomplete
+                v-model="selectedBranch"
+                :items="branches"
+                item-title="name"
+                item-value="id"
+                placeholder="Semua Cabang"
+                density="compact"
+                hide-details
+                clearable
+                @update:model-value="() => { page = 1; fetchData(); }"
+              />
+            </div>
+            <div style="width: 250px;">
+              <VTextField
+                v-model="search"
+                prepend-inner-icon="ri-search-line"
+                placeholder="Cari produk cabang..."
+                density="compact"
+                hide-details
+                variant="outlined"
+                clearable
+                @update:model-value="handleSearch"
+              />
+            </div>
           </div>
         </div>
       </VCardItem>
