@@ -231,6 +231,7 @@ class RoleAndPermissionSeeder extends Seeder
             'Penjualan Read', 'Penjualan Export',
             'Retur Barang Read', 'Retur Barang Create',
             'Kasir (POS) Read', 'Kasir (POS) Create',
+            'Mutasi Stok Read', 'Mutasi Stok Create', 'Mutasi Stok Write', 'Mutasi Stok Approve', 'Mutasi Stok Validate',
             'Audit & Laporan Read', 'Audit Read', 'Closing Harian Read', 'Closing Harian Create', 'Closing Harian Write',
             'Stock Opname Read', 'Stock Opname Create', 'Stock Opname Write',
             'Riwayat Stok Read', 'Stok Saat Ini Read', 'Fast/Slow Moving Read',

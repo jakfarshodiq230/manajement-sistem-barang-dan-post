@@ -54,7 +54,8 @@ class RoleController extends Controller
 
     public function store(Request $request)
     {
-        if (!request()->user()->can('Roles Create')) {
+        $user = $request->user();
+        if ($user && !$user->hasRole('Super Admin') && !$user->can('Roles Create') && !$user->can('create roles')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -66,23 +67,25 @@ class RoleController extends Controller
         $role = Role::create(['name' => $request->name, 'guard_name' => 'web']);
         
         if ($request->has('permissions')) {
-            $permissionNames = collect($request->permissions)->map(function($perm) {
-                // If it's a string, just use it. If it's an array/object with 'name', extract it.
-                return is_array($perm) ? $perm['name'] : $perm;
-            });
-            
-            foreach ($permissionNames as $name) {
-                Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
-            }
-            $role->syncPermissions($permissionNames);
+            $permissionModels = collect($request->permissions)->map(function($perm) {
+                $name = is_array($perm) ? ($perm['name'] ?? '') : $perm;
+                if (!empty($name)) {
+                    return Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
+                }
+                return null;
+            })->filter();
+
+            app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+            $role->syncPermissions($permissionModels);
         }
 
-        return response()->json(['message' => 'Role created successfully', 'role' => $role], 201);
+        return response()->json(['message' => 'Peran berhasil dibuat', 'role' => $role], 201);
     }
 
     public function update(Request $request, $id)
     {
-        if (!request()->user()->can('Roles Write')) {
+        $user = $request->user();
+        if ($user && !$user->hasRole('Super Admin') && !$user->can('Roles Write') && !$user->can('write roles')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -96,28 +99,31 @@ class RoleController extends Controller
         $role->update(['name' => $request->name, 'guard_name' => 'web']);
 
         if ($request->has('permissions')) {
-            $permissionNames = collect($request->permissions)->map(function($perm) {
-                return is_array($perm) ? $perm['name'] : $perm;
-            });
-            
-            foreach ($permissionNames as $name) {
-                Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
-            }
-            $role->syncPermissions($permissionNames);
+            $permissionModels = collect($request->permissions)->map(function($perm) {
+                $name = is_array($perm) ? ($perm['name'] ?? '') : $perm;
+                if (!empty($name)) {
+                    return Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
+                }
+                return null;
+            })->filter();
+
+            app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+            $role->syncPermissions($permissionModels);
         }
 
-        return response()->json(['message' => 'Role updated successfully', 'role' => $role]);
+        return response()->json(['message' => 'Peran berhasil diperbarui', 'role' => $role]);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        if (!request()->user()->can('Roles Delete')) {
+        $user = $request->user();
+        if ($user && !$user->hasRole('Super Admin') && !$user->can('Roles Delete') && !$user->can('delete roles')) {
             abort(403, 'Unauthorized action.');
         }
 
         $role = Role::findOrFail($id);
         $role->delete();
 
-        return response()->json(['message' => 'Role deleted successfully']);
+        return response()->json(['message' => 'Peran berhasil dihapus']);
     }
 }

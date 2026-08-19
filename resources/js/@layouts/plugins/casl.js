@@ -40,21 +40,32 @@ export const canViewNavMenuGroup = item => {
 export const canNavigate = to => {
   const ability = useAbility()
 
+  // If route is public
+  if (to.meta?.public)
+    return true
+
   // Get the most specific route (last one in the matched array)
   const targetRoute = to.matched[to.matched.length - 1]
 
+  if (targetRoute?.meta?.public)
+    return true
+
   // If the target route has specific permissions, check those first
   if (targetRoute?.meta?.action && targetRoute?.meta?.subject) {
-    if (targetRoute.meta.subject === 'Auth')
+    if (targetRoute.meta.subject === 'Auth' || targetRoute.meta.subject === 'all')
       return true
       
     return ability.can(targetRoute.meta.action, targetRoute.meta.subject)
   }
 
-  // If no specific permissions, fall back to checking if any parent route allows access
-    
+  // If no specific action/subject is required by the page, allow navigation
+  if (!targetRoute?.meta?.action && !targetRoute?.meta?.subject)
+    return true
+
+  // Fall back to checking if any parent route allows access
   return to.matched.some(route => {
-    if (route.meta.subject === 'Auth') return true
+    if (route.meta.subject === 'Auth' || route.meta.subject === 'all') return true
+    if (!route.meta.action && !route.meta.subject) return true
     
     return ability.can(route.meta.action, route.meta.subject)
   })

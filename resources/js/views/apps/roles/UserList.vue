@@ -1,7 +1,8 @@
 <script setup>
+import { avatarText } from '@core/utils/formatters'
+
 const searchQuery = ref('')
 const selectedRole = ref()
-const selectedPlan = ref()
 const selectedStatus = ref()
 const selectedRows = ref([])
 
@@ -20,7 +21,7 @@ const updateOptions = options => {
 // Headers
 const headers = [
   {
-    title: 'User',
+    title: 'Pengguna',
     key: 'user',
   },
   {
@@ -28,19 +29,15 @@ const headers = [
     key: 'email',
   },
   {
-    title: 'Role',
+    title: 'Peran (Role)',
     key: 'role',
-  },
-  {
-    title: 'Plan',
-    key: 'plan',
   },
   {
     title: 'Status',
     key: 'status',
   },
   {
-    title: 'Actions',
+    title: 'Aksi',
     key: 'actions',
     sortable: false,
   },
@@ -53,7 +50,6 @@ const {
   query: {
     q: searchQuery,
     status: selectedStatus,
-    plan: selectedPlan,
     role: selectedRole,
     itemsPerPage,
     page,
@@ -62,305 +58,227 @@ const {
   },
 }))
 
-const users = computed(() => usersData.value.users)
-const totalUsers = computed(() => usersData.value.totalUsers)
+const users = computed(() => usersData.value?.users || [])
+const totalUsers = computed(() => usersData.value?.totalUsers || 0)
 
-// 👉 search filters
+// Real POS Roles
 const roles = [
-  {
-    title: 'Admin',
-    value: 'admin',
-  },
-  {
-    title: 'Author',
-    value: 'author',
-  },
-  {
-    title: 'Editor',
-    value: 'editor',
-  },
-  {
-    title: 'Maintainer',
-    value: 'maintainer',
-  },
-  {
-    title: 'Subscriber',
-    value: 'subscriber',
-  },
+  { title: 'Super Admin', value: 'Super Admin' },
+  { title: 'Owner', value: 'Owner' },
+  { title: 'Admin Pusat', value: 'Admin Pusat' },
+  { title: 'Admin Cabang', value: 'Admin Cabang' },
+  { title: 'Kasir', value: 'Kasir' },
+  { title: 'Admin Gudang', value: 'Admin Gudang' },
+  { title: 'Manager', value: 'Manager' },
+]
+
+const statusOptions = [
+  { title: 'Aktif', value: 'active' },
+  { title: 'Nonaktif', value: 'inactive' },
+  { title: 'Pending', value: 'pending' },
 ]
 
 const resolveUserRoleVariant = role => {
   if (!role) return { color: 'primary', icon: 'ri-user-line' }
   const roleStr = Array.isArray(role) ? role[0] : role
-  const roleLowerCase = String(roleStr).toLowerCase()
-  if (roleLowerCase === 'subscriber')
-    return {
-      color: 'success',
-      icon: 'ri-user-line',
-    }
-  if (roleLowerCase === 'author')
-    return {
-      color: 'error',
-      icon: 'ri-computer-line',
-    }
-  if (roleLowerCase === 'maintainer')
-    return {
-      color: 'info',
-      icon: 'ri-pie-chart-line',
-    }
-  if (roleLowerCase === 'editor')
-    return {
-      color: 'warning',
-      icon: 'ri-edit-box-line',
-    }
-  if (roleLowerCase === 'admin')
-    return {
-      color: 'primary',
-      icon: 'ri-vip-crown-line',
-    }
-  
-  return {
-    color: 'primary',
-    icon: 'ri-user-line',
+  const r = String(roleStr).toLowerCase()
+  if (r.includes('super') || r.includes('owner')) {
+    return { color: 'error', icon: 'ri-vip-crown-line' }
   }
+  if (r.includes('pusat')) {
+    return { color: 'primary', icon: 'ri-building-line' }
+  }
+  if (r.includes('cabang')) {
+    return { color: 'info', icon: 'ri-store-2-line' }
+  }
+  if (r.includes('kasir')) {
+    return { color: 'success', icon: 'ri-shopping-cart-2-line' }
+  }
+  if (r.includes('gudang')) {
+    return { color: 'warning', icon: 'ri-archive-stack-line' }
+  }
+  if (r.includes('manager')) {
+    return { color: 'secondary', icon: 'ri-user-star-line' }
+  }
+  return { color: 'primary', icon: 'ri-user-line' }
 }
 
 const resolveUserStatusVariant = stat => {
-  const statLowerCase = stat.toLowerCase()
-  if (statLowerCase === 'pending')
-    return 'warning'
-  if (statLowerCase === 'active')
-    return 'success'
-  if (statLowerCase === 'inactive')
-    return 'secondary'
-  
-  return 'primary'
+  const s = String(stat || '').toLowerCase()
+  if (s === 'active' || s === 'aktif') return 'success'
+  if (s === 'pending') return 'warning'
+  return 'secondary'
 }
 
 const deleteUser = async id => {
-  await $api(`/apps/users/${ id }`, { method: 'DELETE' })
-
-  // Delete from selectedRows
-  const index = selectedRows.value.findIndex(row => Number(row) === id)
-  if (index !== -1)
-    selectedRows.value.splice(index, 1)
-
-  // refetch User
-
-  // TODO: Make this async
-  fetchUsers()
+  if (confirm('Apakah Anda yakin ingin menghapus akun pengguna ini?')) {
+    await $api(`/apps/users/${id}`, { method: 'DELETE' })
+    fetchUsers()
+  }
 }
 </script>
 
 <template>
-  <section>
-    <VCard>
-      <VCardText class="d-flex justify-space-between flex-wrap gap-5">
-        <!-- 👉 Export button -->
-        <VBtn
-          variant="outlined"
-          color="secondary"
-          prepend-icon="ri-share-box-line"
-        >
-          Export
-        </VBtn>
+  <VCard class="rounded-xl border elevation-1">
+    <!-- Filter & Search Toolbar -->
+    <VCardText class="pa-5">
+      <VRow>
+        <VCol cols="12" sm="6" md="4">
+          <VTextField
+            v-model="searchQuery"
+            placeholder="Cari nama atau email pengguna..."
+            prepend-inner-icon="ri-search-line"
+            density="compact"
+            variant="outlined"
+            rounded="lg"
+            hide-details
+            clearable
+          />
+        </VCol>
 
-        <div class="d-flex flex-wrap gap-4">
-          <!-- 👉 Search  -->
+        <VCol cols="12" sm="3" md="4">
+          <VSelect
+            v-model="selectedRole"
+            placeholder="Filter Peran"
+            :items="roles"
+            item-title="title"
+            item-value="value"
+            density="compact"
+            variant="outlined"
+            rounded="lg"
+            clearable
+            hide-details
+            prepend-inner-icon="ri-shield-user-line"
+          />
+        </VCol>
 
-          <div style="inline-size: 15.625rem;">
-            <VTextField
-              v-model="searchQuery"
-              placeholder="Search User"
-              density="compact"
+        <VCol cols="12" sm="3" md="4">
+          <VSelect
+            v-model="selectedStatus"
+            placeholder="Filter Status"
+            :items="statusOptions"
+            item-title="title"
+            item-value="value"
+            density="compact"
+            variant="outlined"
+            rounded="lg"
+            clearable
+            hide-details
+            prepend-inner-icon="ri-toggle-line"
+          />
+        </VCol>
+      </VRow>
+    </VCardText>
+
+    <VDivider />
+
+    <!-- Data Table -->
+    <VDataTableServer
+      v-model:model-value="selectedRows"
+      v-model:items-per-page="itemsPerPage"
+      :items-per-page-options="[
+        { value: 10, title: '10' },
+        { value: 20, title: '20' },
+        { value: 50, title: '50' },
+      ]"
+      :items="users"
+      item-value="id"
+      :items-length="totalUsers"
+      :headers="headers"
+      class="text-no-wrap"
+      @update:options="updateOptions"
+    >
+      <!-- User Column -->
+      <template #item.user="{ item }">
+        <div class="d-flex align-center py-2">
+          <VAvatar
+            size="38"
+            :variant="!item.avatar ? 'tonal' : undefined"
+            :color="!item.avatar ? resolveUserRoleVariant(item.role).color : undefined"
+            class="me-3 elevation-1"
+          >
+            <VImg
+              v-if="item.avatar"
+              :src="item.avatar"
             />
-          </div>
-
-          <!-- 👉 Add user button -->
-          <div style="inline-size: 9.25rem;">
-            <VSelect
-              v-model="selectedRole"
-              placeholder="Select Role"
-              :items="roles"
-              density="compact"
-              clearable
-              clear-icon="ri-close-line"
-            />
+            <span v-else class="font-weight-bold">{{ avatarText(item.fullName || item.name) }}</span>
+          </VAvatar>
+          <div class="d-flex flex-column">
+            <RouterLink
+              :to="{ name: 'apps-user-view-id', params: { id: item.id } }"
+              class="text-high-emphasis font-weight-bold text-subtitle-2 hover-primary"
+            >
+              {{ item.fullName || item.name }}
+            </RouterLink>
+            <span class="text-caption text-medium-emphasis">ID: #{{ item.id }}</span>
           </div>
         </div>
-      </VCardText>
+      </template>
 
-      <!-- SECTION datatable -->
-      <VDataTableServer
-        v-model:model-value="selectedRows"
-        v-model:items-per-page="itemsPerPage"
-        :items-per-page-options="[
-          { value: 10, title: '10' },
-          { value: 20, title: '20' },
-          { value: 50, title: '50' },
-          { value: -1, title: '$vuetify.dataFooter.itemsPerPageAll' },
-        ]"
-        :items="users"
-        item-value="id"
-        :items-length="totalUsers"
-        :headers="headers"
-        show-select
-        class="text-no-wrap rounded-0"
-        @update:options="updateOptions"
-      >
-        <!-- User -->
-        <template #item.user="{ item }">
-          <div class="d-flex">
-            <VAvatar
-              size="34"
-              :variant="!item.avatar ? 'tonal' : undefined"
-              :color="!item.avatar ? resolveUserRoleVariant(item.role).color : undefined"
-              class="me-3"
-            >
-              <VImg
-                v-if="item.avatar"
-                :src="item.avatar"
-              />
-              <span v-else>{{ avatarText(item.fullName) }}</span>
-            </VAvatar>
-            <div class="d-flex flex-column">
-              <RouterLink
-                :to="{ name: 'apps-user-view-id', params: { id: item.id } }"
-                class="text-link font-weight-medium text-base"
-              >
-                {{ item.fullName }}
-              </RouterLink>
-              <span class="text-sm">@{{ item.username }}</span>
-            </div>
-          </div>
-        </template>
+      <!-- Email Column -->
+      <template #item.email="{ item }">
+        <span class="text-body-2 text-medium-emphasis">{{ item.email }}</span>
+      </template>
 
-        <!-- Role -->
-        <template #item.role="{ item }">
-          <div class="d-flex gap-2">
-            <VIcon
-              size="22"
-              :icon="resolveUserRoleVariant(item.role).icon"
-              :color="resolveUserRoleVariant(item.role).color"
-            />
-            <h6 class="text-h6 text-capitalize font-weight-regular">
-              {{ item.role }}
-            </h6>
-          </div>
-        </template>
+      <!-- Role Column -->
+      <template #item.role="{ item }">
+        <VChip
+          size="small"
+          :color="resolveUserRoleVariant(item.role).color"
+          variant="tonal"
+          class="font-weight-bold"
+        >
+          <VIcon
+            size="14"
+            :icon="resolveUserRoleVariant(item.role).icon"
+            class="me-1"
+          />
+          {{ Array.isArray(item.role) ? item.role.join(', ') : item.role }}
+        </VChip>
+      </template>
 
-        <!-- Plan -->
-        <template #item.plan="{ item }">
-          <h6 class="text-h6 font-weight-regular text-capitalize">
-            {{ item.currentPlan }}
-          </h6>
-        </template>
+      <!-- Status Column -->
+      <template #item.status="{ item }">
+        <VChip
+          :color="resolveUserStatusVariant(item.status)"
+          size="small"
+          variant="elevated"
+          class="font-weight-bold"
+        >
+          {{ String(item.status).toLowerCase() === 'active' || String(item.status).toLowerCase() === 'aktif' ? 'Aktif' : 'Nonaktif' }}
+        </VChip>
+      </template>
 
-        <!-- Status -->
-        <template #item.status="{ item }">
-          <VChip
-            :color="resolveUserStatusVariant(item.status)"
-            size="small"
-            class="text-capitalize"
-          >
-            {{ item.status }}
-          </VChip>
-        </template>
-
-        <!-- Actions -->
-        <template #item.actions="{ item }">
+      <!-- Actions Column -->
+      <template #item.actions="{ item }">
+        <div class="d-flex align-center gap-1">
           <IconBtn
             size="small"
-            @click="deleteUser(item.id)"
-          >
-            <VIcon icon="ri-delete-bin-7-line" />
-          </IconBtn>
-
-          <IconBtn
-            size="small"
+            color="primary"
+            variant="tonal"
+            title="Lihat Detail Profil"
             :to="{ name: 'apps-user-view-id', params: { id: item.id } }"
           >
-            <VIcon icon="ri-eye-line" />
+            <VIcon icon="ri-eye-line" size="18" />
           </IconBtn>
 
-          <IconBtn size="small">
-            <VIcon icon="ri-more-2-line" />
-
-            <VMenu activator="parent">
-              <VList>
-                <VListItem link>
-                  <template #prepend>
-                    <VIcon
-                      size="20"
-                      icon="ri-edit-box-line"
-                    />
-                  </template>
-                  <VListItemTitle>Edit</VListItemTitle>
-                </VListItem>
-                <VListItem link>
-                  <template #prepend>
-                    <VIcon
-                      size="20"
-                      icon="ri-download-line"
-                    />
-                  </template>
-                  <VListItemTitle>Download</VListItemTitle>
-                </VListItem>
-              </VList>
-            </VMenu>
+          <IconBtn
+            size="small"
+            color="error"
+            variant="tonal"
+            title="Hapus Pengguna"
+            @click="deleteUser(item.id)"
+          >
+            <VIcon icon="ri-delete-bin-line" size="18" />
           </IconBtn>
-        </template>
-
-        <!-- Pagination -->
-        <template #bottom>
-          <VDivider />
-
-          <div class="d-flex justify-end flex-wrap gap-x-6 px-2 py-1">
-            <div class="d-flex align-center gap-x-2 text-medium-emphasis text-base">
-              Rows Per Page:
-              <VSelect
-                v-model="itemsPerPage"
-                class="per-page-select"
-                variant="plain"
-                :items="[10, 20, 25, 50, 100]"
-              />
-            </div>
-
-            <p class="d-flex align-center text-base text-high-emphasis me-2 mb-0">
-              {{ paginationMeta({ page, itemsPerPage }, totalUsers) }}
-            </p>
-
-            <div class="d-flex gap-x-2 align-center me-2">
-              <VBtn
-                class="flip-in-rtl"
-                icon="ri-arrow-left-s-line"
-                variant="text"
-                density="comfortable"
-                color="high-emphasis"
-                :disabled="page <= 1"
-                @click="page <= 1 ? page = 1 : page--"
-              />
-
-              <VBtn
-                class="flip-in-rtl"
-                icon="ri-arrow-right-s-line"
-                density="comfortable"
-                variant="text"
-                color="high-emphasis"
-                :disabled="page >= Math.ceil(totalUsers / itemsPerPage)"
-                @click="page >= Math.ceil(totalUsers / itemsPerPage) ? page = Math.ceil(totalUsers / itemsPerPage) : page++ "
-              />
-            </div>
-          </div>
-        </template>
-      </VDataTableServer>
-      <!-- SECTION -->
-    </VCard>
-  </section>
+        </div>
+      </template>
+    </VDataTableServer>
+  </VCard>
 </template>
 
-<style lang="scss">
-.text-capitalize {
-  text-transform: capitalize;
+<style scoped>
+.hover-primary:hover {
+  color: rgb(var(--v-theme-primary)) !important;
 }
 </style>

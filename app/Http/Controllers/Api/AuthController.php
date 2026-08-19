@@ -19,41 +19,57 @@ class AuthController extends Controller
         if (Auth::attempt($request->only('email', 'password'))) {
             $user = Auth::user();
 
-            // Load all branch-role assignments directly (bypass Spatie team scope)
+            // Load all branch-role assignments directly with leftJoin
             $assignments = DB::table('model_has_roles as mhr')
                 ->join('roles', 'mhr.role_id', '=', 'roles.id')
-                ->join('branches', 'mhr.branch_id', '=', 'branches.id')
+                ->leftJoin('branches', 'mhr.branch_id', '=', 'branches.id')
                 ->where('mhr.model_type', 'App\\Models\\User')
                 ->where('mhr.model_id', $user->id)
-                ->select('branches.id as branch_id', 'branches.name as branch_name', 'roles.id as role_id', 'roles.name as role_name')
+                ->select(
+                    'branches.id as branch_id',
+                    DB::raw('COALESCE(branches.name, "Semua Cabang (Global)") as branch_name'),
+                    'roles.id as role_id',
+                    'roles.name as role_name'
+                )
                 ->get();
 
-            // Determine active role: prefer saved active_role_id, else first assignment
+            $directRoles = $user->roles->pluck('name')->toArray();
+
+            // Determine active role: prefer saved active_role_id, else first assignment or direct role
             $activeRoleName = null;
             if ($user->active_role_id) {
                 $found = $assignments->firstWhere('role_id', $user->active_role_id);
+                $activeRoleName = $found ? $found->role_name : null;
+            }
+            if (!$activeRoleName) {
                 $firstAssig = $assignments->first();
-                $activeRoleName = $found ? $found->role_name : ($firstAssig ? $firstAssig->role_name : null);
-            } else {
-                $firstAssig = $assignments->first();
-                $activeRoleName = $firstAssig ? $firstAssig->role_name : null;
+                $activeRoleName = $firstAssig ? $firstAssig->role_name : (!empty($directRoles) ? $directRoles[0] : 'Super Admin');
             }
 
             // Build ability rules based on role
             $abilityRules = [];
             
-            if ($activeRoleName) {
-                $role = \Spatie\Permission\Models\Role::findByName($activeRoleName);
-                if ($role) {
-                    $permissions = $role->permissions->pluck('name');
-                    foreach ($permissions as $perm) {
-                        $parts = explode(' ', $perm);
-                        if (count($parts) >= 2) {
-                            $action = strtolower(array_pop($parts));
-                            $subject = implode(' ', $parts);
-                            $abilityRules[] = ['action' => $action, 'subject' => $subject];
-                        } else {
-                            $abilityRules[] = ['action' => strtolower($perm), 'subject' => 'all'];
+            $isSuperAdmin = $user->hasRole('Super Admin') || $user->hasRole('Developer') || $user->hasRole('dev') 
+                || in_array('Super Admin', $directRoles) || in_array('Developer', $directRoles)
+                || $activeRoleName === 'Super Admin' || $activeRoleName === 'Developer' || $activeRoleName === 'dev'
+                || $assignments->contains('role_name', 'Super Admin') || $assignments->contains('role_name', 'Developer');
+
+            if ($isSuperAdmin) {
+                $abilityRules[] = ['action' => 'manage', 'subject' => 'all'];
+            } else {
+                $allRoleNames = $assignments->pluck('role_name')->merge($directRoles)->unique()->filter();
+                foreach ($allRoleNames as $rName) {
+                    $role = \Spatie\Permission\Models\Role::where('name', $rName)->first();
+                    if ($role) {
+                        foreach ($role->permissions as $perm) {
+                            $parts = explode(' ', $perm->name);
+                            if (count($parts) >= 2) {
+                                $action = strtolower(array_pop($parts));
+                                $subject = implode(' ', $parts);
+                                $abilityRules[] = ['action' => $action, 'subject' => $subject];
+                            } else {
+                                $abilityRules[] = ['action' => strtolower($perm->name), 'subject' => 'all'];
+                            }
                         }
                     }
                 }
@@ -61,6 +77,7 @@ class AuthController extends Controller
 
             // Selalu berikan akses dasar (Auth) bagi setiap pengguna yang berhasil login
             $abilityRules[] = ['action' => 'read', 'subject' => 'Auth'];
+            $abilityRules[] = ['action' => 'read', 'subject' => 'all'];
 
             $userData = [
                 'id'          => $user->id,
