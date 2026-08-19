@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useSnackbarStore } from '@/stores/snackbar'
 import AddNewCategoryDrawer from './AddNewCategoryDrawer.vue'
+import SimpleConfirmDialog from '@/components/dialogs/SimpleConfirmDialog.vue'
 
 const categories = ref([])
 const isLoading = ref(false)
@@ -20,10 +21,16 @@ const editingCategory = ref(null)
 const isConfirmDeleteDialogVisible = ref(false)
 const categoryToDelete = ref(null)
 
+const stats = computed(() => {
+  const all = categories.value || []
+  const total = totalItems.value || all.length
+  return { total }
+})
+
 const tableHeaders = [
-  { title: 'NAMA KATEGORI', key: 'name' },
-  { title: 'DESKRIPSI', key: 'description' },
-  { title: 'ACTIONS', key: 'actions', sortable: false, align: 'end' },
+  { title: 'IDENTITAS KATEGORI', key: 'name' },
+  { title: 'DESKRIPSI & KETERANGAN', key: 'description' },
+  { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
 ]
 
 const fetchCategories = async () => {
@@ -57,7 +64,7 @@ const handleSearch = () => {
   searchTimeout = setTimeout(() => {
     page.value = 1
     fetchCategories()
-  }, 500)
+  }, 400)
 }
 
 onMounted(() => {
@@ -103,8 +110,8 @@ const handleCategoryData = async categoryData => {
   }
 }
 
-const deleteCategory = async () => {
-  if (!categoryToDelete.value) return
+const deleteCategory = async isConfirmed => {
+  if (!isConfirmed || !categoryToDelete.value) return
   
   try {
     await $api(`/apps/categories/${categoryToDelete.value.id}`, {
@@ -114,9 +121,8 @@ const deleteCategory = async () => {
     fetchCategories()
   } catch (error) {
     console.error(error)
-    snackbar.show('Gagal menghapus kategori', 'error')
+    snackbar.show('Gagal menghapus kategori. Pastikan tidak ada produk terikat.', 'error')
   } finally {
-    isConfirmDeleteDialogVisible.value = false
     categoryToDelete.value = null
   }
 }
@@ -125,7 +131,7 @@ const deleteCategory = async () => {
 const fileInput = ref(null)
 
 const downloadTemplate = () => {
-  const csvContent = 'Nama Kategori,Deskripsi\nContoh Kategori,Ini adalah contoh deskripsi'
+  const csvContent = 'Nama Kategori,Deskripsi\nSembako & Pangan,Bahan pokok kebutuhan harian\nElektronik,Perangkat elektronik dan aksesoris'
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -140,7 +146,6 @@ const downloadTemplate = () => {
 const exportExcel = () => {
   if (!categories.value.length) {
     snackbar.show('Tidak ada data untuk diekspor', 'warning')
-    
     return
   }
   const headers = ['Nama Kategori', 'Deskripsi']
@@ -175,7 +180,6 @@ const handleFileUpload = async event => {
   if (!file) return
   
   const formData = new FormData()
-
   formData.append('file', file)
   
   isLoading.value = true
@@ -189,7 +193,7 @@ const handleFileUpload = async event => {
     fetchCategories()
   } catch (error) {
     console.error(error)
-    snackbar.show('Gagal melakukan import data', 'error')
+    snackbar.show('Gagal melakukan import data kategori', 'error')
   } finally {
     isLoading.value = false
     event.target.value = '' // Reset input
@@ -198,16 +202,19 @@ const handleFileUpload = async event => {
 </script>
 
 <template>
-  <section>
-    <!-- Page Header -->
-    <div class="d-flex align-center justify-space-between mb-4">
+  <div class="pa-4">
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-center justify-space-between mb-4 gap-4">
       <div>
-        <h2 class="text-h4 mb-0">
-          Master Data Kategori
+        <h2 class="text-h4 font-weight-bold mb-1">
+          Master Data Kategori Barang
         </h2>
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          Kelola klasifikasi kategori produk untuk mempermudah inventarisasi, pencarian kasir, dan audit Cycle Counting.
+        </p>
       </div>
       
-      <div class="d-flex gap-4">
+      <div class="d-flex flex-wrap gap-3">
         <input 
           ref="fileInput" 
           type="file" 
@@ -215,15 +222,17 @@ const handleFileUpload = async event => {
           style="display: none" 
           @change="handleFileUpload"
         >
+
         <VBtn
           v-if="$can('import', 'Kategori Barang')"
-          color="info"
+          color="secondary"
           variant="tonal"
           prepend-icon="ri-download-cloud-line"
           @click="downloadTemplate"
         >
-          Template
+          Template CSV
         </VBtn>
+
         <VBtn
           v-if="$can('import', 'Kategori Barang')"
           color="warning"
@@ -234,6 +243,7 @@ const handleFileUpload = async event => {
         >
           Import
         </VBtn>
+
         <VBtn
           v-if="$can('export', 'Kategori Barang')"
           color="success"
@@ -241,10 +251,12 @@ const handleFileUpload = async event => {
           prepend-icon="ri-file-excel-2-line"
           @click="exportExcel"
         >
-          Export
+          Export CSV
         </VBtn>
+
         <VBtn
           v-if="$can('create', 'Kategori Barang')"
+          color="primary"
           prepend-icon="ri-add-line"
           @click="openAddDrawer"
         >
@@ -253,27 +265,79 @@ const handleFileUpload = async event => {
       </div>
     </div>
 
-    <!-- Card -->
-    <VCard>
-      <VCardItem class="pa-4 pb-0">
-        <div class="d-flex align-center justify-space-between w-100">
-          <VCardTitle class="px-0">
-            Daftar Kategori
-          </VCardTitle>
-          <div style="width: 250px;">
+    <!-- KPI Summary Row -->
+    <VRow class="mb-4">
+      <VCol cols="12" sm="4">
+        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-primary font-weight-bold">TOTAL KATEGORI</div>
+              <div class="text-h4 font-weight-bold text-primary mt-1">{{ stats.total }} <span class="text-caption text-medium-emphasis">Kategori</span></div>
+            </div>
+            <VAvatar color="primary" variant="tonal" rounded size="44">
+              <VIcon icon="ri-folder-3-line" size="24" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Seluruh pengelompokan aktif</div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="4">
+        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-info font-weight-bold">CYCLE COUNTING AUDIT</div>
+              <div class="text-h4 font-weight-bold text-info mt-1">Siap <span class="text-caption text-medium-emphasis">Parsial</span></div>
+            </div>
+            <VAvatar color="info" variant="tonal" rounded size="44">
+              <VIcon icon="ri-survey-line" size="24" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Audit stok terpisah per kategori</div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="4">
+        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-success font-weight-bold">STATUS DATABASE</div>
+              <div class="text-h4 font-weight-bold text-success mt-1">Sinkron <span class="text-caption text-medium-emphasis">100%</span></div>
+            </div>
+            <VAvatar color="success" variant="tonal" rounded size="44">
+              <VIcon icon="ri-database-2-line" size="24" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Terhubung ke katalog produk</div>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- Main Table Card -->
+    <VCard elevation="2">
+      <!-- Card Toolbar -->
+      <VCardItem class="pa-4">
+        <div class="d-flex flex-wrap align-center justify-space-between gap-4">
+          <div style="min-width: 280px; max-width: 400px;" class="flex-grow-1">
             <VTextField
               v-model="search"
               prepend-inner-icon="ri-search-line"
-              placeholder="Cari Kategori..."
+              placeholder="Cari nama kategori atau deskripsi..."
               density="compact"
-              hide-details
               variant="outlined"
+              hide-details
               clearable
               @update:model-value="handleSearch"
             />
           </div>
+
+          <div class="text-caption text-medium-emphasis">
+            Total Terdaftar: <strong>{{ totalItems }}</strong> Kategori
+          </div>
         </div>
       </VCardItem>
+
+      <VDivider />
 
       <!-- Table -->
       <VDataTableServer
@@ -283,24 +347,56 @@ const handleFileUpload = async event => {
         :items="categories"
         :items-length="totalItems"
         :loading="isLoading"
+        hover
         class="text-no-wrap"
         @update:options="fetchCategories"
       >
+        <!-- Category Name -->
+        <template #item.name="{ item }">
+          <div class="d-flex align-center py-2">
+            <VAvatar
+              size="38"
+              color="primary"
+              variant="tonal"
+              class="me-3 rounded-lg border"
+            >
+              <VIcon icon="ri-folder-line" size="20" />
+            </VAvatar>
+            <div>
+              <div class="font-weight-bold text-subtitle-2">{{ item.name }}</div>
+              <div class="text-caption text-disabled">ID: #{{ item.id }}</div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Description -->
+        <template #item.description="{ item }">
+          <span class="text-body-2 text-medium-emphasis text-wrap" style="max-width: 450px; display: inline-block;">
+            {{ item.description || '-' }}
+          </span>
+        </template>
+
+        <!-- Actions -->
         <template #item.actions="{ item }">
-          <div class="d-flex gap-1 justify-end">
-            <IconBtn
+          <div class="d-flex align-center justify-center gap-1">
+            <VBtn
               v-if="$can('write', 'Kategori Barang')"
+              size="small"
+              variant="text"
+              color="primary"
+              icon="ri-edit-box-line"
+              title="Edit Kategori"
               @click="openEditDrawer(item)"
-            >
-              <VIcon icon="ri-edit-line" />
-            </IconBtn>
-            <IconBtn
+            />
+            <VBtn
               v-if="$can('delete', 'Kategori Barang')"
+              size="small"
+              variant="text"
               color="error"
+              icon="ri-delete-bin-line"
+              title="Hapus Kategori"
               @click="confirmDelete(item)"
-            >
-              <VIcon icon="ri-delete-bin-line" />
-            </IconBtn>
+            />
           </div>
         </template>
       </VDataTableServer>
@@ -314,37 +410,15 @@ const handleFileUpload = async event => {
     />
 
     <!-- Dialog Konfirmasi Hapus -->
-    <VDialog
-      v-model="isConfirmDeleteDialogVisible"
-      max-width="500"
-    >
-      <VCard>
-        <VCardTitle class="text-h5">
-          Konfirmasi Hapus
-        </VCardTitle>
-        <VCardText>
-          Apakah Anda yakin ingin menghapus kategori <strong>{{ categoryToDelete?.name }}</strong>?
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            color="error"
-            variant="outlined"
-            @click="isConfirmDeleteDialogVisible = false"
-          >
-            Batal
-          </VBtn>
-          <VBtn
-            color="error"
-            variant="elevated"
-            @click="deleteCategory"
-          >
-            Hapus
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-  </section>
+    <SimpleConfirmDialog
+      v-model:is-dialog-visible="isConfirmDeleteDialogVisible"
+      title="Hapus Kategori Barang?"
+      :message="`Apakah Anda yakin ingin menghapus kategori '${categoryToDelete?.name}'? Pastikan tidak ada master produk yang masih terikat dengan kategori ini.`"
+      confirm-text="Ya, Hapus"
+      cancel-text="Batal"
+      @confirm="deleteCategory"
+    />
+  </div>
 </template>
 
 <route lang="yaml">

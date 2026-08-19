@@ -2,14 +2,19 @@
 import { ref, onMounted, computed } from 'vue'
 import { useSnackbarStore } from '@/stores/snackbar'
 import AddNewProductDrawer from './AddNewProductDrawer.vue'
+import SimpleConfirmDialog from '@/components/dialogs/SimpleConfirmDialog.vue'
 
 const products = ref([])
 const categories = ref([])
 const search = ref('')
-const selectedCategory = ref(null)
+const selectedCategory = ref('all')
+const selectedStatus = ref('all')
 const isLoading = ref(false)
 const isAddNewProductDrawerVisible = ref(false)
 const selectedProduct = ref(null)
+
+const isConfirmDeleteDialogVisible = ref(false)
+const productToDelete = ref(null)
 
 // Pagination
 const page = ref(1)
@@ -17,17 +22,17 @@ const itemsPerPage = ref(10)
 const totalItems = ref(0)
 let searchTimeout = null
 
-// Format currency
-const formatRupiah = value => {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value)
-}
-
 const snackbar = useSnackbarStore()
+
+const stats = computed(() => {
+  const all = products.value || []
+  const total = totalItems.value || all.length
+  const totalCat = categories.value.length
+  const active = all.filter(p => (p.status || 'Aktif') === 'Aktif').length
+  const fefo = all.filter(p => p.stock_method === 'FEFO').length
+  
+  return { total, totalCat, active, fefo }
+})
 
 const fetchProducts = async () => {
   isLoading.value = true
@@ -40,8 +45,11 @@ const fetchProducts = async () => {
     if (search.value) {
       params.search = search.value
     }
-    if (selectedCategory.value) {
+    if (selectedCategory.value !== 'all') {
       params.category_id = selectedCategory.value
+    }
+    if (selectedStatus.value !== 'all') {
+      params.status = selectedStatus.value
     }
 
     const data = await $api('/apps/products', { query: params })
@@ -63,14 +71,13 @@ const handleSearch = () => {
   searchTimeout = setTimeout(() => {
     page.value = 1
     fetchProducts()
-  }, 500)
+  }, 400)
 }
 
 const fetchCategories = async () => {
   try {
     const data = await $api('/apps/categories', { query: { itemsPerPage: -1 } })
-
-      categories.value = data.data || data
+    categories.value = data.data || data
   } catch (error) {
     console.error(error)
   }
@@ -85,7 +92,6 @@ const addNewProduct = async productData => {
   try {
     const formData = new FormData()
     
-    // Append all data
     for (const key in productData) {
       if (productData[key] !== null && productData[key] !== undefined) {
         formData.append(key, productData[key])
@@ -114,33 +120,36 @@ const addNewProduct = async productData => {
 }
 
 const tableHeaders = [
-  { title: 'PRODUK', key: 'name' },
-  { title: 'MEREK', key: 'brand' },
+  { title: 'INFORMASI PRODUK & SKU', key: 'name' },
+  { title: 'MEREK / BRAND', key: 'brand' },
   { title: 'KATEGORI', key: 'category' },
-  { title: 'METODE STOK', key: 'stock_method' },
-  { title: 'STATUS', key: 'status' },
+  { title: 'METODE STOK', key: 'stock_method', align: 'center' },
+  { title: 'STATUS', key: 'status', align: 'center' },
   { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
 ]
-
-const filteredProducts = computed(() => {
-  return products.value
-})
 
 const editProduct = product => {
   selectedProduct.value = product
   isAddNewProductDrawerVisible.value = true
 }
 
-const confirmDeleteProduct = async id => {
-  if (confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
-    try {
-      await $api(`/apps/products/${id}`, { method: 'DELETE' })
-      snackbar.show('Produk berhasil dihapus', 'success')
-      fetchProducts()
-    } catch (error) {
-      console.error(error)
-      snackbar.show('Gagal menghapus produk', 'error')
-    }
+const openDeleteDialog = id => {
+  productToDelete.value = id
+  isConfirmDeleteDialogVisible.value = true
+}
+
+const executeDeleteProduct = async isConfirmed => {
+  if (!isConfirmed) return
+  
+  try {
+    await $api(`/apps/products/${productToDelete.value}`, { method: 'DELETE' })
+    snackbar.show('Produk berhasil dihapus dari sistem', 'success')
+    fetchProducts()
+  } catch (error) {
+    console.error(error)
+    snackbar.show('Gagal menghapus produk', 'error')
+  } finally {
+    productToDelete.value = null
   }
 }
 
@@ -150,7 +159,7 @@ const fileInput = ref(null)
 const downloadTemplate = () => {
   let csvContent = 'SKU,Nama Produk,Kategori (Wajib),Type,Merek,Satuan,Qty Stok,Harga Modal,Harga Jual Pusat,Harga Cabang Bandung,Harga Cabang Sudirman\n'
   csvContent += 'SKU-001,Produk Contoh A,Mesin,R175,Dongfeng,Unit,10,1000000,1200000,1300000,1350000\n'
-  csvContent += 'Produk Contoh B,SKU002,Minuman,Deskripsi produk B,Aqua,,Karton,5000,false\n\n'
+  csvContent += 'SKU-002,Produk Contoh B,Minuman,Aqua 600ml,Danone,Karton,50,45000,55000,55000,56000\n\n'
   
   if (categories.value && categories.value.length > 0) {
     csvContent += ',,,,\n'
@@ -175,7 +184,6 @@ const downloadTemplate = () => {
 const exportExcel = () => {
   if (!products.value.length) {
     snackbar.show('Tidak ada data untuk diekspor', 'warning')
-    
     return
   }
   const headers = ['Nama Produk', 'SKU', 'Kategori', 'Deskripsi', 'Merek', 'Barcode', 'Satuan', 'Status']
@@ -216,7 +224,6 @@ const handleFileUpload = async event => {
   if (!file) return
   
   const formData = new FormData()
-
   formData.append('file', file)
   
   isLoading.value = true
@@ -239,19 +246,19 @@ const handleFileUpload = async event => {
 </script>
 
 <template>
-  <section>
-    <!-- Page Header -->
-    <div class="d-flex align-center justify-space-between mb-4">
+  <div class="pa-4">
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-center justify-space-between mb-4 gap-4">
       <div>
-        <h2 class="text-h4 mb-0">
-          Master Data Produk (Pusat)
+        <h2 class="text-h4 font-weight-bold mb-1">
+          Master Data Katalog Produk
         </h2>
-        <p class="text-body-1 mb-0 text-disabled mt-1">
-          Kelola daftar master produk dari kantor pusat. Harga dan stok diatur di menu Inventori Cabang.
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          Kelola master SKU, barcode scanner, spesifikasi brand, kategori, dan metode mutasi stok terpusat.
         </p>
       </div>
       
-      <div class="d-flex gap-4">
+      <div class="d-flex flex-wrap gap-3">
         <input 
           ref="fileInput" 
           type="file" 
@@ -259,15 +266,17 @@ const handleFileUpload = async event => {
           style="display: none" 
           @change="handleFileUpload"
         >
+
         <VBtn
           v-if="$can('import', 'Produk')"
-          color="info"
+          color="secondary"
           variant="tonal"
           prepend-icon="ri-download-cloud-line"
           @click="downloadTemplate"
         >
-          Template
+          Template CSV
         </VBtn>
+
         <VBtn
           v-if="$can('import', 'Produk')"
           color="warning"
@@ -278,6 +287,7 @@ const handleFileUpload = async event => {
         >
           Import
         </VBtn>
+
         <VBtn
           v-if="$can('export', 'Produk')"
           color="success"
@@ -285,8 +295,9 @@ const handleFileUpload = async event => {
           prepend-icon="ri-file-excel-2-line"
           @click="exportExcel"
         >
-          Export
+          Export CSV
         </VBtn>
+
         <VBtn
           v-if="$can('create', 'Produk')"
           color="primary"
@@ -298,28 +309,126 @@ const handleFileUpload = async event => {
       </div>
     </div>
 
-    <!-- Card -->
-    <VCard>
-      <!-- Card Header -->
-      <VCardItem class="pa-4 pb-0">
-        <div class="d-flex align-center justify-space-between w-100">
-          <VCardTitle class="px-0">
-            Daftar Produk
-          </VCardTitle>
-          <div style="width: 250px;">
+    <!-- KPI Summary Row -->
+    <VRow class="mb-4">
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-primary font-weight-bold">TOTAL MASTER PRODUK</div>
+              <div class="text-h4 font-weight-bold text-primary mt-1">{{ stats.total }} <span class="text-caption text-medium-emphasis">SKU</span></div>
+            </div>
+            <VAvatar color="primary" variant="tonal" rounded size="44">
+              <VIcon icon="ri-box-3-line" size="24" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Seluruh varian terdaftar</div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-info font-weight-bold">KATEGORI PRODUK</div>
+              <div class="text-h4 font-weight-bold text-info mt-1">{{ stats.totalCat }} <span class="text-caption text-medium-emphasis">Kategori</span></div>
+            </div>
+            <VAvatar color="info" variant="tonal" rounded size="44">
+              <VIcon icon="ri-folder-3-line" size="24" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Pengelompokan jenis barang</div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-success font-weight-bold">PRODUK AKTIF</div>
+              <div class="text-h4 font-weight-bold text-success mt-1">{{ stats.active }} <span class="text-caption text-medium-emphasis">Item</span></div>
+            </div>
+            <VAvatar color="success" variant="tonal" rounded size="44">
+              <VIcon icon="ri-checkbox-circle-line" size="24" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Dapat dijual & diorder</div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3">
+        <VCard elevation="2" class="pa-4 border-s-lg border-warning">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-warning font-weight-bold">PRODUK FEFO (EXPIRED)</div>
+              <div class="text-h4 font-weight-bold text-warning mt-1">{{ stats.fefo }} <span class="text-caption text-medium-emphasis">Item</span></div>
+            </div>
+            <VAvatar color="warning" variant="tonal" rounded size="44">
+              <VIcon icon="ri-time-line" size="24" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Wajib pelacakan tanggal kadaluwarsa</div>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- Main Table Card -->
+    <VCard elevation="2">
+      <!-- Toolbar & Filters -->
+      <VCardItem class="pa-4">
+        <VRow align="center">
+          <VCol cols="12" md="4">
             <VTextField
               v-model="search"
               prepend-inner-icon="ri-search-line"
-              placeholder="Cari produk atau SKU..."
+              placeholder="Cari nama produk, SKU, barcode..."
               density="compact"
-              hide-details
               variant="outlined"
+              hide-details
               clearable
               @update:model-value="handleSearch"
             />
-          </div>
-        </div>
+          </VCol>
+
+          <VCol cols="12" sm="6" md="3">
+            <VSelect
+              v-model="selectedCategory"
+              :items="[{ id: 'all', name: 'Semua Kategori' }, ...categories]"
+              item-title="name"
+              item-value="id"
+              density="compact"
+              variant="outlined"
+              hide-details
+              @update:model-value="fetchProducts"
+            />
+          </VCol>
+
+          <VCol cols="12" sm="6" md="3">
+            <VSelect
+              v-model="selectedStatus"
+              :items="[
+                { title: 'Semua Status', value: 'all' },
+                { title: 'Aktif Dijual', value: 'Aktif' },
+                { title: 'Nonaktif / Arsip', value: 'Nonaktif' }
+              ]"
+              item-title="title"
+              item-value="value"
+              density="compact"
+              variant="outlined"
+              hide-details
+              @update:model-value="fetchProducts"
+            />
+          </VCol>
+
+          <VCol cols="12" md="2" class="text-right d-none d-md-block">
+            <div class="text-caption text-medium-emphasis">
+              Total: <strong>{{ totalItems }}</strong> Produk
+            </div>
+          </VCol>
+        </VRow>
       </VCardItem>
+
+      <VDivider />
 
       <VDataTableServer
         v-model:items-per-page="itemsPerPage"
@@ -328,16 +437,18 @@ const handleFileUpload = async event => {
         :items="products"
         :items-length="totalItems"
         :loading="isLoading"
+        hover
         class="text-no-wrap"
         @update:options="fetchProducts"
       >
+        <!-- Product Name, SKU & Barcode -->
         <template #item.name="{ item }">
-          <div class="d-flex align-center">
+          <div class="d-flex align-center py-2">
             <VAvatar
-              size="45"
-              color="info"
+              size="44"
+              color="primary"
               variant="tonal"
-              class="mr-3 rounded"
+              class="me-3 rounded-lg border flex-shrink-0"
             >
               <VImg
                 v-if="item.image"
@@ -348,57 +459,95 @@ const handleFileUpload = async event => {
               <VIcon
                 v-else
                 icon="ri-box-3-line"
+                size="24"
               />
             </VAvatar>
-            <div class="d-flex flex-column">
-              <h6 class="text-h6 font-weight-medium mb-0">
+            <div>
+              <div class="font-weight-bold text-subtitle-2 text-wrap" style="max-width: 320px;">
                 {{ item.name }}
-              </h6>
-              <span class="text-caption text-disabled">SKU: {{ item.sku }}</span>
+              </div>
+              <div class="d-flex align-center gap-2 mt-1">
+                <span class="text-caption text-medium-emphasis">SKU: <code>{{ item.sku || '-' }}</code></span>
+                <span v-if="item.barcode" class="text-caption text-disabled">| Barcode: <code>{{ item.barcode }}</code></span>
+              </div>
             </div>
           </div>
         </template>
 
-        <template #item.category="{ item }">
-          <span class="text-body-2">{{ item.category ? item.category.name : '-' }}</span>
+        <!-- Brand -->
+        <template #item.brand="{ item }">
+          <div class="text-body-2 font-weight-medium">
+            {{ item.brand || '-' }}
+          </div>
+          <div class="text-caption text-disabled">
+            Satuan: {{ item.unit || 'Pcs' }}
+          </div>
         </template>
 
+        <!-- Category -->
+        <template #item.category="{ item }">
+          <VChip
+            size="small"
+            variant="tonal"
+            color="secondary"
+            class="font-weight-medium"
+          >
+            <VIcon icon="ri-folder-line" size="14" class="me-1" />
+            {{ item.category ? item.category.name : 'Tanpa Kategori' }}
+          </VChip>
+        </template>
+
+        <!-- Stock Method -->
         <template #item.stock_method="{ item }">
           <VChip
             size="small"
             variant="tonal"
-            color="primary"
-            class="text-uppercase font-weight-bold"
+            :color="item.stock_method === 'FEFO' ? 'error' : item.stock_method === 'LIFO' ? 'info' : 'primary'"
+            class="font-weight-bold"
           >
             {{ item.stock_method || 'FIFO' }}
           </VChip>
         </template>
 
+        <!-- Status -->
         <template #item.status="{ item }">
           <VChip
             :color="item.status === 'Aktif' ? 'success' : 'error'"
             size="small"
+            variant="elevated"
+            class="font-weight-bold"
           >
+            <VIcon
+              :icon="item.status === 'Aktif' ? 'ri-checkbox-circle-fill' : 'ri-close-circle-fill'"
+              size="14"
+              class="me-1"
+            />
             {{ item.status || 'Aktif' }}
           </VChip>
         </template>
 
+        <!-- Actions -->
         <template #item.actions="{ item }">
-          <IconBtn
-            v-if="$can('write', 'Produk')"
-            size="small"
-            @click="editProduct(item)"
-          >
-            <VIcon icon="ri-pencil-line" />
-          </IconBtn>
-          <IconBtn
-            v-if="$can('delete', 'Produk')"
-            size="small"
-            color="error"
-            @click="confirmDeleteProduct(item.id)"
-          >
-            <VIcon icon="ri-delete-bin-line" />
-          </IconBtn>
+          <div class="d-flex align-center justify-center gap-1">
+            <VBtn
+              v-if="$can('write', 'Produk')"
+              size="small"
+              variant="text"
+              color="primary"
+              icon="ri-edit-box-line"
+              title="Edit Produk"
+              @click="editProduct(item)"
+            />
+            <VBtn
+              v-if="$can('delete', 'Produk')"
+              size="small"
+              variant="text"
+              color="error"
+              icon="ri-delete-bin-line"
+              title="Hapus Produk"
+              @click="openDeleteDialog(item.id)"
+            />
+          </div>
         </template>
       </VDataTableServer>
     </VCard>
@@ -409,7 +558,16 @@ const handleFileUpload = async event => {
       :categories-list="categories"
       @product-data="addNewProduct"
     />
-  </section>
+
+    <SimpleConfirmDialog
+      v-model:is-dialog-visible="isConfirmDeleteDialogVisible"
+      title="Hapus Master Produk?"
+      message="Peringatan: Menghapus produk ini akan menghapus referensi master data. Pastikan produk tidak memiliki pergerakan transaksi aktif yang belum diselesaikan."
+      confirm-text="Ya, Hapus"
+      cancel-text="Batal"
+      @confirm="executeDeleteProduct"
+    />
+  </div>
 </template>
 
 <route lang="yaml">

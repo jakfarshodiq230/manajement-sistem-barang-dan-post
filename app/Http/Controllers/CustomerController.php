@@ -10,16 +10,25 @@ class CustomerController extends Controller
 {
     public function index(Request $request)
     {
-        $q = $request->query('q', '');
+        $q = $request->query('q', '') ?: $request->query('search', '');
+        $isActive = $request->query('is_active');
         $itemsPerPage = $request->query('itemsPerPage', 10);
         $all = $request->query('all', false);
 
         $query = Customer::query();
 
         if ($q) {
-            $query->where('name', 'like', "%{$q}%")
-                  ->orWhere('company_name', 'like', "%{$q}%")
-                  ->orWhere('phone', 'like', "%{$q}%");
+            $query->where(function($sub) use ($q) {
+                $sub->where('name', 'like', "%{$q}%")
+                    ->orWhere('company_name', 'like', "%{$q}%")
+                    ->orWhere('phone', 'like', "%{$q}%")
+                    ->orWhere('email', 'like', "%{$q}%");
+            });
+        }
+
+        if ($isActive !== null && $isActive !== 'all' && $isActive !== '') {
+            $boolActive = ($isActive === '1' || $isActive === 1 || $isActive === 'true' || $isActive === true);
+            $query->where('is_active', $boolActive);
         }
         
         $query->orderBy('name', 'asc');
@@ -28,6 +37,10 @@ class CustomerController extends Controller
             return response()->json($query->get());
         }
 
+        $totalAll = Customer::count();
+        $totalActive = Customer::where('is_active', true)->count();
+        $totalWithLimit = Customer::where('credit_limit', '>', 0)->count();
+
         $paginator = $query->paginate($itemsPerPage);
 
         return response()->json([
@@ -35,6 +48,11 @@ class CustomerController extends Controller
             'total' => $paginator->total(),
             'current_page' => $paginator->currentPage(),
             'last_page' => $paginator->lastPage(),
+            'summary' => [
+                'total' => $totalAll,
+                'active' => $totalActive,
+                'with_limit' => $totalWithLimit,
+            ],
         ]);
     }
 

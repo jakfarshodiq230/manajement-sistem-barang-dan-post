@@ -12,15 +12,25 @@ class SupplierController extends Controller
      */
     public function index(Request $request)
     {
-        $q = $request->query('q', '');
+        $q = $request->query('q', '') ?: $request->query('search', '');
+        $isActive = $request->query('is_active');
         $itemsPerPage = $request->query('itemsPerPage', 10);
         $all = $request->query('all', false);
 
         $query = \App\Models\Supplier::query();
 
         if ($q) {
-            $query->where('name', 'like', "%{$q}%")
-                  ->orWhere('contact_person', 'like', "%{$q}%");
+            $query->where(function($sub) use ($q) {
+                $sub->where('name', 'like', "%{$q}%")
+                    ->orWhere('contact_person', 'like', "%{$q}%")
+                    ->orWhere('phone', 'like', "%{$q}%")
+                    ->orWhere('email', 'like', "%{$q}%");
+            });
+        }
+
+        if ($isActive !== null && $isActive !== 'all' && $isActive !== '') {
+            $boolActive = ($isActive === '1' || $isActive === 1 || $isActive === 'true' || $isActive === true);
+            $query->where('is_active', $boolActive);
         }
         
         $query->orderBy('created_at', 'desc');
@@ -29,7 +39,23 @@ class SupplierController extends Controller
             return response()->json($query->get());
         }
 
-        return response()->json($query->paginate($itemsPerPage));
+        $totalAll = \App\Models\Supplier::count();
+        $totalActive = \App\Models\Supplier::where('is_active', true)->count();
+        $totalInactive = \App\Models\Supplier::where('is_active', false)->count();
+
+        $paginator = $query->paginate($itemsPerPage);
+
+        return response()->json([
+            'data' => $paginator->items(),
+            'total' => $paginator->total(),
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'summary' => [
+                'total' => $totalAll,
+                'active' => $totalActive,
+                'inactive' => $totalInactive,
+            ],
+        ]);
     }
 
     public function store(Request $request)

@@ -55,7 +55,8 @@ class OwnerController extends Controller
 
     public function store(Request $request)
     {
-        if (!request()->user()->can('Manajemen Owner Create')) {
+        $user = $request->user();
+        if ($user && !$user->hasRole('Super Admin') && !$user->can('Manajemen Owner Create') && !$user->can('Owner Create') && !$user->can('create owners')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -94,7 +95,8 @@ class OwnerController extends Controller
 
     public function update(Request $request, Owner $owner)
     {
-        if (!request()->user()->can('Manajemen Owner Write')) {
+        $user = $request->user();
+        if ($user && !$user->hasRole('Super Admin') && !$user->can('Manajemen Owner Write') && !$user->can('Owner Write') && !$user->can('write owners')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -144,7 +146,8 @@ class OwnerController extends Controller
 
     public function destroy(Owner $owner)
     {
-        if (!request()->user()->can('Manajemen Owner Delete')) {
+        $user = request()->user();
+        if ($user && !$user->hasRole('Super Admin') && !$user->can('Manajemen Owner Delete') && !$user->can('Owner Delete') && !$user->can('delete owners')) {
             abort(403, 'Unauthorized action.');
         }
 

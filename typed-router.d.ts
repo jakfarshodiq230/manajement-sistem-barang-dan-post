@@ -174,6 +174,7 @@ declare module 'vue-router/auto-routes' {
     'penerimaan-barang': RouteRecordInfo<'penerimaan-barang', '/penerimaan-barang', Record<never, never>, Record<never, never>>,
     'penerimaan-barang-print-id': RouteRecordInfo<'penerimaan-barang-print-id', '/penerimaan-barang/print/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     'penerimaan-barang-receive-goods-drawer': RouteRecordInfo<'penerimaan-barang-receive-goods-drawer', '/penerimaan-barang/ReceiveGoodsDrawer', Record<never, never>, Record<never, never>>,
+    'pengaturan-pengguna': RouteRecordInfo<'pengaturan-pengguna', '/pengaturan-pengguna', Record<never, never>, Record<never, never>>,
     'pengaturan-struk': RouteRecordInfo<'pengaturan-struk', '/pengaturan-struk', Record<never, never>, Record<never, never>>,
     'pos': RouteRecordInfo<'pos', '/pos', Record<never, never>, Record<never, never>>,
     'pos-approval-dialog': RouteRecordInfo<'pos-approval-dialog', '/pos/ApprovalDialog', Record<never, never>, Record<never, never>>,

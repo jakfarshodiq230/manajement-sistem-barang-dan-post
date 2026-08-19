@@ -16,6 +16,8 @@ class EmployeeController extends Controller
         $query = Employee::with(['branch', 'user']);
         
         $search = $request->query('search');
+        $branchId = $request->query('branch_id');
+        $status = $request->query('status');
         $itemsPerPage = $request->query('itemsPerPage', 15);
         $page = $request->query('page', 1);
 
@@ -29,6 +31,21 @@ class EmployeeController extends Controller
                       $b->where('name', 'like', "%{$search}%");
                   });
             });
+        }
+
+        if ($branchId && $branchId !== 'all') {
+            $query->where('branch_id', $branchId);
+        }
+
+        if ($status && $status !== 'all') {
+            if (in_array(strtolower($status), ['aktif', 'active', '1'])) {
+                $query->where(function($q) {
+                    $q->whereIn('status', ['Aktif', 'aktif', 'active', 'Active', '1'])
+                      ->orWhereNull('status');
+                });
+            } else {
+                $query->whereNotIn('status', ['Aktif', 'aktif', 'active', 'Active', '1']);
+            }
         }
         
         $query->orderBy('name', 'asc');
@@ -54,6 +71,8 @@ class EmployeeController extends Controller
                         ->pluck('roles.id')
                         ->toArray();
                 }
+
+                $isActive = in_array(strtolower((string)($emp->status ?? 'active')), ['aktif', 'active', '1']);
                 
                 return [
                     'id' => $emp->id,
@@ -74,13 +93,25 @@ class EmployeeController extends Controller
                     'branch_name' => $emp->branch ? $emp->branch->name : null,
                     'user_id' => $emp->user_id,
                     'joined_date' => $emp->joined_date,
-                    'status' => $emp->status,
+                    'status' => $isActive ? 'Aktif' : ($emp->status ?? 'Nonaktif'),
                     'role_id' => count($roles) > 0 ? $roles[0] : null,
                 ];
             });
 
+            $totalActive = Employee::where(function($q) {
+                $q->whereIn('status', ['Aktif', 'aktif', 'active', 'Active', '1'])
+                  ->orWhereNull('status');
+            })->count();
+            $totalWithUser = Employee::whereNotNull('user_id')->count();
+            $totalAll = Employee::count();
+
             $response = [
                 'data' => $formatted,
+                'summary' => [
+                    'total' => $totalAll,
+                    'active' => $totalActive,
+                    'with_user' => $totalWithUser,
+                ],
             ];
 
             if ($paginated) {

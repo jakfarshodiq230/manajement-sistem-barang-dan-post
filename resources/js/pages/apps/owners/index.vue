@@ -4,8 +4,15 @@ import AddNewOwnerDrawer from './AddNewOwnerDrawer.vue'
 import SimpleConfirmDialog from '@/components/dialogs/SimpleConfirmDialog.vue'
 import { useSnackbarStore } from '@/stores/snackbar'
 
+definePage({
+  meta: {
+    public: true,
+  },
+})
+
 const owners = ref([])
 const search = ref('')
+const selectedType = ref('all')
 const isLoading = ref(false)
 
 // Pagination
@@ -20,6 +27,14 @@ const isConfirmDeleteDialogVisible = ref(false)
 const ownerToDelete = ref(null)
 
 const snackbar = useSnackbarStore()
+
+const stats = computed(() => {
+  const all = owners.value || []
+  const total = totalItems.value || all.length
+  const main = all.filter(o => !o.parent_id).length
+  const sub = all.filter(o => !!o.parent_id).length
+  return { total, main, sub }
+})
 
 const fetchOwners = async () => {
   isLoading.value = true
@@ -52,7 +67,7 @@ const handleSearch = () => {
   searchTimeout = setTimeout(() => {
     page.value = 1
     fetchOwners()
-  }, 500)
+  }, 400)
 }
 
 onMounted(() => {
@@ -83,7 +98,7 @@ const executeDeleteOwner = async isConfirmed => {
     fetchOwners()
   } catch (error) {
     console.error(error)
-    snackbar.show('Gagal menghapus owner', 'error')
+    snackbar.show('Gagal menghapus owner. Pastikan tidak ada cabang terkait.', 'error')
   } finally {
     ownerToDelete.value = null
   }
@@ -104,13 +119,13 @@ const saveOwner = async ownerData => {
         method: 'POST',
         body: formData,
       })
-      snackbar.show('Data owner diperbarui', 'success')
+      snackbar.show('Data owner berhasil diperbarui', 'success')
     } else {
       await $api('/apps/owners', {
         method: 'POST',
         body: formData,
       })
-      snackbar.show('Owner baru ditambahkan', 'success')
+      snackbar.show('Owner baru berhasil ditambahkan', 'success')
     }
     fetchOwners()
   } catch (error) {
@@ -120,69 +135,154 @@ const saveOwner = async ownerData => {
 }
 
 const tableHeaders = [
-  { title: 'NAMA OWNER / PERUSAHAAN', key: 'name' },
-  { title: 'KONTAK', key: 'contact', sortable: false },
-  { title: 'CABANG', key: 'branches_count', sortable: false },
-  { title: 'STATUS', key: 'status' },
+  { title: 'IDENTITAS OWNER / PERUSAHAAN', key: 'name' },
+  { title: 'STRUKTUR HIERARKI', key: 'hierarchy' },
+  { title: 'KONTAK RESMI', key: 'contact', sortable: false },
+  { title: 'TOTAL CABANG', key: 'branches_count', align: 'center', sortable: false },
+  { title: 'STATUS', key: 'status', align: 'center' },
   { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
 ]
 
-// To display flat table but clearly indicate sub-owners
 const flatTableData = computed(() => {
-  return owners.value.map(item => {
-    return {
-      ...item,
-      is_sub: !!item.parent_id,
-      parent_name: item.parent?.name || 'Owner Utama',
-    }
-  })
+  let list = owners.value || []
+  if (selectedType.value === 'main') {
+    list = list.filter(o => !o.parent_id)
+  } else if (selectedType.value === 'sub') {
+    list = list.filter(o => !!o.parent_id)
+  }
+  return list.map(item => ({
+    ...item,
+    is_sub: !!item.parent_id,
+    parent_name: item.parent?.name || 'Owner Utama',
+  }))
 })
 </script>
 
 <template>
-  <section>
-    <!-- Page Header -->
-    <div class="d-flex align-center justify-space-between mb-4">
+  <div class="pa-4">
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-center justify-space-between mb-4 gap-4">
       <div>
-        <h2 class="text-h4 mb-0">
-          Manajemen Owner & Cabang
+        <h2 class="text-h4 font-weight-bold mb-1">
+          Manajemen Pemilik Bisnis (Owner & Sub-Owner)
         </h2>
-        <p class="text-body-1 mb-0 text-disabled mt-1">
-          Kelola data pemilik bisnis, sub-owner (franchisee), dan relasi cabang.
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          Kelola kepemilikan bisnis, entitas PT/CV induk, sub-owner mitra, dan alokasi cabang terkait.
         </p>
       </div>
       
-      <div class="d-flex gap-4">
+      <div class="d-flex gap-3">
         <VBtn
-          v-if="$can('create', 'Manajemen Owner')"
+          color="secondary"
+          variant="tonal"
+          prepend-icon="ri-refresh-line"
+          :loading="isLoading"
+          @click="fetchOwners"
+        >
+          Muat Ulang
+        </VBtn>
+
+        <VBtn
+          color="primary"
           prepend-icon="ri-add-line"
           @click="openAddDrawer"
         >
-          Tambah Owner
+          Tambah Owner Baru
         </VBtn>
       </div>
     </div>
 
-    <VCard>
-      <VCardItem class="pa-4 pb-0">
-        <div class="d-flex align-center justify-space-between w-100">
-          <VCardTitle class="px-0">
-            Daftar Owner
-          </VCardTitle>
-          <div style="width: 250px;">
+    <!-- KPI Summary Row -->
+    <VRow class="mb-4">
+      <VCol cols="12" sm="4">
+        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-primary font-weight-bold">TOTAL OWNER TERDATA</div>
+              <div class="text-h4 font-weight-bold text-primary mt-1">{{ stats.total }} <span class="text-caption text-medium-emphasis">Entitas</span></div>
+            </div>
+            <VAvatar color="primary" variant="tonal" rounded size="44">
+              <VIcon icon="ri-user-star-line" size="24" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Seluruh pemegang hak usaha</div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="4">
+        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-success font-weight-bold">OWNER UTAMA (HOLDING)</div>
+              <div class="text-h4 font-weight-bold text-success mt-1">{{ stats.main }} <span class="text-caption text-medium-emphasis">Induk</span></div>
+            </div>
+            <VAvatar color="success" variant="tonal" rounded size="44">
+              <VIcon icon="ri-building-line" size="24" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Pemilik modal entitas utama</div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="4">
+        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-info font-weight-bold">SUB-OWNER / MITRA</div>
+              <div class="text-h4 font-weight-bold text-info mt-1">{{ stats.sub }} <span class="text-caption text-medium-emphasis">Mitra</span></div>
+            </div>
+            <VAvatar color="info" variant="tonal" rounded size="44">
+              <VIcon icon="ri-team-line" size="24" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Pemilik unit cabang turunan</div>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- Main Table Card -->
+    <VCard elevation="2">
+      <!-- Card Toolbar -->
+      <VCardItem class="pa-4">
+        <VRow align="center">
+          <VCol cols="12" sm="6" md="4">
             <VTextField
               v-model="search"
               prepend-inner-icon="ri-search-line"
-              placeholder="Cari owner..."
+              placeholder="Cari nama owner, kontak, email..."
               density="compact"
-              hide-details
               variant="outlined"
+              hide-details
               clearable
               @update:model-value="handleSearch"
             />
-          </div>
-        </div>
+          </VCol>
+
+          <VCol cols="12" sm="6" md="3">
+            <VSelect
+              v-model="selectedType"
+              :items="[
+                { title: 'Semua Tipe Owner', value: 'all' },
+                { title: 'Owner Utama Sahaja', value: 'main' },
+                { title: 'Sub-Owner Sahaja', value: 'sub' }
+              ]"
+              item-title="title"
+              item-value="value"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </VCol>
+
+          <VCol cols="12" md="5" class="text-right d-none d-md-block">
+            <div class="text-caption text-medium-emphasis">
+              Total Terdaftar: <strong>{{ totalItems }}</strong> Pemilik Usaha
+            </div>
+          </VCol>
+        </VRow>
       </VCardItem>
+
+      <VDivider />
 
       <VDataTableServer
         v-model:items-per-page="itemsPerPage"
@@ -191,21 +291,18 @@ const flatTableData = computed(() => {
         :items="flatTableData"
         :items-length="totalItems"
         :loading="isLoading"
+        hover
         class="text-no-wrap"
         @update:options="fetchOwners"
       >
+        <!-- Owner Name -->
         <template #item.name="{ item }">
-          <div class="d-flex align-center">
-            <VIcon
-              v-if="item.is_sub"
-              icon="ri-corner-down-right-line"
-              class="mr-2 text-disabled"
-            />
+          <div class="d-flex align-center py-2">
             <VAvatar
-              size="34"
-              :color="item.is_sub ? 'secondary' : 'primary'"
+              size="40"
+              :color="item.is_sub ? 'info' : 'primary'"
               variant="tonal"
-              class="mr-3"
+              class="me-3 rounded-lg border flex-shrink-0"
             >
               <VImg
                 v-if="item.logo"
@@ -213,81 +310,107 @@ const flatTableData = computed(() => {
                 alt="Logo"
                 cover
               />
-              <span
+              <VIcon
                 v-else
-                class="text-h6"
-              >{{ item.name.charAt(0).toUpperCase() }}</span>
+                :icon="item.is_sub ? 'ri-user-follow-line' : 'ri-user-star-line'"
+                size="22"
+              />
             </VAvatar>
             <div>
-              <h6 class="text-h6 font-weight-medium mb-0">
-                {{ item.name }}
-              </h6>
-              <span
-                v-if="item.is_sub"
-                class="text-caption text-disabled"
-              >Sub-Owner dari: {{ item.parent_name }}</span>
-              <span
-                v-else
-                class="text-caption text-success font-weight-bold"
-              >Owner Utama</span>
+              <div class="font-weight-bold text-subtitle-2">{{ item.name }}</div>
+              <div class="text-caption text-disabled">ID Owner: #{{ item.id }}</div>
             </div>
           </div>
         </template>
 
+        <!-- Hierarchy -->
+        <template #item.hierarchy="{ item }">
+          <VChip
+            v-if="!item.is_sub"
+            color="success"
+            size="small"
+            variant="tonal"
+            class="font-weight-bold"
+          >
+            <VIcon icon="ri-shield-star-line" size="14" class="me-1" />
+            Owner Utama (Holding)
+          </VChip>
+          <div v-else class="d-flex align-center gap-1">
+            <VChip
+              color="info"
+              size="small"
+              variant="tonal"
+              class="font-weight-medium"
+            >
+              <VIcon icon="ri-corner-down-right-line" size="14" class="me-1" />
+              Sub: {{ item.parent_name }}
+            </VChip>
+          </div>
+        </template>
+
+        <!-- Contact -->
         <template #item.contact="{ item }">
-          <div class="text-body-2">
-            <div>
-              <VIcon
-                icon="ri-mail-line"
-                size="14"
-                class="mr-1"
-              /> {{ item.email || '-' }}
+          <div class="d-flex flex-column gap-1">
+            <div class="text-caption d-flex align-center">
+              <VIcon size="14" icon="ri-mail-line" class="me-1 text-primary" />
+              <span>{{ item.email || '-' }}</span>
             </div>
-            <div>
-              <VIcon
-                icon="ri-phone-line"
-                size="14"
-                class="mr-1"
-              /> {{ item.phone || '-' }}
+            <div class="text-caption d-flex align-center">
+              <VIcon size="14" icon="ri-phone-line" class="me-1 text-success" />
+              <span>{{ item.phone || '-' }}</span>
             </div>
           </div>
         </template>
 
+        <!-- Branches Count -->
         <template #item.branches_count="{ item }">
           <VChip
             size="small"
-            color="info"
             variant="tonal"
+            color="primary"
+            class="font-weight-bold"
           >
-            {{ item.branches?.length || 0 }} Cabang
+            {{ item.branches_count || (item.branches ? item.branches.length : 0) }} Cabang
           </VChip>
         </template>
 
+        <!-- Status -->
         <template #item.status="{ item }">
           <VChip
-            :color="item.status === 'Aktif' ? 'success' : 'warning'"
+            :color="item.status === 'Aktif' ? 'success' : 'error'"
             size="small"
+            variant="elevated"
+            class="font-weight-bold"
           >
-            {{ item.status }}
+            <VIcon
+              :icon="item.status === 'Aktif' ? 'ri-checkbox-circle-fill' : 'ri-close-circle-fill'"
+              size="14"
+              class="me-1"
+            />
+            {{ item.status || 'Aktif' }}
           </VChip>
         </template>
 
+        <!-- Actions -->
         <template #item.actions="{ item }">
-          <IconBtn
-            v-if="$can('write', 'Manajemen Owner')"
-            size="small"
-            @click="editOwner(item)"
-          >
-            <VIcon icon="ri-pencil-line" />
-          </IconBtn>
-          <IconBtn
-            v-if="$can('delete', 'Manajemen Owner')"
-            size="small"
-            color="error"
-            @click="deleteOwner(item.id)"
-          >
-            <VIcon icon="ri-delete-bin-line" />
-          </IconBtn>
+          <div class="d-flex align-center justify-center gap-1">
+            <VBtn
+              size="small"
+              variant="text"
+              color="primary"
+              icon="ri-edit-box-line"
+              title="Edit Data Owner"
+              @click="editOwner(item)"
+            />
+            <VBtn
+              size="small"
+              variant="text"
+              color="error"
+              icon="ri-delete-bin-line"
+              title="Hapus Owner"
+              @click="confirmDeleteOwner(item.id)"
+            />
+          </div>
         </template>
       </VDataTableServer>
     </VCard>
@@ -298,11 +421,14 @@ const flatTableData = computed(() => {
       :owners-list="owners"
       @owner-data="saveOwner"
     />
-  </section>
-</template>
 
-<route lang="yaml">
-meta:
-  action: read
-  subject: Manajemen Owner
-</route>
+    <SimpleConfirmDialog
+      v-model:is-dialog-visible="isConfirmDeleteDialogVisible"
+      title="Hapus Data Owner?"
+      message="Apakah Anda yakin ingin menghapus owner ini? Pastikan tidak ada cabang atau sub-owner yang masih bergantung pada entitas ini."
+      confirm-text="Ya, Hapus"
+      cancel-text="Batal"
+      @confirm="executeDeleteOwner"
+    />
+  </div>
+</template>

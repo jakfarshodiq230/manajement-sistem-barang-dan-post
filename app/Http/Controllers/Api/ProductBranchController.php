@@ -36,7 +36,7 @@ class ProductBranchController extends Controller
         }
         
         if ($request->has('paginate') && $request->paginate == 'true') {
-            $perPage = $request->input('per_page', 12);
+            $perPage = $request->input('per_page', $request->input('itemsPerPage', 6));
             return response()->json($query->paginate($perPage));
         }
         
