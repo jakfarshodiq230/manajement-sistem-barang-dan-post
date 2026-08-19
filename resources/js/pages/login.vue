@@ -1,17 +1,8 @@
 <script setup>
 import { VForm } from 'vuetify/components/VForm'
-import AuthProvider from '@/views/pages/authentication/AuthProvider.vue'
 import { themeConfig } from '@themeConfig'
-import authV2LoginIllustrationBorderedDark from '@images/pages/auth-v2-login-illustration-bordered-dark.png'
-import authV2LoginIllustrationBorderedLight from '@images/pages/auth-v2-login-illustration-bordered-light.png'
-import authV2LoginIllustrationDark from '@images/pages/auth-v2-login-illustration-dark.png'
-import authV2LoginIllustrationLight from '@images/pages/auth-v2-login-illustration-light.png'
-import authV2LoginMaskDark from '@images/pages/auth-v2-login-mask-dark.png'
-import authV2LoginMaskLight from '@images/pages/auth-v2-login-mask-light.png'
 import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
-
-const authThemeImg = useGenerateImageVariant(authV2LoginIllustrationLight, authV2LoginIllustrationDark, authV2LoginIllustrationBorderedLight, authV2LoginIllustrationBorderedDark, true)
-const authThemeMask = useGenerateImageVariant(authV2LoginMaskLight, authV2LoginMaskDark)
+import { requiredValidator, emailValidator } from '@core/utils/validators'
 
 definePage({
   meta: {
@@ -42,6 +33,7 @@ const isLoading = ref(false)
 
 const login = async () => {
   isLoading.value = true
+  errors.value = { email: undefined, password: undefined }
   try {
     const res = await $api('/auth/login', {
       method: 'POST',
@@ -51,7 +43,9 @@ const login = async () => {
         remember_me: rememberMe.value,
       },
       onResponseError({ response }) {
-        errors.value = response._data.errors || { email: [response._data.message || 'Terjadi kesalahan pada server'] }
+        errors.value = response._data?.errors || {
+          email: [response._data?.message || 'Email atau kata sandi tidak valid. Silakan periksa kembali.']
+        }
       },
     })
 
@@ -60,15 +54,11 @@ const login = async () => {
     localStorage.setItem('userAbilityRules', JSON.stringify(userAbilityRules))
     ability.update(userAbilityRules)
     
-    // Jika remember me dicentang, simpan cookie selama 5 hari (432000 detik), jika tidak biarkan sebagai session cookie (maxAge: null)
     const cookieOptions = rememberMe.value ? { maxAge: 432000 } : { maxAge: null }
 
     useCookie('userData', cookieOptions).value = userData
     useCookie('accessToken', cookieOptions).value = accessToken
 
-    // Redirect to `to` query if exist or redirect to index route
-
-    // ❗ nextTick is required to wait for DOM updates and later redirect
     await nextTick(() => {
       router.replace(route.query.to ? String(route.query.to) : '/')
     })
@@ -81,144 +71,162 @@ const login = async () => {
 
 const onSubmit = () => {
   refVForm.value?.validate().then(({ valid: isValid }) => {
-    if (isValid)
-      login()
+    if (isValid) login()
   })
 }
 </script>
 
 <template>
-  <div class="auth-wrapper d-flex align-center justify-center pa-4">
-    <VCard
-      class="auth-card pa-4 pt-7"
-      max-width="448"
-    >
-      <VCardItem class="justify-center">
-        <template #prepend>
-          <div class="d-flex">
+  <div class="login-page-wrapper d-flex align-center justify-center">
+    <div class="login-card-container w-100 max-w-420 px-4">
+      <VCard class="login-card pa-6 pa-sm-8 rounded-xl border elevation-2">
+        <!-- Logo & Header -->
+        <div class="text-center mb-6">
+          <div class="d-inline-flex align-center justify-center bg-primary-lighten-5 pa-3 rounded-xl mb-3">
             <VNodeRenderer :nodes="themeConfig.app.logo" />
           </div>
-        </template>
+          <h1 class="text-h5 font-weight-extrabold text-high-emphasis mb-1">
+            {{ themeConfig.app.title }}
+          </h1>
+          <p class="text-caption text-medium-emphasis mb-0">
+            Sistem POS & Inventaris Barang
+          </p>
+        </div>
 
-        <VCardTitle class="font-weight-semibold text-2xl text-uppercase">
-          {{ themeConfig.app.title }}
-        </VCardTitle>
-      </VCardItem>
-
-      <VCardText class="pt-2">
-        <h5 class="text-h5 mb-1">
-          Welcome to {{ themeConfig.app.title }}! 👋🏻
-        </h5>
-        <p class="mb-0">
-          Please sign-in to your account and start the adventure
-        </p>
-      </VCardText>
-
-      <VCardText>
+        <!-- Alert Error -->
         <VAlert
           v-if="errors.email || errors.password"
           color="error"
           variant="tonal"
-          class="mb-4"
+          closable
+          density="compact"
+          class="mb-4 rounded-lg text-caption font-weight-medium"
         >
-          {{ Array.isArray(errors.email) ? errors.email[0] : (errors.email || 'Kredensial tidak valid') }}
+          {{ Array.isArray(errors.email) ? errors.email[0] : (errors.email || 'Email atau kata sandi tidak valid.') }}
         </VAlert>
-      </VCardText>
 
-      <VCardText>
+        <!-- Form -->
         <VForm
           ref="refVForm"
           @submit.prevent="onSubmit"
         >
-          <VRow>
-            <!-- email -->
-            <VCol cols="12">
+          <div class="d-flex flex-column gap-3">
+            <!-- Email -->
+            <div>
+              <label class="text-caption font-weight-bold text-medium-emphasis mb-1 d-block">
+                Email
+              </label>
               <VTextField
                 v-model="credentials.email"
-                label="Email"
-                placeholder="johndoe@email.com"
+                placeholder="nama@perusahaan.com"
                 type="email"
+                prepend-inner-icon="ri-mail-line"
                 autofocus
+                variant="outlined"
+                density="compact"
+                rounded="lg"
                 :rules="[requiredValidator, emailValidator]"
                 :error-messages="errors.email"
+                hide-details="auto"
               />
-            </VCol>
+            </div>
 
-            <!-- password -->
-            <VCol cols="12">
+            <!-- Password -->
+            <div>
+              <div class="d-flex align-center justify-space-between mb-1">
+                <label class="text-caption font-weight-bold text-medium-emphasis d-block">
+                  Kata Sandi
+                </label>
+                <RouterLink
+                  class="text-caption text-primary font-weight-medium"
+                  :to="{ name: 'forgot-password' }"
+                >
+                  Lupa Sandi?
+                </RouterLink>
+              </div>
               <VTextField
                 v-model="credentials.password"
-                label="Password"
                 placeholder="············"
+                prepend-inner-icon="ri-lock-line"
                 :rules="[requiredValidator]"
                 :type="isPasswordVisible ? 'text' : 'password'"
-                autocomplete="password"
+                autocomplete="current-password"
+                variant="outlined"
+                density="compact"
+                rounded="lg"
                 :error-messages="errors.password"
                 :append-inner-icon="isPasswordVisible ? 'ri-eye-off-line' : 'ri-eye-line'"
                 @click:append-inner="isPasswordVisible = !isPasswordVisible"
+                hide-details="auto"
               />
+            </div>
 
-              <div class="d-flex align-center justify-space-between flex-wrap mt-1 mb-4">
-                <VCheckbox
-                  v-model="rememberMe"
-                  label="Remember me"
-                />
+            <!-- Remember Me -->
+            <div class="d-flex align-center mt-1">
+              <VCheckbox
+                v-model="rememberMe"
+                label="Ingat sesi saya"
+                density="compact"
+                hide-details
+                color="primary"
+                class="login-checkbox"
+              />
+            </div>
 
-                <RouterLink
-                  class="text-primary"
-                  :to="{ name: 'forgot-password' }"
-                >
-                  Forgot Password?
-                </RouterLink>
-              </div>
-
-              <VBtn
-                block
-                type="submit"
-                :loading="isLoading"
-                :disabled="isLoading"
-              >
-                Login
-              </VBtn>
-            </VCol>
-
-            <!-- create account -->
-            <VCol
-              cols="12"
-              class="text-center text-base"
+            <!-- Submit Button -->
+            <VBtn
+              block
+              size="large"
+              type="submit"
+              color="primary"
+              rounded="lg"
+              :loading="isLoading"
+              :disabled="isLoading"
+              class="font-weight-bold elevation-1 text-none mt-2"
+              prepend-icon="ri-login-box-line"
             >
-              <span>New on our platform?</span>
-              <RouterLink
-                class="text-primary ms-2"
-                :to="{ name: 'register' }"
-              >
-                Create an account
-              </RouterLink>
-            </VCol>
-
-            <VCol
-              cols="12"
-              class="d-flex align-center"
-            >
-              <VDivider />
-              <span class="mx-4">or</span>
-              <VDivider />
-            </VCol>
-
-            <!-- auth providers -->
-            <VCol
-              cols="12"
-              class="text-center"
-            >
-              <AuthProvider />
-            </VCol>
-          </VRow>
+              Masuk
+            </VBtn>
+          </div>
         </VForm>
-      </VCardText>
-    </VCard>
+
+        <!-- Footer Note -->
+        <div class="mt-6 pt-4 border-t text-center">
+          <div class="text-caption text-disabled" style="font-size: 12px;">
+            © 2026 PT. DUMAI • Seluruh Hak Cipta Dilindungi
+          </div>
+        </div>
+      </VCard>
+    </div>
   </div>
 </template>
 
-<style lang="scss">
-@use "@core-scss/template/pages/page-auth";
+<style scoped>
+.login-page-wrapper {
+  height: 100vh;
+  max-height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: #f8fafc;
+  background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.login-card-container {
+  max-width: 420px;
+}
+
+.login-card {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02) !important;
+}
+
+.bg-primary-lighten-5 {
+  background-color: rgba(var(--v-theme-primary), 0.08);
+}
+
+.login-checkbox :deep(.v-label) {
+  font-size: 13px !important;
+}
 </style>

@@ -2,6 +2,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useSnackbarStore } from '@/stores/snackbar'
 
+definePage({
+  meta: {
+    public: true,
+  },
+})
+
 const snackbar = useSnackbarStore()
 const settings = ref([])
 const safeSettings = computed(() => Array.isArray(settings.value) ? settings.value : [])
@@ -17,11 +23,11 @@ const itemToDelete = ref(null)
 const search = ref('')
 
 const tableHeaders = ref([
-  { title: 'NAMA', key: 'name' },
-  { title: 'LEBAR (WIDTH)', key: 'width' },
-  { title: 'STATUS', key: 'status' },
-  { title: 'DEFAULT', key: 'is_default' },
-  { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
+  { title: 'Nama Profil Kertas', key: 'name' },
+  { title: 'Lebar Kertas (Width)', key: 'width' },
+  { title: 'Status', key: 'status' },
+  { title: 'Default', key: 'is_default' },
+  { title: 'Aksi', key: 'actions', sortable: false, align: 'end' },
 ])
 
 const fetchSettings = async () => {
@@ -50,7 +56,7 @@ onMounted(() => {
 })
 
 const openAddDialog = () => {
-  editedItem.value = { id: null, name: '', width: '', is_active: true, is_default: false, margin_top: 0, margin_bottom: 0, margin_left: 0, margin_right: 0 }
+  editedItem.value = { id: null, name: '', width: '80mm', is_active: true, is_default: false, margin_top: 0, margin_bottom: 0, margin_left: 0, margin_right: 0 }
   isDialogVisible.value = true
 }
 
@@ -64,18 +70,48 @@ const confirmDelete = (item) => {
   isDeleteDialogVisible.value = true
 }
 
+const applyPreset = type => {
+  if (type === '58mm') {
+    editedItem.value.name = 'Thermal 58mm'
+    editedItem.value.width = '58mm'
+    editedItem.value.margin_top = 0
+    editedItem.value.margin_bottom = 0
+    editedItem.value.margin_left = 2
+    editedItem.value.margin_right = 2
+  } else if (type === '80mm') {
+    editedItem.value.name = 'Thermal 80mm'
+    editedItem.value.width = '80mm'
+    editedItem.value.margin_top = 2
+    editedItem.value.margin_bottom = 2
+    editedItem.value.margin_left = 4
+    editedItem.value.margin_right = 4
+  } else if (type === 'a5') {
+    editedItem.value.name = 'Kuitansi A5'
+    editedItem.value.width = '148mm'
+    editedItem.value.margin_top = 5
+    editedItem.value.margin_bottom = 5
+    editedItem.value.margin_left = 5
+    editedItem.value.margin_right = 5
+  }
+}
+
 const saveItem = async () => {
+  if (!editedItem.value.name?.trim()) {
+    snackbar.show('Nama profil kertas wajib diisi', 'error')
+    return
+  }
+
   try {
     if (editedItem.value.id) {
       await $api(`/apps/receipt-settings/${editedItem.value.id}`, {
         method: 'PUT',
-        body: editedItem.value
+        body: editedItem.value,
       })
       snackbar.show('Pengaturan berhasil diperbarui', 'success')
     } else {
       await $api('/apps/receipt-settings', {
         method: 'POST',
-        body: editedItem.value
+        body: editedItem.value,
       })
       snackbar.show('Pengaturan berhasil ditambahkan', 'success')
     }
@@ -90,7 +126,7 @@ const saveItem = async () => {
 const deleteItem = async () => {
   try {
     await $api(`/apps/receipt-settings/${itemToDelete.value.id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
     })
     snackbar.show('Pengaturan berhasil dihapus', 'success')
     isDeleteDialogVisible.value = false
@@ -100,37 +136,65 @@ const deleteItem = async () => {
     snackbar.show('Gagal menghapus pengaturan', 'error')
   }
 }
+
+const filteredSettings = computed(() => {
+  if (!search.value) return safeSettings.value
+  const q = search.value.toLowerCase().trim()
+  return safeSettings.value.filter(s => s.name?.toLowerCase().includes(q) || s.width?.toLowerCase().includes(q))
+})
 </script>
 
 <template>
-  <div>
-    <p class="text-2xl mb-6">
-      Pengaturan Kertas Struk / Kuitansi
-    </p>
+  <div class="print-kuitansi-page">
+    <!-- Header Banner -->
+    <div class="d-flex justify-space-between align-center flex-wrap gap-4 mb-6">
+      <div>
+        <div class="d-flex align-center gap-2 mb-1">
+          <VChip color="primary" variant="tonal" size="small" class="font-weight-bold">
+            <VIcon icon="ri-file-paper-2-line" size="14" class="me-1" />
+            CETAK KUITANSI & STRUK
+          </VChip>
+        </div>
+        <h1 class="text-h4 font-weight-extrabold text-high-emphasis mb-1">
+          Pengaturan Kertas Struk & Kuitansi
+        </h1>
+        <p class="text-body-1 text-medium-emphasis mb-0">
+          Kelola profil ukuran kertas thermal (58mm/80mm) dan kertas faktur kuitansi untuk seluruh modul kasir dan piutang.
+        </p>
+      </div>
 
-    <VCard>
-      <!-- Card Header -->
-      <VCardText class="d-flex flex-wrap align-center py-4 gap-4">
+      <div class="d-flex gap-3">
+        <VBtn
+          color="primary"
+          class="font-weight-bold text-none"
+          prepend-icon="ri-add-line"
+          @click="openAddDialog"
+        >
+          Tambah Profil Kertas
+        </VBtn>
+      </div>
+    </div>
+
+    <!-- Main Card -->
+    <VCard class="rounded-xl border elevation-1">
+      <VCardText class="d-flex flex-wrap align-center py-5 gap-4">
         <VTextField
           v-model="search"
-          placeholder="Cari Pengaturan..."
+          placeholder="Cari profil kertas..."
           density="compact"
+          variant="outlined"
+          rounded="lg"
           prepend-inner-icon="ri-search-line"
-          style="width: 300px;"
+          style="max-width: 280px;"
           hide-details
           clearable
         />
         
         <VSpacer />
         
-        <div class="d-flex gap-2">
-          <VBtn
-            color="primary"
-            prepend-icon="ri-add-line"
-            @click="openAddDialog"
-          >
-            Tambah Kertas
-          </VBtn>
+        <div class="d-flex align-center gap-2 text-caption text-medium-emphasis">
+          <VIcon icon="ri-printer-line" size="18" />
+          <span>{{ safeSettings.length }} Profil Terdaftar</span>
         </div>
       </VCardText>
 
@@ -138,165 +202,183 @@ const deleteItem = async () => {
 
       <VDataTable
         :headers="tableHeaders"
-        :items="settings"
-        :items-per-page="10"
+        :items="filteredSettings"
+        :items-per-page="itemsPerPage"
         :loading="isLoading"
-        :sort-by="[]"
-        :group-by="[]"
         class="text-no-wrap"
       >
+        <template #item.name="{ item }">
+          <div class="d-flex align-center gap-3 py-2">
+            <VAvatar color="primary" variant="tonal" size="36" rounded="lg">
+              <VIcon icon="ri-file-text-line" size="18" />
+            </VAvatar>
+            <div>
+              <span class="font-weight-bold text-subtitle-2 text-high-emphasis d-block">{{ item.name }}</span>
+              <span class="text-caption text-medium-emphasis">ID: #{{ item.id }}</span>
+            </div>
+          </div>
+        </template>
+
         <template #item.width="{ item }">
-          <VChip size="small" color="primary" variant="tonal">
+          <VChip size="small" color="info" variant="tonal" class="font-weight-bold">
+            <VIcon icon="ri-ruler-line" size="13" class="me-1" />
             {{ item.width }}
           </VChip>
         </template>
         
         <template #item.status="{ item }">
-          <VChip size="small" :color="item.is_active ? 'success' : 'error'">
+          <VChip
+            size="small"
+            :color="item.is_active ? 'success' : 'secondary'"
+            variant="elevated"
+            class="font-weight-bold"
+          >
             {{ item.is_active ? 'Aktif' : 'Nonaktif' }}
           </VChip>
         </template>
         
         <template #item.is_default="{ item }">
-          <VIcon v-if="item.is_default" icon="ri-check-line" color="success" />
-          <span v-else>-</span>
+          <VChip v-if="item.is_default" size="small" color="primary" variant="elevated" class="font-weight-bold">
+            <VIcon icon="ri-check-double-line" size="13" class="me-1" />
+            Default
+          </VChip>
+          <span v-else class="text-caption text-medium-emphasis">-</span>
         </template>
         
         <template #item.actions="{ item }">
-          <IconBtn size="small" color="primary" @click="openEditDialog(item)">
-            <VIcon icon="ri-edit-line" />
-          </IconBtn>
-          <IconBtn size="small" color="error" @click="confirmDelete(item)">
-            <VIcon icon="ri-delete-bin-line" />
-          </IconBtn>
+          <div class="d-flex align-center justify-end gap-1">
+            <IconBtn size="small" color="primary" variant="tonal" title="Edit Profil" @click="openEditDialog(item)">
+              <VIcon icon="ri-edit-line" size="18" />
+            </IconBtn>
+            <IconBtn size="small" color="error" variant="tonal" title="Hapus Profil" @click="confirmDelete(item)">
+              <VIcon icon="ri-delete-bin-line" size="18" />
+            </IconBtn>
+          </div>
         </template>
       </VDataTable>
-      
-      <VDivider />
-      <VCardText class="d-flex align-center flex-wrap justify-space-between gap-4 py-3" v-if="totalPages > 1">
-        <span class="text-sm text-disabled">
-          Menampilkan pengaturan halaman {{ currentPage }} dari {{ totalPages }}
-        </span>
-        <VPagination
-          v-model="currentPage"
-          size="small"
-          :total-visible="5"
-          :length="totalPages"
-          @update:modelValue="fetchSettings"
-        />
-      </VCardText>
     </VCard>
 
     <!-- Dialog Form -->
-    <VDialog v-model="isDialogVisible" max-width="500">
-      <VCard>
-        <VCardTitle class="pa-5 pb-3">
-          {{ editedItem.id ? 'Edit Pengaturan Kertas' : 'Tambah Pengaturan Kertas' }}
-        </VCardTitle>
-        <VDivider />
-        <VCardText class="pa-5">
+    <VDialog v-model="isDialogVisible" max-width="560">
+      <VCard class="rounded-2xl pa-6">
+        <VCardItem class="pa-0 mb-4">
+          <div class="d-flex align-center gap-3">
+            <VAvatar color="primary" variant="tonal" size="48" rounded="xl">
+              <VIcon icon="ri-file-paper-2-line" size="26" />
+            </VAvatar>
+            <div>
+              <h3 class="text-h6 font-weight-bold mb-0">
+                {{ editedItem.id ? 'Edit Profil Kertas' : 'Tambah Profil Kertas Baru' }}
+              </h3>
+              <p class="text-caption text-medium-emphasis mb-0">
+                Atur ukuran lebar kertas dan margin cetak kuitansi / struk.
+              </p>
+            </div>
+          </div>
+        </VCardItem>
+
+        <VCardText class="pa-0 mb-4">
+          <!-- Preset Chips -->
+          <div class="mb-4">
+            <label class="text-caption font-weight-bold text-medium-emphasis mb-1 d-block">
+              Template Preset Cepat:
+            </label>
+            <div class="d-flex flex-wrap gap-2">
+              <VChip size="small" color="primary" variant="tonal" class="cursor-pointer font-weight-medium" @click="applyPreset('58mm')">
+                Thermal 58mm (Mini)
+              </VChip>
+              <VChip size="small" color="success" variant="tonal" class="cursor-pointer font-weight-medium" @click="applyPreset('80mm')">
+                Thermal 80mm (Standar POS)
+              </VChip>
+              <VChip size="small" color="info" variant="tonal" class="cursor-pointer font-weight-medium" @click="applyPreset('a5')">
+                Kertas A5 (Kuitansi/Faktur)
+              </VChip>
+            </div>
+          </div>
+
           <VRow>
-            <VCol cols="12">
+            <VCol cols="12" md="6">
+              <label class="text-caption font-weight-bold text-high-emphasis mb-1 d-block">Nama Profil Kertas</label>
               <VTextField
                 v-model="editedItem.name"
-                label="Nama Profil Kertas"
-                placeholder="Contoh: Thermal Besar"
+                placeholder="Contoh: Thermal Standar 80mm"
                 variant="outlined"
+                density="comfortable"
+                rounded="lg"
+                hide-details
               />
             </VCol>
-            <VCol cols="12">
+            <VCol cols="12" md="6">
+              <label class="text-caption font-weight-bold text-high-emphasis mb-1 d-block">Lebar Kertas (Width)</label>
               <VTextField
                 v-model="editedItem.width"
-                label="Lebar Kertas (Width)"
-                placeholder="Contoh: 80mm atau 210mm"
+                placeholder="Contoh: 80mm"
                 variant="outlined"
-                hint="Gunakan satuan 'mm' (Milimeter). Contoh: 58mm"
-                persistent-hint
+                density="comfortable"
+                rounded="lg"
+                hide-details
               />
             </VCol>
             
-            <VCol cols="12" class="mt-4">
-              <h5 class="text-h6 mb-3">Pengaturan Margin (mm)</h5>
+            <VCol cols="12">
+              <label class="text-caption font-weight-bold text-high-emphasis mb-2 d-block">Pengaturan Margin (mm)</label>
               <VRow>
-                <VCol cols="6">
-                  <VTextField
-                    v-model="editedItem.margin_top"
-                    label="Margin Atas"
-                    type="number"
-                    variant="outlined"
-                  />
+                <VCol cols="6" sm="3">
+                  <VTextField v-model="editedItem.margin_top" label="Atas" type="number" variant="outlined" density="compact" rounded="lg" hide-details />
                 </VCol>
-                <VCol cols="6">
-                  <VTextField
-                    v-model="editedItem.margin_bottom"
-                    label="Margin Bawah"
-                    type="number"
-                    variant="outlined"
-                  />
+                <VCol cols="6" sm="3">
+                  <VTextField v-model="editedItem.margin_bottom" label="Bawah" type="number" variant="outlined" density="compact" rounded="lg" hide-details />
                 </VCol>
-                <VCol cols="6">
-                  <VTextField
-                    v-model="editedItem.margin_left"
-                    label="Margin Kiri"
-                    type="number"
-                    variant="outlined"
-                  />
+                <VCol cols="6" sm="3">
+                  <VTextField v-model="editedItem.margin_left" label="Kiri" type="number" variant="outlined" density="compact" rounded="lg" hide-details />
                 </VCol>
-                <VCol cols="6">
-                  <VTextField
-                    v-model="editedItem.margin_right"
-                    label="Margin Kanan"
-                    type="number"
-                    variant="outlined"
-                  />
+                <VCol cols="6" sm="3">
+                  <VTextField v-model="editedItem.margin_right" label="Kanan" type="number" variant="outlined" density="compact" rounded="lg" hide-details />
                 </VCol>
               </VRow>
             </VCol>
 
-            <VCol cols="6">
+            <VCol cols="12" sm="6">
               <VSwitch
                 v-model="editedItem.is_active"
-                label="Aktif"
-                color="primary"
+                label="Status Aktif"
+                color="success"
+                hide-details
               />
             </VCol>
-            <VCol cols="6">
+            <VCol cols="12" sm="6">
               <VSwitch
                 v-model="editedItem.is_default"
                 label="Jadikan Default"
-                color="success"
+                color="primary"
+                hide-details
               />
             </VCol>
           </VRow>
         </VCardText>
-        <VDivider />
-        <VCardActions class="pa-4 justify-end">
+
+        <VCardActions class="pa-0 d-flex justify-end gap-2">
           <VBtn color="secondary" variant="tonal" @click="isDialogVisible = false">Batal</VBtn>
-          <VBtn color="primary" variant="elevated" @click="saveItem">Simpan</VBtn>
+          <VBtn color="primary" class="font-weight-bold" @click="saveItem">Simpan</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
 
     <!-- Dialog Konfirmasi Hapus -->
-    <VDialog v-model="isDeleteDialogVisible" max-width="400">
-      <VCard>
-        <VCardTitle class="pa-5 pb-3">Konfirmasi Hapus</VCardTitle>
-        <VDivider />
-        <VCardText class="pa-5">
+    <VDialog v-model="isDeleteDialogVisible" max-width="440">
+      <VCard class="rounded-2xl pa-6 text-center">
+        <VAvatar color="error" variant="tonal" size="64" class="mx-auto mb-4">
+          <VIcon icon="ri-delete-bin-line" size="36" />
+        </VAvatar>
+        <h3 class="text-h6 font-weight-bold mb-2">Konfirmasi Hapus</h3>
+        <p class="text-body-2 text-medium-emphasis mb-5">
           Apakah Anda yakin ingin menghapus profil kertas <strong>{{ itemToDelete?.name }}</strong>?
-        </VCardText>
-        <VDivider />
-        <VCardActions class="pa-4 justify-end">
+        </p>
+        <div class="d-flex justify-center gap-2">
           <VBtn color="secondary" variant="tonal" @click="isDeleteDialogVisible = false">Batal</VBtn>
-          <VBtn color="error" variant="elevated" @click="deleteItem">Hapus</VBtn>
-        </VCardActions>
+          <VBtn color="error" class="font-weight-bold" @click="deleteItem">Ya, Hapus</VBtn>
+        </div>
       </VCard>
     </VDialog>
   </div>
 </template>
-
-<route lang="yaml">
-meta:
-  action: read
-  subject: Print Kuitansi
-</route>

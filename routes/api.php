@@ -99,7 +99,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     Route::apiResource('sales', \App\Http\Controllers\Api\SaleController::class);
     // Returns endpoints
     Route::apiResource('returns', \App\Http\Controllers\Api\ReturnController::class);
-    Route::post('returns/{returnTransaction}/approve', [\App\Http\Controllers\Api\ReturnController::class, 'approve']);
+    Route::post('returns/{id}/approve', [\App\Http\Controllers\Api\ReturnController::class, 'approve']);
     // Products endpoints
     Route::post('products/import', [\App\Http\Controllers\Api\ProductController::class, 'import']);
     Route::apiResource('products', \App\Http\Controllers\Api\ProductController::class);
@@ -108,10 +108,12 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     Route::get('product-batches/detail/{batchId}', [\App\Http\Controllers\Api\ProductBranchController::class, 'batchDetail']);
     Route::get('pos/scan-batch/{batchId}', [\App\Http\Controllers\Api\ProductBranchController::class, 'scanBatch']);
     Route::apiResource('product-branches', \App\Http\Controllers\Api\ProductBranchController::class);
-    Route::apiResource('stock-movements', \App\Http\Controllers\Api\StockMovementController::class);
     Route::apiResource('stock-transfers', \App\Http\Controllers\Api\StockTransferController::class)->except(['update', 'destroy']);
+    Route::post('stock-transfers/{id}/prepare', [\App\Http\Controllers\Api\StockTransferController::class, 'prepare']);
+    Route::post('stock-transfers/{id}/receive', [\App\Http\Controllers\Api\StockTransferController::class, 'receive']);
     Route::post('stock-transfers/{id}/approve', [\App\Http\Controllers\Api\StockTransferController::class, 'approve']);
     Route::post('stock-transfers/{id}/reject', [\App\Http\Controllers\Api\StockTransferController::class, 'reject']);
+    Route::post('stock-transfers/{id}/cancel', [\App\Http\Controllers\Api\StockTransferController::class, 'cancel']);
     // Switch active role
     Route::post('switch-role', function (\Illuminate\Http\Request $request) {
         $user = $request->user();
@@ -169,15 +171,21 @@ Route::middleware('auth:sanctum')->get('/user', function (\Illuminate\Http\Reque
     $user = $request->user();
     $assignments = \DB::table('model_has_roles as mhr')
         ->join('roles', 'mhr.role_id', '=', 'roles.id')
-        ->join('branches', 'mhr.branch_id', '=', 'branches.id')
+        ->leftJoin('branches', 'mhr.branch_id', '=', 'branches.id')
         ->where('mhr.model_type', 'App\\Models\\User')
         ->where('mhr.model_id', $user->id)
-        ->select('branches.id as branch_id', 'branches.name as branch_name', 'roles.id as role_id', 'roles.name as role_name')
+        ->select(
+            'branches.id as branch_id',
+            \DB::raw('COALESCE(branches.name, "Semua Cabang (Global)") as branch_name'),
+            'roles.id as role_id',
+            'roles.name as role_name'
+        )
         ->get();
 
+    $directRoles = $user->roles->pluck('name')->toArray();
     $foundRole = $user->active_role_id ? \Spatie\Permission\Models\Role::find($user->active_role_id) : null;
     $firstAssig = $assignments->first();
-    $activeRole = $foundRole ? $foundRole->name : ($firstAssig ? $firstAssig->role_name : null);
+    $activeRole = $foundRole ? $foundRole->name : ($firstAssig ? $firstAssig->role_name : (!empty($directRoles) ? $directRoles[0] : 'Super Admin'));
 
     return response()->json([
         'id'          => $user->id,

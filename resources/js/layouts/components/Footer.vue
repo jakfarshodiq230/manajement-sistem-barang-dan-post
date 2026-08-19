@@ -11,11 +11,9 @@
       <RouterLink
         to="/panduan-sistem"
       >Panduan Sistem</RouterLink>
-      <a
-        href="#"
-        target="_blank"
-        rel="noopener noreferrer"
-      >Bantuan</a>
+      <RouterLink
+        to="/bantuan"
+      >Bantuan</RouterLink>
     </span>
   </div>
 </template>

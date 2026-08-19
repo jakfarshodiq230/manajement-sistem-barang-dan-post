@@ -70,6 +70,7 @@ declare module 'vue-router/auto-routes' {
     'audit-laporan-fast-slow-moving': RouteRecordInfo<'audit-laporan-fast-slow-moving', '/audit-laporan/fast-slow-moving', Record<never, never>, Record<never, never>>,
     'audit-laporan-riwayat-stok': RouteRecordInfo<'audit-laporan-riwayat-stok', '/audit-laporan/riwayat-stok', Record<never, never>, Record<never, never>>,
     'audit-laporan-stok-saat-ini': RouteRecordInfo<'audit-laporan-stok-saat-ini', '/audit-laporan/stok-saat-ini', Record<never, never>, Record<never, never>>,
+    'bantuan': RouteRecordInfo<'bantuan', '/bantuan', Record<never, never>, Record<never, never>>,
     'charts-apex-chart': RouteRecordInfo<'charts-apex-chart', '/charts/apex-chart', Record<never, never>, Record<never, never>>,
     'charts-chartjs': RouteRecordInfo<'charts-chartjs', '/charts/chartjs', Record<never, never>, Record<never, never>>,
     'components-alert': RouteRecordInfo<'components-alert', '/components/alert', Record<never, never>, Record<never, never>>,
