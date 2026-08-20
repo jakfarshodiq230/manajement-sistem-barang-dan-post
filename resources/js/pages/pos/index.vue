@@ -49,6 +49,33 @@ const activeReceiptSetting = computed(() => {
 const transactionType = ref('lunas') // 'lunas', 'utang'
 const paymentMethod = ref('cash') // 'cash', 'transfer', 'qris'
 const customerId = ref(null)
+const selectedCustomer = ref(null)
+const customerSearch = ref('')
+const isSearchingCustomer = ref(false)
+let customerSearchTimeout = null
+
+const onCustomerSearchInput = val => {
+  customerSearch.value = val || ''
+  clearTimeout(customerSearchTimeout)
+  if (!val) return
+  customerSearchTimeout = setTimeout(async () => {
+    try {
+      isSearchingCustomer.value = true
+      const res = await $api('/apps/customers', { params: { search: val, itemsPerPage: 30 } })
+      const list = res.data || res || []
+      
+      const map = new Map()
+      customers.value.forEach(c => map.set(c.id, c))
+      list.forEach(c => map.set(c.id, c))
+      customers.value = Array.from(map.values())
+    } catch (e) {
+      console.error(e)
+    } finally {
+      isSearchingCustomer.value = false
+    }
+  }, 300)
+}
+
 const dueDate = ref(null)
 const bankName = ref('')
 const bankAccountNumber = ref('')
@@ -204,7 +231,6 @@ const saveCustomer = async customerData => {
 
     snackbar.show('Pelanggan berhasil ditambahkan', 'success')
 
-
     // Refresh customers list
     const customerList = await $api('/apps/customers', { params: { all: true, itemsPerPage: 1000 } })
 
@@ -213,10 +239,14 @@ const saveCustomer = async customerData => {
     // Auto-select the newly added customer
     if (res.customer && res.customer.id) {
       customerId.value = res.customer.id
+      selectedCustomer.value = res.customer.id
     } else {
       // Find the last added if id is not returned directly
       const newCust = Array.isArray(customers.value) ? customers.value.find(c => c.name === customerData.name) : null
-      if (newCust) customerId.value = newCust.id
+      if (newCust) {
+        customerId.value = newCust.id
+        selectedCustomer.value = newCust.id
+      }
     }
   } catch (error) {
     console.error(error)
@@ -414,6 +444,8 @@ const handleCheckoutClick = () => {
   paidAmountRaw.value = 0
   dpAmountRaw.value = 0
   customerId.value = null
+  selectedCustomer.value = null
+  customerSearch.value = ''
   dueDate.value = null
   bankName.value = ''
   bankAccountNumber.value = ''
@@ -424,11 +456,60 @@ const handleCheckoutClick = () => {
   isCheckoutDialogVisible.value = true
 }
 
-const submitCheckout = () => {
-  if (!customerId.value) {
-    snackbar.show('Mohon pilih pelanggan! (Wajib untuk semua transaksi)', 'warning')
+const submitCheckout = async () => {
+  let targetCustomerId = null
+  let targetCustomerName = ''
+
+  if (selectedCustomer.value) {
+    if (typeof selectedCustomer.value === 'object' && selectedCustomer.value.id) {
+      targetCustomerId = selectedCustomer.value.id
+      targetCustomerName = selectedCustomer.value.name
+    } else if (typeof selectedCustomer.value === 'number') {
+      targetCustomerId = selectedCustomer.value
+      const found = customers.value.find(c => c.id === targetCustomerId)
+      if (found) targetCustomerName = found.name
+    } else if (typeof selectedCustomer.value === 'string' && selectedCustomer.value.trim()) {
+      targetCustomerName = selectedCustomer.value.trim()
+    }
+  } else if (customerSearch.value && customerSearch.value.trim()) {
+    targetCustomerName = customerSearch.value.trim()
+  }
+
+  if (!targetCustomerId && !targetCustomerName) {
+    snackbar.show('Mohon pilih atau ketik nama pelanggan! (Wajib untuk semua transaksi)', 'warning')
     
     return
+  }
+
+  // If customer name is typed but ID is not resolved, check if already in list or auto-create in DB
+  if (!targetCustomerId && targetCustomerName) {
+    const existing = customers.value.find(c => c.name && c.name.toLowerCase() === targetCustomerName.toLowerCase())
+    if (existing) {
+      targetCustomerId = existing.id
+      customerId.value = existing.id
+      selectedCustomer.value = existing.id
+    } else {
+      try {
+        const resCust = await $api('/apps/customers', {
+          method: 'POST',
+          body: {
+            name: targetCustomerName,
+            is_active: true,
+          },
+        })
+        if (resCust.customer && resCust.customer.id) {
+          targetCustomerId = resCust.customer.id
+          customers.value.unshift(resCust.customer)
+          selectedCustomer.value = resCust.customer.id
+          customerId.value = resCust.customer.id
+          snackbar.show(`Pelanggan "${targetCustomerName}" berhasil tersimpan ke database`, 'success')
+        }
+      } catch (e) {
+        console.warn('Auto-create customer error:', e)
+      }
+    }
+  } else if (targetCustomerId) {
+    customerId.value = targetCustomerId
   }
 
   if (transactionType.value === 'utang') {
@@ -481,6 +562,10 @@ const confirmAndSubmitCheckout = () => {
 
   if (customerId.value) {
     formData.append('customer_id', customerId.value)
+  }
+  if (customerSearch.value || (typeof selectedCustomer.value === 'string' && selectedCustomer.value)) {
+    const nameToSend = customerSearch.value || selectedCustomer.value
+    formData.append('customer_name', typeof nameToSend === 'string' ? nameToSend : (nameToSend.name || ''))
   }
 
   if (transactionType.value === 'utang') {
@@ -1034,7 +1119,7 @@ const startNewTransaction = () => {
                   hide-details
                   prefix="Rp"
                   class="text-right"
-                  @update:model-value="val => discount = parseInputRupiah(val)"
+                  readonly
                 />
               </div>
             </div>
@@ -1100,7 +1185,7 @@ const startNewTransaction = () => {
           <!-- Customer Selection (Always visible & Required) -->
           <div class="mt-4">
             <div class="d-flex align-center justify-space-between mb-1">
-              <span class="text-caption">Pelanggan (Wajib)</span>
+              <span class="text-caption font-weight-medium">Pelanggan (Wajib)</span>
               <VBtn
                 variant="text"
                 size="small"
@@ -1111,17 +1196,31 @@ const startNewTransaction = () => {
                 Pelanggan Baru
               </VBtn>
             </div>
-            <VAutocomplete
-              v-model="customerId"
+            <VCombobox
+              v-model="selectedCustomer"
+              v-model:search="customerSearch"
               :items="customers"
               item-title="name"
               item-value="id"
-              placeholder="Pilih Pelanggan"
+              placeholder="Pilih atau ketik nama pelanggan baru..."
               density="compact"
               clearable
-              :error-messages="!customerId ? ['Pelanggan wajib dipilih'] : []"
+              :loading="isSearchingCustomer"
+              :error-messages="(!selectedCustomer && !customerSearch) ? ['Pelanggan wajib dipilih / diketik'] : []"
               class="mb-4"
-            />
+              @update:search="onCustomerSearchInput"
+            >
+              <template #no-data>
+                <div class="pa-2 text-caption text-medium-emphasis">
+                  <span v-if="customerSearch">
+                    Pelanggan <b>"{{ customerSearch }}"</b> belum ada di daftar. Transaksi akan otomatis menyimpannya ke database.
+                  </span>
+                  <span v-else>
+                    Ketik nama pelanggan untuk mencari atau menambah baru...
+                  </span>
+                </div>
+              </template>
+            </VCombobox>
           </div>
 
           <VExpandTransition>

@@ -111,7 +111,8 @@ class SaleController extends Controller
             'bank_account_name' => 'nullable|string',
             'transfer_phone_number' => 'nullable|string',
             'payment_proof' => 'nullable|image|max:5120', // max 5MB
-            'customer_id' => 'nullable|exists:customers,id',
+            'customer_id' => 'nullable',
+            'customer_name' => 'nullable|string|max:255',
             'due_date' => 'nullable|date',
             'dp_amount' => 'nullable|numeric|min:0',
             'dp_payment_method' => 'nullable|in:cash,transfer,qris',
@@ -151,6 +152,21 @@ class SaleController extends Controller
         }
         try {
             $invoice_number = 'INV-' . date('YmdHis') . '-' . rand(100, 999);
+
+            $finalCustomerId = $request->customer_id;
+            if (!$finalCustomerId && $request->filled('customer_name')) {
+                $cust = \App\Models\Customer::firstOrCreate(
+                    ['name' => trim($request->customer_name)],
+                    ['is_active' => true]
+                );
+                $finalCustomerId = $cust->id;
+            } elseif ($finalCustomerId && !is_numeric($finalCustomerId)) {
+                $cust = \App\Models\Customer::firstOrCreate(
+                    ['name' => trim($finalCustomerId)],
+                    ['is_active' => true]
+                );
+                $finalCustomerId = $cust->id;
+            }
             
             $sale = \App\Models\Sale::create([
                 'invoice_number' => $invoice_number,
@@ -170,7 +186,7 @@ class SaleController extends Controller
                 'bank_account_number' => $request->bank_account_number,
                 'bank_account_name' => $request->bank_account_name,
                 'transfer_phone_number' => $request->transfer_phone_number,
-                'customer_id' => $request->customer_id,
+                'customer_id' => $finalCustomerId,
                 'due_date' => $request->payment_method === 'tempo' ? $request->due_date : null,
             ]);
 
