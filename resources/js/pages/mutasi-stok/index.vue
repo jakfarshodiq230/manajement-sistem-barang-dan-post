@@ -6,7 +6,7 @@ import SimpleConfirmDialog from '@/components/dialogs/SimpleConfirmDialog.vue'
 
 const mutasiList = ref([])
 const branches = ref([])
-const masterProducts = ref([])
+const employees = ref([])
 const search = ref('')
 const selectedSourceBranch = ref(null)
 const selectedDestinationBranch = ref(null)
@@ -22,6 +22,13 @@ const prepareMutasi = ref(null)
 const prepareItems = ref([])
 const isSubmittingPrepare = ref(false)
 
+// Pickup Dialog State (Tahap 3 Penjemputan Barang)
+const isPickupDialogVisible = ref(false)
+const pickupMutasi = ref(null)
+const pickupEmployeeName = ref('')
+const pickupNotes = ref('')
+const isSubmittingPickup = ref(false)
+
 // Reject Dialog State
 const isRejectDialogVisible = ref(false)
 const rejectMutasiId = ref(null)
@@ -35,6 +42,20 @@ const totalItems = ref(0)
 let searchTimeout = null
 
 const snackbar = useSnackbarStore()
+
+// Fetch options once on mount
+const fetchInitialOptions = async () => {
+  try {
+    const [branchData, employeeData] = await Promise.all([
+      $api('/apps/branches'),
+      $api('/apps/employees', { query: { itemsPerPage: 100 } }).catch(() => ({ data: [] })),
+    ])
+    branches.value = branchData.data || branchData || []
+    employees.value = employeeData.data || employeeData || []
+  } catch (e) {
+    console.error('Failed to load initial options:', e)
+  }
+}
 
 const fetchData = async () => {
   isLoading.value = true
@@ -58,18 +79,12 @@ const fetchData = async () => {
       params.status = 'rejected_cancelled'
     }
 
-    const [mutasiData, branchData, productData] = await Promise.all([
-      $api('/apps/stock-transfers', { query: params }),
-      $api('/apps/branches'),
-      $api('/apps/products', { query: { itemsPerPage: 100 } }),
-    ])
+    const mutasiData = await $api('/apps/stock-transfers', { query: params })
 
-    mutasiList.value = mutasiData.data || mutasiData
+    mutasiList.value = mutasiData.data || mutasiData || []
     if (mutasiData.total !== undefined) {
       totalItems.value = mutasiData.total
     }
-    branches.value = branchData.data || branchData
-    masterProducts.value = productData.data || productData
   } catch (error) {
     console.error(error)
     snackbar.show('Gagal mengambil data mutasi stok', 'error')
@@ -87,22 +102,13 @@ const handleSearch = () => {
 }
 
 onMounted(() => {
+  fetchInitialOptions()
   fetchData()
 })
 
-const saveMutasi = async data => {
-  try {
-    const res = await $api('/apps/stock-transfers', {
-      method: 'POST',
-      body: data,
-    })
-    snackbar.show(res.message || 'Pengajuan mutasi berhasil dibuat', 'success')
-    fetchData()
-  } catch (error) {
-    console.error(error)
-    const errorMsg = error.response?._data?.error || error.response?._data?.message || 'Gagal membuat mutasi'
-    snackbar.show(errorMsg, 'error')
-  }
+const saveMutasi = () => {
+  page.value = 1
+  fetchData()
 }
 
 const tableHeaders = [
@@ -110,7 +116,7 @@ const tableHeaders = [
   { title: 'TANGGAL REQUEST', key: 'created_at' },
   { title: 'CABANG ASAL (SUMBER)', key: 'source_branch.name' },
   { title: 'CABANG TUJUAN (PEMOHON)', key: 'destination_branch.name' },
-  { title: 'PEMOHON', key: 'created_by.name' },
+  { title: 'PENJEMPUT', key: 'picked_up_by_name' },
   { title: 'STATUS TAHAPAN', key: 'status' },
   { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
 ]
@@ -247,7 +253,52 @@ const submitReject = async () => {
   }
 }
 
-// Simple Confirm Actions for Receive & Cancel
+// Pickup Dialog Handlers (Tahap 3)
+const openPickupDialog = mutasi => {
+  pickupMutasi.value = mutasi
+  pickupEmployeeName.value = ''
+  pickupNotes.value = ''
+  isPickupDialogVisible.value = true
+}
+
+const submitPickup = async () => {
+  let employeeName = ''
+  if (typeof pickupEmployeeName.value === 'object' && pickupEmployeeName.value !== null) {
+    employeeName = pickupEmployeeName.value.name || ''
+  } else if (typeof pickupEmployeeName.value === 'string') {
+    employeeName = pickupEmployeeName.value.trim()
+  }
+
+  if (!employeeName) {
+    snackbar.show('Mohon masukkan nama karyawan yang menjemput barang!', 'warning')
+    return
+  }
+
+  if (!pickupMutasi.value) return
+
+  isSubmittingPickup.value = true
+  try {
+    const res = await $api(`/apps/stock-transfers/${pickupMutasi.value.id}/receive`, {
+      method: 'POST',
+      body: {
+        picked_up_by_name: employeeName,
+        pickup_notes: pickupNotes.value ? String(pickupNotes.value).trim() : null,
+      },
+    })
+    snackbar.show(res.message || 'Barang berhasil dikonfirmasi telah dijemput', 'success')
+    isPickupDialogVisible.value = false
+    isTrackingDialogVisible.value = false
+    fetchData()
+  } catch (error) {
+    console.error(error)
+    const errorMsg = error.response?._data?.error || error.response?._data?.message || error.message || 'Gagal memproses penjemputan'
+    snackbar.show(`Gagal: ${errorMsg}`, 'error')
+  } finally {
+    isSubmittingPickup.value = false
+  }
+}
+
+// Simple Confirm Actions for Cancel
 const pendingAction = ref(null)
 const isConfirmDialogVisible = ref(false)
 const confirmTitle = ref('')
@@ -256,12 +307,7 @@ const confirmActionText = ref('')
 const confirmColor = ref('')
 
 const handleActionConfirm = (id, action) => {
-  if (action === 'receive') {
-    confirmTitle.value = 'Konfirmasi Penjemputan Barang'
-    confirmMessage.value = 'Apakah barang telah dijemput dan diterima oleh pihak cabang pemohon? Stok akan resmi masuk ke cabang tujuan.'
-    confirmActionText.value = 'Ya, Konfirmasi Diterima'
-    confirmColor.value = 'success'
-  } else if (action === 'cancel') {
+  if (action === 'cancel') {
     confirmTitle.value = 'Batalkan Mutasi Stok'
     confirmMessage.value = 'Apakah Anda yakin ingin membatalkan mutasi ini? Stok barang yang sudah disiapkan akan otomatis dikembalikan ke unit asal.'
     confirmActionText.value = 'Ya, Batalkan'
@@ -482,6 +528,14 @@ const formatDateTime = dateStr => {
           </div>
         </template>
 
+        <template #item.picked_up_by_name="{ item }">
+          <div v-if="item.picked_up_by_name" class="d-flex align-center gap-1">
+            <VIcon icon="ri-user-follow-line" size="14" class="text-success" />
+            <span class="font-weight-medium text-success text-caption">{{ item.picked_up_by_name }}</span>
+          </div>
+          <span v-else class="text-caption text-disabled">-</span>
+        </template>
+
         <template #item.status="{ item }">
           <VChip
             :color="getStatusBadge(item.status).color"
@@ -520,6 +574,17 @@ const formatDateTime = dateStr => {
             >
               Siapkan
             </VBtn>
+
+            <VBtn
+              v-if="['ready_for_pickup', 'approved'].includes(item.status)"
+              size="small"
+              variant="elevated"
+              color="success"
+              prepend-icon="ri-truck-line"
+              @click="openPickupDialog(item)"
+            >
+              Jemput
+            </VBtn>
           </div>
         </template>
       </VDataTableServer>
@@ -529,7 +594,6 @@ const formatDateTime = dateStr => {
     <AddNewMutasiDrawer
       v-model:is-drawer-open="isAddNewDrawerVisible"
       :branches="branches"
-      :master-products="masterProducts"
       @save-data="saveMutasi"
     />
 
@@ -891,8 +955,15 @@ const formatDateTime = dateStr => {
                   </div>
                   <div class="text-caption text-medium-emphasis">
                     <div v-if="trackingMutasi.status === 'completed'">
-                      <div>Penerima: <strong>{{ trackingMutasi.received_by?.name || 'Cabang Pemohon' }}</strong></div>
+                      <div v-if="trackingMutasi.picked_up_by_name" class="text-success font-weight-bold mb-1">
+                        <VIcon icon="ri-user-follow-line" size="14" class="me-1" />
+                        Penjemput: {{ trackingMutasi.picked_up_by_name }}
+                      </div>
+                      <div>Penerima (Akun): <strong>{{ trackingMutasi.received_by?.name || 'Cabang Pemohon' }}</strong></div>
                       <div>Waktu: {{ formatDateTime(trackingMutasi.received_at || trackingMutasi.updated_at) }}</div>
+                      <div v-if="trackingMutasi.pickup_notes" class="mt-1">
+                        <i>Catatan: "{{ trackingMutasi.pickup_notes }}"</i>
+                      </div>
                     </div>
                     <div v-else-if="['ready_for_pickup', 'approved'].includes(trackingMutasi.status)" class="text-info font-weight-medium">
                       Barang siap dijemput oleh pihak cabang pemohon.
@@ -1075,8 +1146,8 @@ const formatDateTime = dateStr => {
               <VBtn
                 color="success"
                 variant="elevated"
-                prepend-icon="ri-checkbox-circle-line"
-                @click="handleActionConfirm(trackingMutasi.id, 'receive')"
+                prepend-icon="ri-truck-line"
+                @click="openPickupDialog(trackingMutasi)"
               >
                 Konfirmasi Barang Telah Dijemput
               </VBtn>
@@ -1089,6 +1160,94 @@ const formatDateTime = dateStr => {
               </span>
             </template>
           </div>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Pickup Dialog (Tahap 3 Konfirmasi Penjemputan Barang) -->
+    <VDialog
+      v-model="isPickupDialogVisible"
+      max-width="600"
+      persistent
+    >
+      <VCard v-if="pickupMutasi">
+        <VCardTitle class="d-flex justify-space-between align-center px-6 pt-6 pb-3 bg-success-lighten-5">
+          <div class="d-flex align-center gap-2">
+            <VAvatar color="success" size="36">
+              <VIcon icon="ri-truck-line" color="white" size="20" />
+            </VAvatar>
+            <div>
+              <span class="text-h6 font-weight-bold text-success">Konfirmasi Penjemputan Barang</span>
+              <p class="text-caption text-medium-emphasis mb-0">
+                No. Referensi: <strong>{{ pickupMutasi.reference_no }}</strong>
+              </p>
+            </div>
+          </div>
+          <VBtn icon variant="text" size="small" @click="isPickupDialogVisible = false">
+            <VIcon icon="ri-close-line" />
+          </VBtn>
+        </VCardTitle>
+
+        <VDivider />
+
+        <VCardText class="pa-6">
+          <VAlert color="info" variant="tonal" class="mb-4" density="compact">
+            <div class="text-caption">
+              Barang akan dijemput dari <b>{{ pickupMutasi.source_branch?.name }}</b> menuju <b>{{ pickupMutasi.destination_branch?.name }}</b>. Stok akan otomatis bertambah di cabang tujuan setelah penjemputan dikonfirmasi.
+            </div>
+          </VAlert>
+
+          <VForm @submit.prevent="submitPickup">
+            <div class="mb-4">
+              <label class="text-subtitle-2 font-weight-bold mb-1 d-block">
+                Nama Karyawan yang Menjemput <span class="text-error">*</span>
+              </label>
+              <VCombobox
+                v-model="pickupEmployeeName"
+                :items="employees"
+                item-title="name"
+                item-value="name"
+                placeholder="Pilih atau ketik nama karyawan penjemput..."
+                density="compact"
+                clearable
+                prepend-inner-icon="ri-user-follow-line"
+                :rules="[v => !!v || 'Nama karyawan yang menjemput wajib diisi']"
+              />
+              <span class="text-caption text-medium-emphasis">
+                Pilih dari daftar karyawan atau ketik nama driver/kurir/staf penjemput.
+              </span>
+            </div>
+
+            <div class="mb-2">
+              <label class="text-subtitle-2 font-weight-bold mb-1 d-block">
+                Catatan Penjemputan (Opsional)
+              </label>
+              <VTextarea
+                v-model="pickupNotes"
+                placeholder="Contoh: Dijemput menggunakan kendaraan operasional, kondisi barang lengkap dan tersegel baik..."
+                rows="2"
+                density="compact"
+                hide-details
+              />
+            </div>
+          </VForm>
+        </VCardText>
+
+        <VDivider />
+
+        <VCardActions class="px-6 py-4 justify-space-between bg-grey-50">
+          <VBtn variant="outlined" color="secondary" @click="isPickupDialogVisible = false">
+            Batal
+          </VBtn>
+          <VBtn
+            color="success"
+            variant="elevated"
+            prepend-icon="ri-checkbox-circle-line"
+            :loading="isSubmittingPickup"
+            @click="submitPickup"
+          >
+            Konfirmasi Barang Dijemput & Terima Stok
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

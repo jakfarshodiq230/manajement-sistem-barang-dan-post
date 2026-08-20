@@ -42,15 +42,37 @@ const items = ref([
 const fetchProducts = async (search = '') => {
   isSearchingProduct.value = true
   try {
-    const params = {
-      itemsPerPage: 60,
+    let fetched = []
+    if (source_branch_id.value) {
+      const params = {
+        branch_id: source_branch_id.value,
+        itemsPerPage: -1,
+      }
+      if (search) params.search = search
+      const res = await $api('/apps/product-branches', { query: params })
+      const list = res.data || res || []
+      fetched = list.map(pb => ({
+        id: pb.product_id,
+        name: pb.product?.name || 'Item',
+        sku: pb.product?.sku || '',
+        stock: pb.stock ?? 0,
+        unit: pb.product?.unit || 'Pcs',
+      }))
+    } else {
+      const params = {
+        itemsPerPage: -1,
+      }
+      if (search) params.search = search
+      const res = await $api('/apps/products', { query: params })
+      const list = res.data || res || []
+      fetched = list.map(p => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        stock: null,
+        unit: p.unit || 'Pcs',
+      }))
     }
-    if (search) {
-      params.search = search
-    }
-
-    const res = await $api('/apps/products', { query: params })
-    const fetched = res.data || res || []
 
     // Merge with currently selected products so they don't disappear from dropdown
     const selectedIds = items.value.map(i => i.product_id).filter(Boolean)
@@ -67,6 +89,10 @@ const fetchProducts = async (search = '') => {
     isSearchingProduct.value = false
   }
 }
+
+watch(source_branch_id, () => {
+  fetchProducts('')
+})
 
 const onProductSearchInput = val => {
   clearTimeout(searchTimeout)
@@ -110,28 +136,43 @@ const removeItem = index => {
   }
 }
 
-const onSubmit = () => {
-  refForm.value?.validate().then(({ valid }) => {
-    if (valid) {
-      if (source_branch_id.value === destination_branch_id.value) {
-        snackbar.show('Cabang asal dan cabang tujuan tidak boleh sama!', 'warning')
-        return
-      }
+const isSubmitting = ref(false)
 
-      if (items.value.some(i => !i.product_id || i.qty < 1)) {
-        snackbar.show('Mohon lengkapi semua baris barang (Produk dan Qty harus minimal 1).', 'warning')
-        return
-      }
-
-      emit('saveData', {
-        source_branch_id: source_branch_id.value,
-        destination_branch_id: destination_branch_id.value,
-        notes: notes.value,
-        items: items.value,
-      })
-      closeNavigationDrawer()
+const onSubmit = async () => {
+  const result = await refForm.value?.validate()
+  if (result?.valid) {
+    if (source_branch_id.value === destination_branch_id.value) {
+      snackbar.show('Cabang asal dan cabang tujuan tidak boleh sama!', 'warning')
+      return
     }
-  })
+
+    if (items.value.some(i => !i.product_id || i.qty < 1)) {
+      snackbar.show('Mohon lengkapi semua baris barang (Produk dan Qty harus minimal 1).', 'warning')
+      return
+    }
+
+    isSubmitting.value = true
+    try {
+      const res = await $api('/apps/stock-transfers', {
+        method: 'POST',
+        body: {
+          source_branch_id: source_branch_id.value,
+          destination_branch_id: destination_branch_id.value,
+          notes: notes.value,
+          items: items.value,
+        },
+      })
+      snackbar.show(res.message || 'Pengajuan mutasi berhasil dibuat', 'success')
+      emit('saveData')
+      closeNavigationDrawer()
+    } catch (error) {
+      console.error(error)
+      const errorMsg = error.response?._data?.error || error.response?._data?.message || 'Gagal membuat mutasi'
+      snackbar.show(errorMsg, 'error')
+    } finally {
+      isSubmitting.value = false
+    }
+  }
 }
 
 const handleDrawerModelValueUpdate = val => {
@@ -236,7 +277,7 @@ const handleDrawerModelValueUpdate = val => {
                     <VAutocomplete
                       v-model="item.product_id"
                       :items="productOptions"
-                      :item-title="prod => prod.sku ? `[${prod.sku}] ${prod.name}` : prod.name"
+                      :item-title="prod => prod.sku ? `[${prod.sku}] ${prod.name}${prod.stock !== null ? ` (Stok Cabang Asal: ${prod.stock} ${prod.unit || ''})` : ''}` : prod.name"
                       item-value="id"
                       label="Cari Produk (Nama / SKU)"
                       placeholder="Ketik untuk mencari barang..."
@@ -282,6 +323,7 @@ const handleDrawerModelValueUpdate = val => {
                   type="submit"
                   color="primary"
                   prepend-icon="ri-send-plane-line"
+                  :loading="isSubmitting"
                 >
                   Kirim Pengajuan Mutasi
                 </VBtn>

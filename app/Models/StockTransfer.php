@@ -22,6 +22,8 @@ class StockTransfer extends Model
         'approved_by',
         'received_by',
         'received_at',
+        'picked_up_by_name',
+        'pickup_notes',
     ];
 
     protected $casts = [

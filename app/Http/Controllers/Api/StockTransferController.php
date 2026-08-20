@@ -103,25 +103,32 @@ class StockTransferController extends Controller
             ]);
 
             foreach ($request->items as $item) {
-                // Verify source stock exists (bypass global scopes for cross-branch queries)
-                $sourceProductBranch = ProductBranch::withoutGlobalScopes()
-                    ->where('branch_id', $request->source_branch_id)
-                    ->where('product_id', $item['product_id'])
-                    ->first();
+                // Ensure product branch records exist for both source and destination
+                ProductBranch::withoutGlobalScopes()->firstOrCreate(
+                    [
+                        'branch_id' => $request->source_branch_id,
+                        'product_id' => $item['product_id'],
+                    ],
+                    [
+                        'stock' => 0,
+                    ]
+                );
 
-                if (!$sourceProductBranch) {
-                    throw new \Exception("Produk ID " . $item['product_id'] . " belum terdaftar di cabang asal.");
-                }
-                
-                if ($sourceProductBranch->stock < $item['qty']) {
-                    $prodName = $sourceProductBranch->product->name ?? "ID " . $item['product_id'];
-                    throw new \Exception("Stok tidak mencukupi untuk '{$prodName}' di cabang asal (Sisa stok: " . $sourceProductBranch->stock . ").");
-                }
+                ProductBranch::withoutGlobalScopes()->firstOrCreate(
+                    [
+                        'branch_id' => $request->destination_branch_id,
+                        'product_id' => $item['product_id'],
+                    ],
+                    [
+                        'stock' => 0,
+                    ]
+                );
 
                 StockTransferItem::create([
                     'stock_transfer_id' => $transfer->id,
                     'product_id' => $item['product_id'],
                     'qty' => $item['qty'],
+                    'status' => 'pending',
                 ]);
             }
 
@@ -448,6 +455,8 @@ class StockTransferController extends Controller
                 'status' => 'completed',
                 'received_by' => $request->user()->id ?? null,
                 'received_at' => now(),
+                'picked_up_by_name' => $request->picked_up_by_name ? trim($request->picked_up_by_name) : null,
+                'pickup_notes' => $request->pickup_notes ? trim($request->pickup_notes) : null,
             ]);
 
             DB::commit();
