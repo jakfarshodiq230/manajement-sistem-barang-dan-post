@@ -120,7 +120,7 @@ export default defineConfig({
       host: '127.0.0.1',
     },
     watch: {
-      ignored: ['**/*.docx', '**/*.xlsx', '**/*.pdf'],
+      ignored: ['**/*.docx', '**/*.xlsx', '**/*.pdf', '**/*.sql', '**/storage/**'],
     },
   },
   optimizeDeps: {

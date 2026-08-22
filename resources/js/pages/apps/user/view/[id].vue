@@ -1,8 +1,7 @@
 <script setup>
 definePage({
   meta: {
-    action: 'read',
-    subject: 'Pengguna',
+    public: true,
   },
 })
 

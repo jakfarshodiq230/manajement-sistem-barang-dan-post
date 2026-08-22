@@ -177,7 +177,7 @@ class StockTransferController extends Controller
     public function prepare(Request $request, $id)
     {
         $user = $request->user();
-        if ($user && !$user->hasRole(['Super Admin', 'Dev', 'Admin Pusat', 'Admin Cabang']) && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate')) {
+        if ($user && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses (permission) untuk memvalidasi / menyiapkan mutasi stok.'], 403);
         }
 
@@ -348,7 +348,7 @@ class StockTransferController extends Controller
     public function receive(Request $request, $id)
     {
         $user = $request->user();
-        if ($user && !$user->hasRole(['Super Admin', 'Dev', 'Admin Pusat', 'Admin Cabang']) && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate')) {
+        if ($user && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses (permission) untuk mengonfirmasi penerimaan mutasi stok.'], 403);
         }
 
@@ -476,7 +476,7 @@ class StockTransferController extends Controller
     public function reject(Request $request, $id)
     {
         $user = $request->user();
-        if ($user && !$user->hasRole(['Super Admin', 'Dev', 'Admin Pusat', 'Admin Cabang']) && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate')) {
+        if ($user && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses untuk menolak mutasi stok.'], 403);
         }
 
@@ -502,7 +502,7 @@ class StockTransferController extends Controller
     public function cancel(Request $request, $id)
     {
         $user = $request->user();
-        if ($user && !$user->hasRole(['Super Admin', 'Dev', 'Admin Pusat', 'Admin Cabang']) && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate')) {
+        if ($user && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses untuk membatalkan mutasi stok.'], 403);
         }
 
@@ -602,5 +602,27 @@ class StockTransferController extends Controller
             Log::error('Mutasi Stok Cancel Error: ' . $e->getMessage());
             return response()->json(['message' => 'Gagal membatalkan mutasi stok', 'error' => $e->getMessage()], 400);
         }
+    }
+
+    /**
+     * Get Delivery Note (Surat Jalan) details for printing
+     */
+    public function deliveryNote($id)
+    {
+        $transfer = StockTransfer::withoutGlobalScopes()
+            ->with([
+                'sourceBranch',
+                'destinationBranch',
+                'createdBy:id,name',
+                'preparedBy:id,name',
+                'approvedBy:id,name',
+                'receivedBy:id,name',
+                'items.product:id,name,sku,unit,barcode',
+            ])
+            ->findOrFail($id);
+
+        return response()->json([
+            'data' => $transfer,
+        ]);
     }
 }

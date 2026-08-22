@@ -46,18 +46,32 @@ const items = ref([
   { product_id: null, qty: 1, unit_cost: 0 },
 ])
 
+const extractArray = val => {
+  if (Array.isArray(val)) return val
+  if (val && Array.isArray(val.data)) return val.data
+  if (val && Array.isArray(val.products)) return val.products
+  return []
+}
+
+const formatProductTitle = prod => {
+  if (!prod) return ''
+  if (typeof prod === 'string') return prod
+  if (typeof prod !== 'object') return String(prod)
+  return prod.sku ? `[${prod.sku}] ${prod.name}` : (prod.name || 'Barang')
+}
+
 const fetchProducts = async (search = '') => {
   isSearchingProduct.value = true
   try {
     const params = {
-      itemsPerPage: 60,
+      itemsPerPage: -1,
     }
     if (search) {
       params.search = search
     }
 
-    const res = await $api('/apps/products', { query: params })
-    const fetched = res.data || res || []
+    const res = await $api('/apps/products', { params })
+    const fetched = extractArray(res)
 
     const selectedIds = items.value.map(i => i.product_id).filter(Boolean)
     const existingSelected = productOptions.value.filter(p => selectedIds.includes(p.id))
@@ -292,7 +306,7 @@ const parseNumber = value => {
                     <VAutocomplete
                       v-model="item.product_id"
                       :items="productOptions"
-                      :item-title="prod => prod.sku ? `[${prod.sku}] ${prod.name}` : prod.name"
+                      :item-title="formatProductTitle"
                       item-value="id"
                       label="Cari Produk (Nama / SKU)"
                       placeholder="Ketik nama atau SKU barang..."

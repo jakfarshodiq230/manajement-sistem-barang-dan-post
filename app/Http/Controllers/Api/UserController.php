@@ -201,7 +201,8 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
-        if (!request()->user()->can('Pengguna Create')) {
+        $admin = $request->user();
+        if (!$admin || (!$admin->can('Pengguna Create') && !$admin->can('Daftar Pengguna Create') && !$admin->can('manage all') && !$admin->can('*'))) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -320,7 +321,8 @@ class UserController extends Controller
 
     public function update(Request $request, User $user)
     {
-        if (!request()->user()->can('Pengguna Write')) {
+        $admin = $request->user();
+        if (!$admin || (!$admin->can('Pengguna Write') && !$admin->can('Daftar Pengguna Write') && !$admin->can('manage all') && !$admin->can('*'))) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -385,7 +387,8 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
-        if (!request()->user()->can('Pengguna Delete')) {
+        $admin = request()->user();
+        if (!$admin || (!$admin->can('Pengguna Delete') && !$admin->can('Daftar Pengguna Delete') && !$admin->can('manage all') && !$admin->can('*'))) {
             abort(403, 'Unauthorized action.');
         }
 

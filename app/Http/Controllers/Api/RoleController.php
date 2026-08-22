@@ -55,7 +55,7 @@ class RoleController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        if ($user && !$user->hasRole('Super Admin') && !$user->can('Roles Create') && !$user->can('create roles')) {
+        if ($user && !$user->can('Roles Create') && !$user->can('create roles') && !$user->can('manage all')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -85,7 +85,7 @@ class RoleController extends Controller
     public function update(Request $request, $id)
     {
         $user = $request->user();
-        if ($user && !$user->hasRole('Super Admin') && !$user->can('Roles Write') && !$user->can('write roles')) {
+        if ($user && !$user->can('Roles Write') && !$user->can('write roles') && !$user->can('manage all')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -117,7 +117,7 @@ class RoleController extends Controller
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
-        if ($user && !$user->hasRole('Super Admin') && !$user->can('Roles Delete') && !$user->can('delete roles')) {
+        if ($user && !$user->can('Roles Delete') && !$user->can('delete roles') && !$user->can('manage all')) {
             abort(403, 'Unauthorized action.');
         }
 

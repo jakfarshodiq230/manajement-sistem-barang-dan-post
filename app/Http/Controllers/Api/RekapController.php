@@ -46,8 +46,10 @@ class RekapController extends Controller
                     ->where('sale_id', $sale->id)
                     ->sum(DB::raw('cost_price * qty'));
             }
-            $laba       = $omset - $cogs;
-            $jumlahTx   = $sales->count();
+            $labaKotor   = $omset - $cogs;
+            $expenses    = \App\Models\PettyCash::whereYear('date', $year)->whereMonth('date', $m)->sum('amount');
+            $labaBersih  = $labaKotor - $expenses;
+            $jumlahTx    = $sales->count();
 
             // --- Kas / Closing Harian ---
             $closings = CashReconciliation::whereYear('date', $year)
@@ -72,7 +74,7 @@ class RekapController extends Controller
             // --- Kumulatif ---
             if (!$isFuture) {
                 $kumulatifOmset += $omset;
-                $kumulatifLaba  += $laba;
+                $kumulatifLaba  += $labaBersih;
             }
 
             $rows[] = [
@@ -82,11 +84,13 @@ class RekapController extends Controller
                 'is_future'        => $isFuture,
                 'is_current'       => ($year == $now->year && $m == $now->month),
 
-                // Penjualan
+                // Penjualan & Kas Kecil
                 'jumlah_transaksi' => $isFuture ? null : $jumlahTx,
                 'omset'            => $isFuture ? null : (float) $omset,
                 'modal_cogs'       => $isFuture ? null : (float) $cogs,
-                'laba_bersih'      => $isFuture ? null : (float) $laba,
+                'laba_kotor'       => $isFuture ? null : (float) $labaKotor,
+                'beban_operasional'=> $isFuture ? null : (float) $expenses,
+                'laba_bersih'      => $isFuture ? null : (float) $labaBersih,
 
                 // Kas
                 'jumlah_closing'   => $isFuture ? null : $jumlahClosing,
@@ -105,25 +109,25 @@ class RekapController extends Controller
         }
 
         // Year summary
-        $summary = [
-            'total_transaksi'  => $sales ? 0 : 0, // calculated below
-            'total_omset'      => $kumulatifOmset,
-            'total_laba'       => $kumulatifLaba,
-            'margin'           => $kumulatifOmset > 0 ? round(($kumulatifLaba / $kumulatifOmset) * 100, 1) : 0,
-        ];
-
-        // Recalculate proper year totals
         $yearSales = Sale::where('status', 'completed')->whereYear('date', $year)->get();
         $yearCogs  = 0;
         foreach ($yearSales as $s) {
             $yearCogs += DB::table('sale_items')->where('sale_id', $s->id)->sum(DB::raw('cost_price * qty'));
         }
-        $summary['total_transaksi'] = $yearSales->count();
-        $summary['total_omset']     = (float) $yearSales->sum('total_amount');
-        $summary['total_laba']      = (float) ($yearSales->sum('total_amount') - $yearCogs);
-        $summary['margin']          = $summary['total_omset'] > 0
-            ? round(($summary['total_laba'] / $summary['total_omset']) * 100, 1)
-            : 0;
+        $yearExpenses = (float) \App\Models\PettyCash::whereYear('date', $year)->sum('amount');
+        $yearOmset    = (float) $yearSales->sum('total_amount');
+        $yearGross    = $yearOmset - $yearCogs;
+        $yearNet      = $yearGross - $yearExpenses;
+
+        $summary = [
+            'total_transaksi'  => $yearSales->count(),
+            'total_omset'      => $yearOmset,
+            'total_cogs'       => (float) $yearCogs,
+            'total_laba_kotor' => (float) $yearGross,
+            'total_beban'      => $yearExpenses,
+            'total_laba'       => (float) $yearNet,
+            'margin'           => $yearOmset > 0 ? round(($yearNet / $yearOmset) * 100, 1) : 0,
+        ];
 
         // Available years (from first sale to current year + 1)
         $firstYear = Sale::min(DB::raw('YEAR(date)')) ?? date('Y');
@@ -170,8 +174,62 @@ class RekapController extends Controller
 
     private function getBulananData(int $year, int $month)
     {
-
         $daysInMonth = Carbon::create($year, $month, 1)->daysInMonth;
+
+        // Bulk load month sales
+        $salesList = Sale::where('status', 'completed')
+            ->whereYear('date', $year)
+            ->whereMonth('date', $month)
+            ->get();
+
+        $salesByDate = $salesList->groupBy(function ($s) {
+            return Carbon::parse($s->date)->format('Y-m-d');
+        });
+
+        $saleIds = $salesList->pluck('id');
+        $cogsBySaleId = [];
+        if ($saleIds->isNotEmpty()) {
+            $cogsBySaleId = DB::table('sale_items')
+                ->whereIn('sale_id', $saleIds)
+                ->select('sale_id', DB::raw('SUM(cost_price * qty) as total_cogs'))
+                ->groupBy('sale_id')
+                ->pluck('total_cogs', 'sale_id')
+                ->toArray();
+        }
+
+        // Bulk load expenses (Petty Cash)
+        $expensesByDate = \App\Models\PettyCash::whereYear('date', $year)
+            ->whereMonth('date', $month)
+            ->select(DB::raw('DATE(date) as dt'), DB::raw('SUM(amount) as total_exp'))
+            ->groupBy(DB::raw('DATE(date)'))
+            ->pluck('total_exp', 'dt')
+            ->toArray();
+
+        // Bulk load cash variance
+        $closingsByDate = CashReconciliation::whereYear('date', $year)
+            ->whereMonth('date', $month)
+            ->select(DB::raw('DATE(date) as dt'), DB::raw('SUM(variance) as total_var'))
+            ->groupBy(DB::raw('DATE(date)'))
+            ->pluck('total_var', 'dt')
+            ->toArray();
+
+        // Bulk load stock movements
+        $stockInByDate = StockMovement::whereYear('created_at', $year)
+            ->whereMonth('created_at', $month)
+            ->where('type', 'in')
+            ->select(DB::raw('DATE(created_at) as dt'), DB::raw('SUM(quantity) as total_qty'))
+            ->groupBy(DB::raw('DATE(created_at)'))
+            ->pluck('total_qty', 'dt')
+            ->toArray();
+
+        $stockOutByDate = StockMovement::whereYear('created_at', $year)
+            ->whereMonth('created_at', $month)
+            ->where('type', '!=', 'in')
+            ->select(DB::raw('DATE(created_at) as dt'), DB::raw('SUM(ABS(quantity)) as total_qty'))
+            ->groupBy(DB::raw('DATE(created_at)'))
+            ->pluck('total_qty', 'dt')
+            ->toArray();
+
         $rows = [];
 
         for ($d = 1; $d <= $daysInMonth; $d++) {
@@ -193,24 +251,29 @@ class RekapController extends Controller
                 continue;
             }
 
-            $sales = Sale::where('status', 'completed')->whereDate('date', $dateStr)->get();
-            $omset = $sales->sum('total_amount');
+            $daySales = $salesByDate->get($dateStr, collect());
+            $omset = $daySales->sum('total_amount');
             $cogs  = 0;
-            foreach ($sales as $sale) {
-                $cogs += DB::table('sale_items')->where('sale_id', $sale->id)->sum(DB::raw('cost_price * qty'));
+            foreach ($daySales as $sale) {
+                $cogs += (float) ($cogsBySaleId[$sale->id] ?? 0);
             }
-
-            $closing = CashReconciliation::whereDate('date', $dateStr)->sum('variance');
+            $dayExpense = (float) ($expensesByDate[$dateStr] ?? 0);
+            $grossProfit = $omset - $cogs;
+            $netProfit = $grossProfit - $dayExpense;
+            $closing = (float) ($closingsByDate[$dateStr] ?? 0);
 
             $rows[] = [
                 'tanggal'          => $dateStr,
                 'hari'             => $dateObj->locale('id')->isoFormat('dddd'),
                 'is_future'        => false,
-                'jumlah_transaksi' => $sales->count(),
+                'jumlah_transaksi' => $daySales->count(),
                 'omset'            => (float) $omset,
-                'laba'             => (float) ($omset - $cogs),
-                'stok_masuk'       => (int) StockMovement::whereDate('created_at', $dateStr)->where('type', 'in')->sum('quantity'),
-                'stok_keluar'      => (int) StockMovement::whereDate('created_at', $dateStr)->where('type', '!=', 'in')->sum(DB::raw('ABS(quantity)')),
+                'modal_cogs'       => (float) $cogs,
+                'beban_operasional'=> (float) $dayExpense,
+                'laba_kotor'       => (float) $grossProfit,
+                'laba'             => (float) $netProfit,
+                'stok_masuk'       => (int) ($stockInByDate[$dateStr] ?? 0),
+                'stok_keluar'      => (int) ($stockOutByDate[$dateStr] ?? 0),
                 'selisih_kas'      => (float) $closing,
             ];
         }

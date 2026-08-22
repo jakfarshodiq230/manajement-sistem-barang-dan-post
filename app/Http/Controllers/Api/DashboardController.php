@@ -290,60 +290,109 @@ class DashboardController extends Controller
 
 
     // GET /profit
-    public function profit()
+    public function profit(Request $request = null)
     {
+        $request = $request ?? request();
         $today = Carbon::today();
         $thisMonth = Carbon::now()->month;
         $thisYear = Carbon::now()->year;
+        $branchId = $request->query('branch_id');
+
+        // Base Query
+        $salesQuery = Sale::where('status', 'completed');
+        $expenseQuery = \App\Models\PettyCash::query();
+
+        if ($branchId && $branchId !== 'all') {
+            $salesQuery->where('branch_id', $branchId);
+            $expenseQuery->where('branch_id', $branchId);
+        }
 
         // Today
-        $salesToday = Sale::where('status', 'completed')->whereDate('date', $today)->get();
-        $revenueToday = $salesToday->sum('total_amount');
+        $salesToday = (clone $salesQuery)->whereDate('date', $today)->get();
+        $revenueToday = (float) $salesToday->sum('total_amount');
         $cogsToday = 0;
         foreach ($salesToday as $sale) {
             $cogsToday += DB::table('sale_items')->where('sale_id', $sale->id)->sum(DB::raw('cost_price * qty'));
         }
+        $expenseToday = (float) (clone $expenseQuery)->whereDate('date', $today)->sum('amount');
+        $grossProfitToday = $revenueToday - $cogsToday;
+        $netProfitToday = $grossProfitToday - $expenseToday;
 
         // This Month
-        $salesMonth = Sale::where('status', 'completed')->whereMonth('date', $thisMonth)->whereYear('date', $thisYear)->get();
-        $revenueMonth = $salesMonth->sum('total_amount');
+        $salesMonth = (clone $salesQuery)->whereMonth('date', $thisMonth)->whereYear('date', $thisYear)->get();
+        $revenueMonth = (float) $salesMonth->sum('total_amount');
         $cogsMonth = 0;
         foreach ($salesMonth as $sale) {
             $cogsMonth += DB::table('sale_items')->where('sale_id', $sale->id)->sum(DB::raw('cost_price * qty'));
         }
+        $expenseMonth = (float) (clone $expenseQuery)->whereMonth('date', $thisMonth)->whereYear('date', $thisYear)->sum('amount');
+        $grossProfitMonth = $revenueMonth - $cogsMonth;
+        $netProfitMonth = $grossProfitMonth - $expenseMonth;
 
         // All Time
-        $salesAll = Sale::where('status', 'completed')->get();
-        $revenueAll = $salesAll->sum('total_amount');
+        $salesAll = (clone $salesQuery)->get();
+        $revenueAll = (float) $salesAll->sum('total_amount');
         $cogsAll = 0;
         foreach ($salesAll as $sale) {
             $cogsAll += DB::table('sale_items')->where('sale_id', $sale->id)->sum(DB::raw('cost_price * qty'));
         }
+        $expenseAll = (float) (clone $expenseQuery)->sum('amount');
+        $grossProfitAll = $revenueAll - $cogsAll;
+        $netProfitAll = $grossProfitAll - $expenseAll;
 
         // Last 6 months chart data
-        $chartData = [];
+        $chartCategories = [];
+        $chartGross = [];
+        $chartExpenses = [];
+        $chartNet = [];
         $now = Carbon::now();
         for ($i = 5; $i >= 0; $i--) {
             $d = clone $now;
             $d->subMonths($i);
-            $mSales = Sale::where('status', 'completed')->whereMonth('date', $d->month)->whereYear('date', $d->year)->get();
-            $revenue = $mSales->sum('total_amount');
-            $cogs = 0;
+            $mSales = (clone $salesQuery)->whereMonth('date', $d->month)->whereYear('date', $d->year)->get();
+            $rev = (float) $mSales->sum('total_amount');
+            $cg = 0;
             foreach ($mSales as $sale) {
-                $cogs += DB::table('sale_items')->where('sale_id', $sale->id)->sum(DB::raw('cost_price * qty'));
+                $cg += DB::table('sale_items')->where('sale_id', $sale->id)->sum(DB::raw('cost_price * qty'));
             }
-            $chartData['categories'][] = $d->format('M Y');
-            $chartData['series'][] = $revenue - $cogs;
+            $exp = (float) (clone $expenseQuery)->whereMonth('date', $d->month)->whereYear('date', $d->year)->sum('amount');
+            $gross = $rev - $cg;
+            $net = $gross - $exp;
+
+            $chartCategories[] = $d->format('M Y');
+            $chartGross[] = (float) $gross;
+            $chartExpenses[] = (float) $exp;
+            $chartNet[] = (float) $net;
         }
 
         return response()->json([
             'success' => true,
             'data' => [
-                'profit_today' => $revenueToday - $cogsToday,
-                'profit_this_month' => $revenueMonth - $cogsMonth,
+                'revenue_today' => $revenueToday,
+                'cogs_today' => (float) $cogsToday,
+                'expense_today' => $expenseToday,
+                'gross_profit_today' => $grossProfitToday,
+                'profit_today' => $netProfitToday,
+
+                'revenue_this_month' => $revenueMonth,
+                'cogs_this_month' => (float) $cogsMonth,
+                'expense_this_month' => $expenseMonth,
+                'gross_profit_this_month' => $grossProfitMonth,
+                'profit_this_month' => $netProfitMonth,
+
                 'total_revenue' => $revenueAll,
-                'total_profit' => $revenueAll - $cogsAll,
-                'chart_data' => $chartData
+                'total_cogs' => (float) $cogsAll,
+                'total_expense' => $expenseAll,
+                'total_gross_profit' => $grossProfitAll,
+                'total_profit' => $netProfitAll,
+                'margin' => $revenueAll > 0 ? round(($netProfitAll / $revenueAll) * 100, 1) : 0,
+
+                'chart_data' => [
+                    'categories' => $chartCategories,
+                    'series' => $chartNet,
+                    'series_gross' => $chartGross,
+                    'series_expenses' => $chartExpenses,
+                ]
             ]
         ]);
     }

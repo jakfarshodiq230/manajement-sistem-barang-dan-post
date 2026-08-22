@@ -104,24 +104,44 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     Route::post('products/import', [\App\Http\Controllers\Api\ProductController::class, 'import']);
     Route::apiResource('products', \App\Http\Controllers\Api\ProductController::class);
     Route::post('product-branches/import', [\App\Http\Controllers\Api\ProductBranchController::class, 'import']);
+    Route::apiResource('product-branches', \App\Http\Controllers\Api\ProductBranchController::class);
     Route::put('product-batches/{batchId}', [\App\Http\Controllers\Api\ProductBranchController::class, 'updateBatchPrice']);
     Route::get('product-batches/detail/{batchId}', [\App\Http\Controllers\Api\ProductBranchController::class, 'batchDetail']);
     Route::get('pos/scan-batch/{batchId}', [\App\Http\Controllers\Api\ProductBranchController::class, 'scanBatch']);
-    Route::apiResource('product-branches', \App\Http\Controllers\Api\ProductBranchController::class);
+    // Cash Shifts (Shift Kasir)
+    Route::get('cash-shifts/current', [\App\Http\Controllers\Api\CashShiftController::class, 'current']);
+    Route::post('cash-shifts/open', [\App\Http\Controllers\Api\CashShiftController::class, 'open']);
+    Route::post('cash-shifts/close', [\App\Http\Controllers\Api\CashShiftController::class, 'close']);
+    Route::get('cash-shifts', [\App\Http\Controllers\Api\CashShiftController::class, 'index']);
+
+    // POS Held Bills (Simpan Transaksi Sementara)
+    Route::get('pos-held-bills', [\App\Http\Controllers\Api\PosHeldBillController::class, 'index']);
+    Route::post('pos-held-bills', [\App\Http\Controllers\Api\PosHeldBillController::class, 'store']);
+    Route::delete('pos-held-bills/{id}', [\App\Http\Controllers\Api\PosHeldBillController::class, 'destroy']);
+
+    // Petty Cash (Kas Kecil Cabang)
+    Route::apiResource('petty-cashes', \App\Http\Controllers\Api\PettyCashController::class);
+
     Route::apiResource('stock-transfers', \App\Http\Controllers\Api\StockTransferController::class)->except(['update', 'destroy']);
+    Route::get('stock-transfers/{id}/delivery-note', [\App\Http\Controllers\Api\StockTransferController::class, 'deliveryNote']);
     Route::post('stock-transfers/{id}/prepare', [\App\Http\Controllers\Api\StockTransferController::class, 'prepare']);
     Route::post('stock-transfers/{id}/receive', [\App\Http\Controllers\Api\StockTransferController::class, 'receive']);
     Route::post('stock-transfers/{id}/approve', [\App\Http\Controllers\Api\StockTransferController::class, 'approve']);
     Route::post('stock-transfers/{id}/reject', [\App\Http\Controllers\Api\StockTransferController::class, 'reject']);
     Route::post('stock-transfers/{id}/cancel', [\App\Http\Controllers\Api\StockTransferController::class, 'cancel']);
-    // Switch active role
+    // Switch active role and branch
     Route::post('switch-role', function (\Illuminate\Http\Request $request) {
-        $user = $request->user();
+        $user = $request->user() ?: auth()->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
         $roleId = $request->input('role_id');
+        $branchId = $request->input('branch_id');
         
-        // Verify the user actually has this role (in any branch)
+        // Verify the user actually has this role
         $hasRole = \DB::table('model_has_roles')
-            ->where('model_type', 'App\\Models\\User')
+            ->where('model_type', get_class($user))
             ->where('model_id', $user->id)
             ->where('role_id', $roleId)
             ->exists();
@@ -130,7 +150,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
             return response()->json(['message' => 'Unauthorized: role not assigned to this user'], 403);
         }
 
-        $user->update(['active_role_id' => $roleId]);
+        $user->update([
+            'active_role_id' => $roleId,
+            'branch_id'      => $branchId ?: null,
+        ]);
         $role = \Spatie\Permission\Models\Role::find($roleId);
 
         $abilityRules = [];
@@ -159,20 +182,28 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
             $abilityRules[] = ['action' => 'read', 'subject' => 'Auth'];
         }
 
+        $activeBranch = $user->branch_id ? \App\Models\Branch::find($user->branch_id) : null;
+
         return response()->json([
-            'message'          => 'Role switched successfully',
-            'active_role' => $role ? $role->name : null,
-            'userAbilityRules' => $abilityRules,
+            'message'            => 'Role switched successfully',
+            'active_role'        => $role ? $role->name : null,
+            'active_branch_id'   => $user->branch_id,
+            'active_branch_name' => $activeBranch ? $activeBranch->name : 'Semua Cabang (Global)',
+            'userAbilityRules'   => $abilityRules,
         ]);
     });
 });
 
 Route::middleware('auth:sanctum')->get('/user', function (\Illuminate\Http\Request $request) {
-    $user = $request->user();
-    $assignments = \DB::table('model_has_roles as mhr')
+    $user = $request->user() ?: auth()->user();
+    if (!$user) {
+        return response()->json(['message' => 'Unauthenticated.'], 401);
+    }
+
+    $rawAssignments = \DB::table('model_has_roles as mhr')
         ->join('roles', 'mhr.role_id', '=', 'roles.id')
         ->leftJoin('branches', 'mhr.branch_id', '=', 'branches.id')
-        ->where('mhr.model_type', 'App\\Models\\User')
+        ->where('mhr.model_type', get_class($user))
         ->where('mhr.model_id', $user->id)
         ->select(
             'branches.id as branch_id',
@@ -182,19 +213,42 @@ Route::middleware('auth:sanctum')->get('/user', function (\Illuminate\Http\Reque
         )
         ->get();
 
+    $assignments = collect();
+
+    // If user has multiple assigned branches, add 'Semua Cabang yang Ditugaskan' as the primary option
+    if ($rawAssignments->count() > 1) {
+        $first = $rawAssignments->first();
+        $assignments->push([
+            'branch_id'   => null,
+            'branch_name' => 'Semua Cabang yang Ditugaskan (Multi-Cabang)',
+            'role_id'     => $first->role_id,
+            'role_name'   => $first->role_name,
+            'is_all'      => true,
+        ]);
+    }
+
+    foreach ($rawAssignments as $a) {
+        $assignments->push($a);
+    }
+
     $directRoles = $user->roles->pluck('name')->toArray();
     $foundRole = $user->active_role_id ? \Spatie\Permission\Models\Role::find($user->active_role_id) : null;
-    $firstAssig = $assignments->first();
+    $firstAssig = $rawAssignments->first();
     $activeRole = $foundRole ? $foundRole->name : ($firstAssig ? $firstAssig->role_name : (!empty($directRoles) ? $directRoles[0] : 'Super Admin'));
+    $activeBranch = $user->branch_id ? \App\Models\Branch::find($user->branch_id) : null;
 
     return response()->json([
-        'id'          => $user->id,
-        'fullName'    => $user->name,
-        'username'    => strtolower(str_replace(' ', '', $user->name)),
-        'email'       => $user->email,
-        'role'        => $activeRole,
-        'assignments' => $assignments,
-        'avatar'      => '',
+        'id'                 => $user->id,
+        'fullName'           => $user->name,
+        'username'           => strtolower(str_replace(' ', '', $user->name)),
+        'email'              => $user->email,
+        'role'               => $activeRole,
+        'branch_id'          => $user->branch_id,
+        'branch_name'        => $activeBranch ? $activeBranch->name : 'Semua Cabang (Global)',
+        'active_branch_id'   => $user->branch_id,
+        'active_branch_name' => $activeBranch ? $activeBranch->name : 'Semua Cabang (Global)',
+        'assignments'        => $assignments,
+        'avatar'             => '',
     ]);
 });
 

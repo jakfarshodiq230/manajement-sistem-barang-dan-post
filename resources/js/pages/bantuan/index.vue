@@ -267,25 +267,37 @@ const faqs = [
   {
     id: 7,
     category: 'master',
-    question: 'Bagaimana cara mengganti cabang aktif saat login multi-cabang?',
-    answer: 'Jika akun Anda memiliki hak akses multi-cabang (seperti Owner atau Super Admin), klik dropdown nama cabang di pojok kanan atas navbar, lalu pilih cabang yang ingin Anda kelola. Data stok, kasir, dan laporan akan otomatis beralih ke cabang tersebut.',
+    question: 'Bagaimana cara mengganti peran atau cabang aktif saat login multi-cabang?',
+    answer: 'Klik ikon avatar profil Anda di pojok kanan atas, lalu pilih menu "Ganti Peran". Sistem akan menampilkan daftar jabatan dan cabang yang ditugaskan kepada Anda. Anda dapat memilih "Semua Cabang yang Ditugaskan (Multi-Cabang)" untuk melihat rekapitulasi seluruh cabang, atau memilih salah satu cabang spesifik (misal: Cabang Bandung) untuk fokus pada operasional cabang tersebut. Badge profil akan otomatis menampilkan format "[Peran] - [Nama Cabang]".',
   },
   {
     id: 8,
     category: 'laporan',
-    question: 'Bagaimana cara mengekspor Laporan Laba Rugi dan Neraca ke format Excel atau PDF?',
-    answer: 'Buka menu Laporan > Laporan Laba Rugi atau Laporan Penjualan. Tentukan rentang tanggal dan filter cabang yang diinginkan, lalu klik tombol "Ekspor Excel (.xlsx)" atau "Cetak PDF" di sudut kanan atas tabel laporan.',
+    question: 'Bagaimana cara mengekspor Laporan Laba Rugi, Rekap Tahunan, dan Neraca ke format Excel atau PDF?',
+    answer: 'Buka menu Laporan > Laporan Laba Rugi, Rekapitulasi Tahunan, atau Laporan Penjualan. Tentukan tahun/bulan dan filter cabang yang diinginkan, lalu klik tombol "Ekspor Excel (.xlsx)" atau "Cetak PDF". Laporan PDF otomatis menyajikan rekap finansial, HPP COGS, beban kas kecil, selisih audit kasir, mutasi stok, hingga rincian harian secara instan.',
+  },
+  {
+    id: 9,
+    category: 'laporan',
+    question: 'Bagaimana alur pencatatan Kas Kecil (Petty Cash) dan pengaruhnya ke Laba Bersih?',
+    answer: 'Buka menu Kasir POS > Kas Kecil. Kasir atau admin dapat mencatat pengeluaran operasional toko (misal: beli bensin kurir, ATK, konsumsi) lengkap dengan foto struk/nota fisik. Pengeluaran kas kecil ini otomatis mengurangi laba kotor toko sehingga menghasilkan Laba Bersih Riil pada Rekapitulasi Keuangan dan Laporan Laba Rugi.',
+  },
+  {
+    id: 10,
+    category: 'master',
+    question: 'Bagaimana cara menugaskan staf/kasir ke banyak cabang sekaligus (Multi-Cabang)?',
+    answer: 'Buka menu Pengaturan > Daftar Pengguna. Klik ikon kunci/tugas cabang pada pengguna yang bersangkutan. Centang kotak "Pilih Semua Cabang (Select All)" atau centang cabang-cabang tertentu, pilih peran/jabatan utama, lalu klik tombol "Terapkan Peran ke Semua Cabang Terpilih" dan simpan penugasan.',
   },
 ]
 
 // 3. Pintasan Keyboard POS
 const shortcuts = [
-  { key: 'F2', desc: 'Fokus ke kolom pencarian produk / scan barcode' },
-  { key: 'F4', desc: 'Pilih data pelanggan dari daftar' },
-  { key: 'F8', desc: 'Buka modal pembayaran (Checkout)' },
-  { key: 'F9', desc: 'Pilih nominal Uang Pas secara instan' },
-  { key: 'Esc', desc: 'Tutup modal aktif / batalkan aksi' },
-  { key: 'Enter', desc: 'Konfirmasi pembayaran & simpan transaksi' },
+  { key: 'F1 / F2', desc: 'Fokus instan ke kolom pencarian produk atau scan barcode scanner' },
+  { key: 'F4', desc: 'Buka form input / daftar pelanggan (Walk-In maupun Pelanggan Terdaftar)' },
+  { key: 'F8', desc: 'Buka pop-up pembayaran kasir (Checkout) saat keranjang belanja terisi' },
+  { key: 'F9', desc: 'Pilih nominal Uang Pas sesuai total tagihan nota belanja secara instan' },
+  { key: 'Esc', desc: 'Tutup pop-up pembayaran / modal aktif / batalkan aksi seketika' },
+  { key: 'Enter', desc: 'Konfirmasi pembayaran, simpan transaksi kasir, dan cetak struk thermal' },
 ]
 
 // Filtering Logic

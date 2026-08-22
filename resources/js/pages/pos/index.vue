@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useSnackbarStore } from '@/stores/snackbar'
 import ApprovalDialog from './ApprovalDialog.vue'
 import ReceiptPrinter from './ReceiptPrinter.vue'
@@ -139,6 +139,173 @@ const errorMessage = ref('')
 
 const snackbar = useSnackbarStore()
 
+// ======================= 1. SHIFT KASIR STATE =======================
+const currentShift = ref(null)
+const hasActiveShift = ref(true)
+const isShiftChecking = ref(true)
+const isStartShiftDialogOpen = ref(false)
+const isCloseShiftDialogOpen = ref(false)
+const startCashInput = ref('')
+const actualCashInput = ref('')
+const closeShiftNotes = ref('')
+const isSubmittingShift = ref(false)
+const shiftSummary = ref(null)
+
+const checkCurrentShift = async () => {
+  try {
+    const res = await $api('/apps/cash-shifts/current')
+    hasActiveShift.value = res.has_active_shift
+    currentShift.value = res.shift
+    shiftSummary.value = res.summary || null
+    if (!res.has_active_shift) {
+      isStartShiftDialogOpen.value = true
+    }
+  } catch (e) {
+    console.error('Failed to check shift:', e)
+  } finally {
+    isShiftChecking.value = false
+  }
+}
+
+const openShift = async () => {
+  if (!startCashInput.value && startCashInput.value !== 0 && startCashInput.value !== '0') {
+    snackbar.show('Silakan masukkan modal kas awal', 'warning')
+    return
+  }
+  isSubmittingShift.value = true
+  try {
+    const res = await $api('/apps/cash-shifts/open', {
+      method: 'POST',
+      body: {
+        start_cash: parseInputRupiah(startCashInput.value),
+      },
+    })
+    snackbar.show('Shift kasir berhasil dibuka', 'success')
+    isStartShiftDialogOpen.value = false
+    startCashInput.value = ''
+    await checkCurrentShift()
+  } catch (e) {
+    snackbar.show(e.data?.message || 'Gagal membuka shift', 'error')
+  } finally {
+    isSubmittingShift.value = false
+  }
+}
+
+const openCloseShiftDialog = async () => {
+  await checkCurrentShift()
+  actualCashInput.value = ''
+  closeShiftNotes.value = ''
+  isCloseShiftDialogOpen.value = true
+}
+
+const submitCloseShift = async () => {
+  if (!actualCashInput.value && actualCashInput.value !== 0 && actualCashInput.value !== '0') {
+    snackbar.show('Silakan masukkan jumlah uang fisik di laci', 'warning')
+    return
+  }
+  isSubmittingShift.value = true
+  try {
+    const res = await $api('/apps/cash-shifts/close', {
+      method: 'POST',
+      body: {
+        actual_cash: parseInputRupiah(actualCashInput.value),
+        notes: closeShiftNotes.value,
+      },
+    })
+    snackbar.show('Shift kasir berhasil ditutup', 'success')
+    isCloseShiftDialogOpen.value = false
+    shiftSummary.value = res.summary
+    hasActiveShift.value = false
+    currentShift.value = null
+    isStartShiftDialogOpen.value = true
+  } catch (e) {
+    snackbar.show(e.data?.message || 'Gagal menutup shift', 'error')
+  } finally {
+    isSubmittingShift.value = false
+  }
+}
+
+// ======================= 2. HOLD BILL STATE =======================
+const heldBills = ref([])
+const isHeldBillsDialogOpen = ref(false)
+const isHoldingBill = ref(false)
+
+const fetchHeldBills = async () => {
+  try {
+    const res = await $api('/apps/pos-held-bills', {
+      params: { branch_id: activeBranchId.value || undefined },
+    })
+    heldBills.value = res.data || []
+  } catch (e) {
+    console.error('Failed to fetch held bills:', e)
+  }
+}
+
+const holdCurrentBill = async () => {
+  if (cart.value.length === 0) {
+    snackbar.show('Keranjang masih kosong untuk ditahan', 'warning')
+    return
+  }
+  isHoldingBill.value = true
+  try {
+    const custObj = customers.value.find(c => c.id === customerId.value)
+    const custName = custObj ? custObj.name : (customerSearch.value || 'Pelanggan Walk-In')
+
+    await $api('/apps/pos-held-bills', {
+      method: 'POST',
+      body: {
+        branch_id: activeBranchId.value,
+        items: cart.value,
+        subtotal: subtotal.value,
+        discount: discount.value,
+        total: totalAmount.value,
+        customer_id: customerId.value,
+        customer_name: custName,
+      },
+    })
+
+    snackbar.show('Transaksi berhasil disimpan sementara (Hold Bill)', 'success')
+    cart.value = []
+    discount.value = 0
+    customerId.value = null
+    selectedCustomer.value = null
+    customerSearch.value = ''
+    await fetchHeldBills()
+  } catch (e) {
+    snackbar.show(e.data?.message || 'Gagal menyimpan transaksi sementara', 'error')
+  } finally {
+    isHoldingBill.value = false
+  }
+}
+
+const resumeHeldBill = async bill => {
+  cart.value = bill.items_json || []
+  discount.value = bill.discount || 0
+  if (bill.customer_id) {
+    customerId.value = bill.customer_id
+    selectedCustomer.value = bill.customer_id
+    customerSearch.value = bill.customer_name || ''
+  }
+  try {
+    await $api(`/apps/pos-held-bills/${bill.id}`, { method: 'DELETE' })
+    await fetchHeldBills()
+    isHeldBillsDialogOpen.value = false
+    snackbar.show('Transaksi ditahan berhasil dimuat kembali ke keranjang', 'success')
+  } catch (e) {
+    console.error('Failed to delete held bill:', e)
+  }
+}
+
+const deleteHeldBill = async id => {
+  try {
+    await $api(`/apps/pos-held-bills/${id}`, { method: 'DELETE' })
+    await fetchHeldBills()
+    snackbar.show('Transaksi ditahan berhasil dihapus', 'info')
+  } catch (e) {
+    console.error('Failed to delete held bill:', e)
+  }
+}
+
 const isQrDialogVisible = ref(false)
 
 const catalogUrl = computed(() => {
@@ -202,22 +369,34 @@ const fetchData = async () => {
       $api('/apps/receipt-settings').catch(() => [])
     ])
 
-    branches.value = branchData.data || branchData
-    categories.value = categoryData.data || categoryData
-    customers.value = customerData.data || customerData
-    receiptSettings.value = receiptSettingsData.data || receiptSettingsData
+    branches.value = branchData.data || branchData || []
+    categories.value = categoryData.data || categoryData || []
+    customers.value = customerData.data || customerData || []
+    receiptSettings.value = receiptSettingsData.data || receiptSettingsData || []
     
-    // For demo purposes, auto select the first branch
-    if (branches.value.length > 0 && !activeBranchId.value) {
-      activeBranchId.value = branches.value[0].id
+    await Promise.all([
+      checkCurrentShift(),
+      fetchHeldBills(),
+    ])
+
+    // Select active branch: Priority: Shift branch -> User branch -> Kantor Pusat (ID 1) -> First branch
+    if (!activeBranchId.value) {
+      const preferred = currentShift.value?.branch_id
+        || userData.value?.branch_id
+        || (Array.isArray(branches.value) ? branches.value.find(b => b.name?.toLowerCase().includes('pusat') || b.id === 1)?.id : null)
+        || (Array.isArray(branches.value) && branches.value.length > 0 ? branches.value[0].id : 1)
+
+      activeBranchId.value = preferred
     }
-    
+
+    // Always fetch products explicitly for active branch
     if (activeBranchId.value) {
-      fetchProducts(activeBranchId.value)
+      await fetchProducts(activeBranchId.value, true)
     }
   } catch (error) {
     console.error(error)
     snackbar.show('Gagal mengambil data', 'error')
+  } finally {
     isLoading.value = false
   }
 }
@@ -255,27 +434,98 @@ const saveCustomer = async customerData => {
 }
 
 const fetchProducts = async (branchId, resetPage = false) => {
+  if (!branchId) return
   if (resetPage) page.value = 1
   isLoading.value = true
   try {
-    let url = `/apps/product-branches?branch_id=${branchId}&paginate=true&has_stock=true&per_page=6&page=${page.value}`
+    let url = `/apps/product-branches?branch_id=${branchId}&paginate=true&has_stock=true&per_page=9&page=${page.value}`
     if (search.value) url += `&search=${encodeURIComponent(search.value)}`
     if (selectedCategory.value) url += `&category_id=${selectedCategory.value}`
     
     const data = await $api(url)
+    const list = data.data || (Array.isArray(data) ? data : [])
 
-    products.value = data.data || []
+    products.value = Array.isArray(list) ? list : []
     totalPages.value = data.last_page || 1
   } catch (error) {
-    console.error(error)
+    console.error('Error fetching POS products:', error)
     snackbar.show('Gagal mengambil data produk', 'error')
   } finally {
     isLoading.value = false
   }
 }
 
+const searchInputRef = ref(null)
+
+const handleKeyDown = event => {
+  // F1 or F2: Search / Scan Product
+  if (event.key === 'F1' || event.key === 'F2') {
+    event.preventDefault()
+    if (searchInputRef.value) {
+      searchInputRef.value.focus?.()
+      const inputEl = searchInputRef.value.$el?.querySelector('input')
+      if (inputEl) {
+        inputEl.focus()
+        inputEl.select()
+      }
+    }
+  } 
+  // F4: Pilih / Tambah Pelanggan
+  else if (event.key === 'F4') {
+    event.preventDefault()
+    isAddCustomerDrawerVisible.value = !isAddCustomerDrawerVisible.value
+  } 
+  // F8: Checkout / Bayar
+  else if (event.key === 'F8') {
+    event.preventDefault()
+    if (cart.value.length > 0 && !isCheckoutDialogVisible.value) {
+      handleCheckoutClick()
+    }
+  } 
+  // F9: Uang Pas
+  else if (event.key === 'F9') {
+    event.preventDefault()
+    if (isCheckoutDialogVisible.value) {
+      setQuickCash('exact')
+    }
+  } 
+  // Escape: Batal / Tutup Dialog
+  else if (event.key === 'Escape') {
+    if (isAddCustomerDrawerVisible.value) {
+      isAddCustomerDrawerVisible.value = false
+    } else if (isBatchDialogVisible.value) {
+      isBatchDialogVisible.value = false
+    } else if (isShiftSummaryVisible.value) {
+      isShiftSummaryVisible.value = false
+    } else if (isHeldBillsVisible.value) {
+      isHeldBillsVisible.value = false
+    } else if (isCheckoutDialogVisible.value) {
+      isCheckoutDialogVisible.value = false
+    }
+  } 
+  // Enter: Konfirmasi Bayar saat modal checkout terbuka
+  else if (event.key === 'Enter') {
+    if (isCheckoutDialogVisible.value && !isProcessing.value) {
+      const isCredit = paymentMethod.value === 'credit'
+      const isDueValid = isCredit ? !!dueDate.value : true
+      const isCashValid = !isCredit ? (paidAmount.value >= finalTotal.value) : true
+      const isCustomerValid = !!selectedCustomer.value || !!customerSearch.value
+
+      if (isCustomerValid && isDueValid && isCashValid) {
+        event.preventDefault()
+        processPayment()
+      }
+    }
+  }
+}
+
 onMounted(() => {
   fetchData()
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown)
 })
 
 let searchTimeout
@@ -313,6 +563,7 @@ watch(activeBranchId, newVal => {
   if (newVal) {
     cart.value = [] // Clear cart if branch changes
     fetchProducts(newVal, true)
+    fetchHeldBills()
   }
 })
 
@@ -705,8 +956,44 @@ const startNewTransaction = () => {
         </p>
       </div>
       
-      <div class="d-flex align-center gap-4">
-        <!-- Branch Selector Mock -->
+      <div class="d-flex align-center gap-3">
+        <!-- Held Bills Button -->
+        <VBtn
+          variant="tonal"
+          :color="heldBills.length > 0 ? 'warning' : 'secondary'"
+          density="compact"
+          prepend-icon="ri-pause-circle-line"
+          class="font-weight-bold shadow-sm"
+          @click="isHeldBillsDialogOpen = true"
+        >
+          Ditahan ({{ heldBills.length }})
+        </VBtn>
+
+        <!-- Cash Shift Button -->
+        <VBtn
+          v-if="hasActiveShift"
+          variant="tonal"
+          color="success"
+          density="compact"
+          prepend-icon="ri-time-line"
+          class="font-weight-bold"
+          @click="openCloseShiftDialog"
+        >
+          Shift Kasir: Aktif
+        </VBtn>
+        <VBtn
+          v-else
+          variant="elevated"
+          color="error"
+          density="compact"
+          prepend-icon="ri-lock-unlock-line"
+          class="font-weight-bold"
+          @click="isStartShiftDialogOpen = true"
+        >
+          Buka Shift Kasir
+        </VBtn>
+
+        <!-- Branch Selector -->
         <VAutocomplete
           v-model="activeBranchId"
           :items="branches"
@@ -714,11 +1001,10 @@ const startNewTransaction = () => {
           item-value="id"
           density="compact"
           hide-details
-          style="width: 250px;"
+          style="width: 220px;"
           prepend-inner-icon="ri-store-2-line"
           bg-color="surface"
         />
-
 
         <VMenu>
           <template #activator="{ props }">
@@ -772,8 +1058,9 @@ const startNewTransaction = () => {
                 sm="6"
               >
                 <VTextField
+                  ref="searchInputRef"
                   v-model="search"
-                  placeholder="Cari nama produk, SKU, barcode (Tekan F2)..."
+                  placeholder="Cari nama produk, SKU, barcode (Tekan F1)..."
                   density="compact"
                   prepend-inner-icon="ri-search-line"
                   hide-details
@@ -985,9 +1272,22 @@ const startNewTransaction = () => {
                 />
                 Keranjang Belanja
               </div>
-              <VChip v-if="cart.length > 0" color="white" size="x-small" variant="elevated" class="text-primary font-weight-bold">
-                {{ cart.length }} Item
-              </VChip>
+              <div class="d-flex align-center gap-2">
+                <VChip
+                  v-if="heldBills.length > 0"
+                  color="warning"
+                  size="x-small"
+                  variant="elevated"
+                  class="font-weight-bold cursor-pointer"
+                  @click="isHeldBillsDialogOpen = true"
+                >
+                  <VIcon icon="ri-pause-line" size="12" class="me-1" />
+                  {{ heldBills.length }} Ditahan
+                </VChip>
+                <VChip v-if="cart.length > 0" color="white" size="x-small" variant="elevated" class="text-primary font-weight-bold">
+                  {{ cart.length }} Item
+                </VChip>
+              </div>
             </VCardTitle>
           </VCardItem>
 
@@ -1129,16 +1429,31 @@ const startNewTransaction = () => {
               <span class="text-h5 font-weight-bold text-primary">{{ formatRupiah(totalAmount) }}</span>
             </div>
             
-            <VBtn
-              block
-              color="primary"
-              size="large"
-              prepend-icon="ri-bank-card-line"
-              :disabled="cart.length === 0"
-              @click="handleCheckoutClick"
-            >
-              Bayar Sekarang
-            </VBtn>
+            <div class="d-flex gap-2">
+              <VBtn
+                variant="tonal"
+                color="warning"
+                size="large"
+                style="width: 40%;"
+                prepend-icon="ri-pause-line"
+                :disabled="cart.length === 0"
+                :loading="isHoldingBill"
+                class="font-weight-bold"
+                @click="holdCurrentBill"
+              >
+                Hold (F4)
+              </VBtn>
+              <VBtn
+                color="primary"
+                size="large"
+                class="flex-grow-1 font-weight-bold"
+                prepend-icon="ri-bank-card-line"
+                :disabled="cart.length === 0"
+                @click="handleCheckoutClick"
+              >
+                Bayar (F8)
+              </VBtn>
+            </div>
           </VCardText>
         </VCard>
       </VCol>
@@ -1700,6 +2015,224 @@ const startNewTransaction = () => {
             @click="isBatchDialogVisible = false"
           >
             Batal
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ================= 1. DIALOG BUKA SHIFT KASIR ================= -->
+    <VDialog
+      v-model="isStartShiftDialogOpen"
+      max-width="450"
+      :persistent="!hasActiveShift"
+    >
+      <VCard>
+        <VCardTitle class="bg-primary text-white pa-4 d-flex align-center justify-space-between">
+          <div class="d-flex align-center gap-2">
+            <VIcon icon="ri-time-line" />
+            <span class="font-weight-bold">Buka Shift Kasir Baru</span>
+          </div>
+          <VBtn
+            v-if="hasActiveShift"
+            icon="ri-close-line"
+            variant="text"
+            size="small"
+            @click="isStartShiftDialogOpen = false"
+          />
+        </VCardTitle>
+
+        <VCardText class="pa-5">
+          <VAlert
+            type="info"
+            variant="tonal"
+            class="mb-4 text-caption"
+          >
+            Silakan masukkan <strong>Kas Awal (Uang Modal Kembalian di Laci)</strong> untuk memulai operasional kasir hari ini.
+          </VAlert>
+
+          <VTextField
+            :model-value="startCashInput"
+            label="Modal Kas Awal (Rp) *"
+            prefix="Rp"
+            placeholder="0"
+            variant="outlined"
+            density="compact"
+            class="mb-2"
+            autofocus
+            @update:model-value="val => startCashInput = formatInputRupiah(val)"
+          />
+        </VCardText>
+
+        <VCardActions class="pa-4 pt-0 justify-end">
+          <VBtn
+            color="primary"
+            class="font-weight-bold"
+            block
+            size="large"
+            :loading="isSubmittingShift"
+            @click="openShift"
+          >
+            Buka Shift & Mulai Transaksi
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ================= 2. DIALOG TUTUP SHIFT KASIR ================= -->
+    <VDialog
+      v-model="isCloseShiftDialogOpen"
+      max-width="500"
+    >
+      <VCard>
+        <VCardTitle class="bg-warning-darken-1 text-white pa-4 d-flex align-center justify-space-between">
+          <div class="d-flex align-center gap-2">
+            <VIcon icon="ri-door-lock-line" />
+            <span class="font-weight-bold">Tutup Shift Kasir (Reconciliation)</span>
+          </div>
+          <VBtn icon="ri-close-line" variant="text" size="small" @click="isCloseShiftDialogOpen = false" />
+        </VCardTitle>
+
+        <VCardText class="pa-5">
+          <div v-if="shiftSummary" class="mb-4 pa-3 rounded border bg-surface">
+            <div class="d-flex justify-space-between py-1 text-body-2">
+              <span class="text-medium-emphasis">Modal Kas Awal:</span>
+              <span class="font-weight-bold">{{ formatRupiah(shiftSummary.start_cash) }}</span>
+            </div>
+            <div class="d-flex justify-space-between py-1 text-body-2">
+              <span class="text-medium-emphasis">Total Penjualan Tunai:</span>
+              <span class="font-weight-bold text-success">+ {{ formatRupiah(shiftSummary.total_cash_sales) }}</span>
+            </div>
+            <div class="d-flex justify-space-between py-1 text-body-2">
+              <span class="text-medium-emphasis">Pengeluaran Kas Kecil:</span>
+              <span class="font-weight-bold text-error">- {{ formatRupiah(shiftSummary.total_expenses) }}</span>
+            </div>
+            <VDivider class="my-2" />
+            <div class="d-flex justify-space-between py-1 text-body-1">
+              <span class="font-weight-bold">Ekspektasi Kas di Laci:</span>
+              <span class="font-weight-bold text-primary">{{ formatRupiah(shiftSummary.expected_cash) }}</span>
+            </div>
+          </div>
+
+          <VTextField
+            :model-value="actualCashInput"
+            label="Uang Fisik Kasir di Laci (Rp) *"
+            prefix="Rp"
+            placeholder="0"
+            variant="outlined"
+            density="compact"
+            class="mb-3"
+            @update:model-value="val => actualCashInput = formatInputRupiah(val)"
+          />
+
+          <div
+            v-if="actualCashInput && shiftSummary"
+            class="pa-3 mb-3 rounded border text-caption"
+            :class="parseInputRupiah(actualCashInput) - shiftSummary.expected_cash === 0 ? 'bg-success-lighten-5 text-success' : 'bg-warning-lighten-5 text-warning-darken-2'"
+          >
+            <div class="font-weight-bold">
+              Selisih Fisik vs Sistem: {{ formatRupiah(parseInputRupiah(actualCashInput) - shiftSummary.expected_cash) }}
+              <span v-if="parseInputRupiah(actualCashInput) - shiftSummary.expected_cash === 0">(KAS COCOK / BALANCE)</span>
+              <span v-else-if="parseInputRupiah(actualCashInput) - shiftSummary.expected_cash > 0">(SURPLUS KAS)</span>
+              <span v-else>(DEFISIT / KAS KURANG)</span>
+            </div>
+          </div>
+
+          <VTextarea
+            v-model="closeShiftNotes"
+            label="Catatan Tutup Shift (Opsional)"
+            placeholder="Contoh: Kas fisik cocok, sudah diserahterimakan ke bendahara."
+            rows="2"
+            variant="outlined"
+            density="compact"
+          />
+        </VCardText>
+
+        <VCardActions class="pa-4 pt-0 justify-end gap-2">
+          <VBtn variant="tonal" color="secondary" @click="isCloseShiftDialogOpen = false">
+            Batal
+          </VBtn>
+          <VBtn
+            color="warning"
+            class="font-weight-bold"
+            :loading="isSubmittingShift"
+            @click="submitCloseShift"
+          >
+            Konfirmasi & Tutup Shift
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ================= 3. DIALOG TRANSAKSI DITAHAN (HELD BILLS) ================= -->
+    <VDialog
+      v-model="isHeldBillsDialogOpen"
+      max-width="650"
+    >
+      <VCard>
+        <VCardTitle class="bg-warning text-white pa-4 d-flex align-center justify-space-between">
+          <div class="d-flex align-center gap-2">
+            <VIcon icon="ri-pause-circle-line" />
+            <span class="font-weight-bold">Daftar Transaksi Ditahan (Pending Bills)</span>
+          </div>
+          <VBtn icon="ri-close-line" variant="text" size="small" @click="isHeldBillsDialogOpen = false" />
+        </VCardTitle>
+
+        <VCardText class="pa-4">
+          <p class="text-caption text-medium-emphasis mb-3">
+            Pilih transaksi yang ingin dimuat kembali (resume) ke keranjang belanja:
+          </p>
+
+          <VList lines="two" border rounded>
+            <template v-for="(bill, index) in heldBills" :key="bill.id">
+              <VListItem class="py-2">
+                <template #prepend>
+                  <VAvatar color="warning" variant="tonal" class="me-3">
+                    <VIcon icon="ri-shopping-basket-line" />
+                  </VAvatar>
+                </template>
+
+                <VListItemTitle class="font-weight-bold">
+                  {{ bill.customer_name || 'Pelanggan Walk-In' }}
+                  <span class="text-caption text-disabled ms-2">({{ bill.items_json?.length || 0 }} Item)</span>
+                </VListItemTitle>
+                <VListItemSubtitle class="mt-1">
+                  Total: <strong class="text-primary">{{ formatRupiah(bill.total) }}</strong> • Ditahan: {{ bill.created_at }}
+                </VListItemSubtitle>
+
+                <template #append>
+                  <div class="d-flex gap-2">
+                    <VBtn
+                      size="small"
+                      color="primary"
+                      prepend-icon="ri-arrow-right-line"
+                      class="font-weight-bold"
+                      @click="resumeHeldBill(bill)"
+                    >
+                      Ambil
+                    </VBtn>
+                    <IconBtn
+                      size="small"
+                      color="error"
+                      @click="deleteHeldBill(bill.id)"
+                    >
+                      <VIcon icon="ri-delete-bin-line" size="18" />
+                    </IconBtn>
+                  </div>
+                </template>
+              </VListItem>
+              <VDivider v-if="index < heldBills.length - 1" />
+            </template>
+          </VList>
+
+          <div v-if="heldBills.length === 0" class="text-center py-6 text-disabled">
+            <VIcon icon="ri-inbox-line" size="36" class="mb-2" />
+            <p class="mb-0">Tidak ada transaksi yang sedang ditahan.</p>
+          </div>
+        </VCardText>
+
+        <VCardActions class="pa-4 pt-0 justify-end">
+          <VBtn variant="tonal" color="secondary" @click="isHeldBillsDialogOpen = false">
+            Tutup
           </VBtn>
         </VCardActions>
       </VCard>

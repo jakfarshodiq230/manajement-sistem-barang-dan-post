@@ -39,7 +39,30 @@ const formatRupiah = value => {
 
 const snackbar = useSnackbarStore()
 
-const fetchData = async () => {
+const extractArray = val => {
+  if (Array.isArray(val)) return val
+  if (val && Array.isArray(val.data)) return val.data
+  return []
+}
+
+const loadInitialOptions = async () => {
+  try {
+    const [bData, mData] = await Promise.all([
+      $api('/apps/branches'),
+      $api('/apps/products', { query: { itemsPerPage: 100 } }).catch(() => ({ data: [] })),
+    ])
+    branches.value = extractArray(bData)
+    masterProducts.value = extractArray(mData)
+  } catch (e) {
+    console.error('Failed to load initial options:', e)
+  }
+}
+
+const fetchData = async options => {
+  if (options && typeof options === 'object') {
+    if (options.page) page.value = options.page
+    if (options.itemsPerPage) itemsPerPage.value = options.itemsPerPage
+  }
   isLoading.value = true
   try {
     const params = {
@@ -54,21 +77,14 @@ const fetchData = async () => {
       params.branch_id = selectedBranch.value
     }
     
-    const [pbData, mData, bData] = await Promise.all([
-      $api('/apps/product-branches', { query: params }),
-      $api('/apps/products'),
-      $api('/apps/branches'),
-    ])
+    const pbData = await $api('/apps/product-branches', { query: params })
 
-    productBranches.value = pbData.data || pbData
-    if (pbData.total !== undefined) {
-      totalItems.value = pbData.total
-    }
-    masterProducts.value = mData.data || mData
-    branches.value = bData
+    productBranches.value = extractArray(pbData)
+    totalItems.value = pbData?.total ?? (Array.isArray(productBranches.value) ? productBranches.value.length : 0)
   } catch (error) {
     console.error(error)
     snackbar.show('Gagal mengambil data inventori', 'error')
+    productBranches.value = []
   } finally {
     isLoading.value = false
   }
@@ -83,6 +99,7 @@ const handleSearch = () => {
 }
 
 onMounted(() => {
+  loadInitialOptions()
   fetchData()
 })
 
@@ -215,7 +232,7 @@ const tableHeaders = [
 ]
 
 const filteredItems = computed(() => {
-  return productBranches.value
+  return Array.isArray(productBranches.value) ? productBranches.value : []
 })
 
 const editItem = item => {
@@ -456,12 +473,34 @@ const confirmDelete = async id => {
         </template>
 
         <template #item.stock="{ item }">
-          <VChip
-            :color="item.stock > 10 ? 'success' : (item.stock > 0 ? 'warning' : 'error')"
-            size="small"
-          >
-            {{ item.stock }}
-          </VChip>
+          <div class="d-flex flex-column align-start">
+            <VChip
+              :color="item.stock <= 0 ? 'error' : (item.stock <= (item.product?.min_stock || 5) ? 'warning' : 'success')"
+              size="small"
+              class="font-weight-bold"
+            >
+              <VIcon
+                :icon="item.stock <= 0 ? 'ri-close-circle-line' : (item.stock <= (item.product?.min_stock || 5) ? 'ri-alert-line' : 'ri-check-line')"
+                size="14"
+                class="me-1"
+              />
+              {{ item.stock }} {{ item.product?.unit || 'Unit' }}
+            </VChip>
+            <span
+              v-if="item.stock <= (item.product?.min_stock || 5) && item.stock > 0"
+              class="text-caption text-warning font-weight-bold mt-1"
+              style="font-size: 10px;"
+            >
+              ⚠️ Perlu Restok (Min: {{ item.product?.min_stock || 5 }})
+            </span>
+            <span
+              v-else-if="item.stock <= 0"
+              class="text-caption text-error font-weight-bold mt-1"
+              style="font-size: 10px;"
+            >
+              Habis Total
+            </span>
+          </div>
         </template>
 
         <template #item.actions="{ item }">

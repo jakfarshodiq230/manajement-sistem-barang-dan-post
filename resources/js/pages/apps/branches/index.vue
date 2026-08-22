@@ -387,25 +387,17 @@ const filteredBranches = computed(() => {
         <!-- Type -->
         <template #item.type="{ item }">
           <VChip
-<<<<<<< HEAD
-            :color="item?.type === 'warehouse' ? 'warning' : 'primary'"
-=======
             :color="item.type === 'warehouse' ? 'warning' : 'info'"
->>>>>>> 637f98f (feat(master-data): Peningkatan Modul Master Data Owner, Cabang, Karyawan, Produk & Supplier)
             size="small"
             variant="tonal"
             class="font-weight-bold"
           >
-<<<<<<< HEAD
-            {{ item?.type === 'warehouse' ? 'Gudang' : 'Toko' }}
-=======
             <VIcon
               :icon="item.type === 'warehouse' ? 'ri-building-2-line' : 'ri-shopping-cart-2-line'"
               size="14"
               class="me-1"
             />
             {{ item.type === 'warehouse' ? 'Gudang' : 'Toko' }}
->>>>>>> 637f98f (feat(master-data): Peningkatan Modul Master Data Owner, Cabang, Karyawan, Produk & Supplier)
           </VChip>
         </template>
 

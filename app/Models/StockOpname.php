@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class StockOpname extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Traits\ScopedByBranch;
 
     protected $guarded = ['id'];
 

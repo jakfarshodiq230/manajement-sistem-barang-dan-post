@@ -30,6 +30,12 @@ const countNeedApproval = ref(0)
 
 const snackbar = useSnackbarStore()
 
+const extractArray = val => {
+  if (Array.isArray(val)) return val
+  if (val && Array.isArray(val.data)) return val.data
+  return []
+}
+
 // Format currency
 const formatRupiah = value => {
   return new Intl.NumberFormat('id-ID', {
@@ -70,21 +76,24 @@ const fetchData = async () => {
       $api('/apps/purchase-orders', { query: { itemsPerPage: -1 } }) // To get counts
     ])
 
-    purchaseOrders.value = poData.data || poData
-    if (poData.total !== undefined) {
-      totalItems.value = poData.total
-    }
-    branches.value = branchData.data || branchData
-    suppliers.value = supplierData
-    masterProducts.value = productData.data || productData
+    purchaseOrders.value = extractArray(poData)
+    totalItems.value = poData?.total ?? (Array.isArray(purchaseOrders.value) ? purchaseOrders.value.length : 0)
+    branches.value = extractArray(branchData)
+    suppliers.value = extractArray(supplierData)
+    masterProducts.value = extractArray(productData)
+    
     // Update badge counts
-    const allPOs = countsData.data || countsData
+    const allPOs = extractArray(countsData)
     countNeedValidation.value = allPOs.filter(item => !item.approval_status || item.approval_status === 'draft' || item.approval_status === 'pending').length
     countNeedApproval.value = allPOs.filter(item => item.approval_status === 'validated').length
 
   } catch (error) {
     console.error(error)
     snackbar.show('Gagal mengambil data', 'error')
+    purchaseOrders.value = []
+    branches.value = []
+    suppliers.value = []
+    masterProducts.value = []
   } finally {
     isLoading.value = false
   }

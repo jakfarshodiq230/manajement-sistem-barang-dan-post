@@ -59,7 +59,7 @@ class CustomerController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        if ($user && !$user->hasRole('Super Admin') && !$user->hasRole('Dev') && !$user->can('Data Pelanggan Create') && !$user->can('Pelanggan Create') && !$user->can('Transaksi Create')) {
+        if ($user && !$user->can('Data Pelanggan Create') && !$user->can('Pelanggan Create') && !$user->can('Transaksi Create') && !$user->can('manage all')) {
             abort(403, 'Unauthorized action.');
         }
 

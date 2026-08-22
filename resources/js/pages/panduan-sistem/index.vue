@@ -331,12 +331,12 @@ const guides = [
 
 // Keyboard Shortcuts
 const shortcuts = [
-  { key: 'F2', name: 'Cari Produk / Scan', desc: 'Fokus ke kolom pencarian produk atau scan barcode scanner' },
-  { key: 'F4', name: 'Pilih Pelanggan', desc: 'Membuka daftar pelanggan terdaftar untuk transaksi kredit/tempo' },
-  { key: 'F8', name: 'Checkout / Bayar', desc: 'Membuka pop-up pembayaran kasir' },
+  { key: 'F1 / F2', name: 'Cari Produk / Scan Barcode', desc: 'Fokus instan ke kolom pencarian produk atau scan barcode scanner' },
+  { key: 'F4', name: 'Pilih / Tambah Pelanggan', desc: 'Membuka drawer pelanggan terdaftar untuk transaksi kredit/tempo/kasbon' },
+  { key: 'F8', name: 'Checkout / Bayar', desc: 'Membuka pop-up pembayaran kasir saat keranjang belanja terisi' },
   { key: 'F9', name: 'Uang Pas', desc: 'Memilih nominal bayar sesuai total tagihan nota secara instan' },
-  { key: 'Esc', name: 'Batal / Reset', desc: 'Menutup dialog modal yang sedang aktif' },
-  { key: 'Enter', name: 'Konfirmasi Bayar', desc: 'Menyimpan transaksi kasir dan mencetak struk thermal' },
+  { key: 'Esc', name: 'Batal / Reset', desc: 'Menutup dialog modal yang sedang aktif atau membatalkan aksi' },
+  { key: 'Enter', name: 'Konfirmasi Bayar', desc: 'Menyimpan transaksi kasir dan mencetak struk thermal kasir' },
 ]
 
 // Filtering

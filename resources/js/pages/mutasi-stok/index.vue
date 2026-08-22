@@ -35,6 +35,29 @@ const rejectMutasiId = ref(null)
 const rejectReason = ref('')
 const isSubmittingReject = ref(false)
 
+// Delivery Note (Surat Jalan) State
+const isDeliveryNoteDialogVisible = ref(false)
+const deliveryNoteData = ref(null)
+const isLoadingDeliveryNote = ref(false)
+
+const openDeliveryNoteDialog = async item => {
+  isLoadingDeliveryNote.value = true
+  isDeliveryNoteDialogVisible.value = true
+  deliveryNoteData.value = item
+  try {
+    const res = await $api(`/apps/stock-transfers/${item.id}/delivery-note`)
+    deliveryNoteData.value = res.data || item
+  } catch (e) {
+    console.error('Failed to load delivery note detail:', e)
+  } finally {
+    isLoadingDeliveryNote.value = false
+  }
+}
+
+const printDeliveryNote = () => {
+  window.print()
+}
+
 // Pagination
 const page = ref(1)
 const itemsPerPage = ref(10)
@@ -43,6 +66,12 @@ let searchTimeout = null
 
 const snackbar = useSnackbarStore()
 
+const extractArray = val => {
+  if (Array.isArray(val)) return val
+  if (val && Array.isArray(val.data)) return val.data
+  return []
+}
+
 // Fetch options once on mount
 const fetchInitialOptions = async () => {
   try {
@@ -50,10 +79,12 @@ const fetchInitialOptions = async () => {
       $api('/apps/branches'),
       $api('/apps/employees', { query: { itemsPerPage: 100 } }).catch(() => ({ data: [] })),
     ])
-    branches.value = branchData.data || branchData || []
-    employees.value = employeeData.data || employeeData || []
+    branches.value = extractArray(branchData)
+    employees.value = extractArray(employeeData)
   } catch (e) {
     console.error('Failed to load initial options:', e)
+    branches.value = []
+    employees.value = []
   }
 }
 
@@ -81,13 +112,15 @@ const fetchData = async () => {
 
     const mutasiData = await $api('/apps/stock-transfers', { query: params })
 
-    mutasiList.value = mutasiData.data || mutasiData || []
-    if (mutasiData.total !== undefined) {
-      totalItems.value = mutasiData.total
-    }
+    mutasiList.value = extractArray(mutasiData)
+    totalItems.value = mutasiData?.total ?? (Array.isArray(mutasiList.value) ? mutasiList.value.length : 0)
+    
+    // Refresh stats badge counts
+    fetchStatusCounts()
   } catch (error) {
-    console.error(error)
-    snackbar.show('Gagal mengambil data mutasi stok', 'error')
+    console.error('Error loading mutasi:', error)
+    snackbar.show('Gagal memuat daftar mutasi stok', 'error')
+    mutasiList.value = []
   } finally {
     isLoading.value = false
   }
@@ -561,7 +594,17 @@ const formatDateTime = dateStr => {
               prepend-icon="ri-eye-line"
               @click="openTrackingDialog(item)"
             >
-              Detail & Alur
+              Detail
+            </VBtn>
+
+            <VBtn
+              size="small"
+              variant="outlined"
+              color="info"
+              prepend-icon="ri-printer-line"
+              @click="openDeliveryNoteDialog(item)"
+            >
+              Surat Jalan
             </VBtn>
 
             <VBtn
@@ -1247,6 +1290,155 @@ const formatDateTime = dateStr => {
             @click="submitPickup"
           >
             Konfirmasi Barang Dijemput & Terima Stok
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ================= SURAT JALAN / DELIVERY NOTE DIALOG ================= -->
+    <VDialog
+      v-model="isDeliveryNoteDialogVisible"
+      max-width="850"
+    >
+      <VCard v-if="deliveryNoteData">
+        <VCardTitle class="bg-primary text-white pa-4 d-flex align-center justify-space-between d-print-none">
+          <div class="d-flex align-center gap-2">
+            <VIcon icon="ri-file-paper-2-line" />
+            <span class="font-weight-bold">Dokumen Surat Jalan Mutasi Antar Cabang</span>
+          </div>
+          <div class="d-flex align-center gap-2">
+            <VBtn
+              color="white"
+              variant="elevated"
+              size="small"
+              class="text-primary font-weight-bold"
+              prepend-icon="ri-printer-line"
+              @click="printDeliveryNote"
+            >
+              Cetak Dokumen (Print)
+            </VBtn>
+            <VBtn icon="ri-close-line" variant="text" size="small" @click="isDeliveryNoteDialogVisible = false" />
+          </div>
+        </VCardTitle>
+
+        <!-- Printable Document Body -->
+        <VCardText class="pa-6 printable-area bg-white text-black" id="printable-surat-jalan">
+          <!-- Document Header -->
+          <div class="border-b-2 pb-4 mb-4">
+            <div class="d-flex justify-space-between align-center">
+              <div>
+                <h3 class="text-h4 font-weight-bold mb-1 text-uppercase text-primary">
+                  SURAT JALAN MUTASI BARANG
+                </h3>
+                <p class="text-subtitle-2 text-medium-emphasis mb-0">
+                  PT. DUMAI MANAJEMEN SISTEM INVENTORI & LOGISTIK
+                </p>
+              </div>
+              <div class="text-right">
+                <div class="text-caption text-medium-emphasis">NO. DOKUMEN:</div>
+                <div class="text-h6 font-weight-bold">{{ deliveryNoteData.reference_no }}</div>
+                <div class="text-caption font-weight-medium">Tgl: {{ formatDateTime(deliveryNoteData.created_at) }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cabang Asal vs Cabang Tujuan Grid -->
+          <VRow class="mb-4 g-3">
+            <VCol cols="6">
+              <div class="pa-3 border rounded bg-grey-50">
+                <div class="text-caption font-weight-bold text-uppercase text-medium-emphasis mb-1">
+                  PENGIRIM (CABANG ASAL):
+                </div>
+                <div class="font-weight-bold text-body-1">{{ deliveryNoteData.source_branch?.name || '-' }}</div>
+                <div class="text-caption text-medium-emphasis">{{ deliveryNoteData.source_branch?.address || 'Alamat Cabang Asal' }}</div>
+                <div class="text-caption mt-1">Dibuat Oleh: <strong>{{ deliveryNoteData.user?.name || '-' }}</strong></div>
+              </div>
+            </VCol>
+            <VCol cols="6">
+              <div class="pa-3 border rounded bg-grey-50">
+                <div class="text-caption font-weight-bold text-uppercase text-medium-emphasis mb-1">
+                  PENERIMA (CABANG TUJUAN):
+                </div>
+                <div class="font-weight-bold text-body-1 text-primary">{{ deliveryNoteData.destination_branch?.name || '-' }}</div>
+                <div class="text-caption text-medium-emphasis">{{ deliveryNoteData.destination_branch?.address || 'Alamat Cabang Tujuan' }}</div>
+                <div class="text-caption mt-1">Kurir / Penjemput: <strong>{{ deliveryNoteData.pickup_employee_name || 'Kurir Operasional' }}</strong></div>
+              </div>
+            </VCol>
+          </VRow>
+
+          <!-- Items Table -->
+          <div class="border rounded mb-4 overflow-hidden">
+            <table class="w-100" style="border-collapse: collapse; width: 100%;">
+              <thead>
+                <tr style="background-color: #f3f4f6; border-bottom: 2px solid #e5e7eb;">
+                  <th style="padding: 10px; text-align: center; width: 40px; font-size: 12px;">NO</th>
+                  <th style="padding: 10px; text-align: left; font-size: 12px;">KODE / SKU</th>
+                  <th style="padding: 10px; text-align: left; font-size: 12px;">NAMA BARANG</th>
+                  <th style="padding: 10px; text-align: center; width: 100px; font-size: 12px;">QTY MINTA</th>
+                  <th style="padding: 10px; text-align: center; width: 100px; font-size: 12px;">QTY KIRIM</th>
+                  <th style="padding: 10px; text-align: left; font-size: 12px;">STATUS / BATCH</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(it, idx) in (deliveryNoteData.items || [])"
+                  :key="idx"
+                  style="border-bottom: 1px solid #e5e7eb;"
+                >
+                  <td style="padding: 8px 10px; text-align: center; font-size: 12px;">{{ idx + 1 }}</td>
+                  <td style="padding: 8px 10px; font-size: 12px; font-weight: bold;">{{ it.product?.sku || '-' }}</td>
+                  <td style="padding: 8px 10px; font-size: 12px;">{{ it.product?.name || '-' }}</td>
+                  <td style="padding: 8px 10px; text-align: center; font-size: 12px;">{{ it.qty }}</td>
+                  <td style="padding: 8px 10px; text-align: center; font-size: 12px; font-weight: bold; color: #16a34a;">
+                    {{ it.qty_prepared ?? it.qty }}
+                  </td>
+                  <td style="padding: 8px 10px; font-size: 11px;">
+                    <span v-if="it.status === 'prepared'" class="text-success font-weight-bold">Siap Kirim</span>
+                    <span v-else-if="it.status === 'received'" class="text-primary font-weight-bold">Diterima</span>
+                    <span v-else>{{ it.status }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Notes -->
+          <div v-if="deliveryNoteData.notes || deliveryNoteData.pickup_notes" class="pa-3 mb-6 border rounded bg-grey-50 text-caption">
+            <div v-if="deliveryNoteData.notes"><strong>Catatan Mutasi:</strong> {{ deliveryNoteData.notes }}</div>
+            <div v-if="deliveryNoteData.pickup_notes" class="mt-1"><strong>Catatan Penjemputan:</strong> {{ deliveryNoteData.pickup_notes }}</div>
+          </div>
+
+          <!-- 3-Party Signature Block -->
+          <div class="mt-8 pt-4">
+            <VRow class="text-center">
+              <VCol cols="4">
+                <div class="text-caption font-weight-bold mb-12">PENGIRIM (CABANG ASAL)</div>
+                <div class="border-t mx-6 pt-1 font-weight-bold text-body-2">
+                  ( {{ deliveryNoteData.prepared_by?.name || deliveryNoteData.created_by?.name || 'Petugas Gudang' }} )
+                </div>
+              </VCol>
+              <VCol cols="4">
+                <div class="text-caption font-weight-bold mb-12">KURIR / PENGANTAR</div>
+                <div class="border-t mx-6 pt-1 font-weight-bold text-body-2">
+                  ( {{ deliveryNoteData.picked_up_by_name || 'Driver / Kurir' }} )
+                </div>
+              </VCol>
+              <VCol cols="4">
+                <div class="text-caption font-weight-bold mb-12">PENERIMA (CABANG TUJUAN)</div>
+                <div class="border-t mx-6 pt-1 font-weight-bold text-body-2">
+                  ( {{ deliveryNoteData.received_by?.name || '........................................' }} )
+                </div>
+              </VCol>
+            </VRow>
+          </div>
+        </VCardText>
+
+        <VCardActions class="pa-4 bg-grey-50 justify-end d-print-none">
+          <VBtn variant="tonal" color="secondary" @click="isDeliveryNoteDialogVisible = false">
+            Tutup
+          </VBtn>
+          <VBtn color="primary" prepend-icon="ri-printer-line" class="font-weight-bold" @click="printDeliveryNote">
+            Cetak Surat Jalan
           </VBtn>
         </VCardActions>
       </VCard>

@@ -86,16 +86,16 @@
                 <strong>Rp {{ number_format($summary['total_omset'], 0, ',', '.') }}</strong>
             </td>
             <td>
-                Total Laba Bersih
-                <strong>Rp {{ number_format($summary['total_laba'], 0, ',', '.') }}</strong>
+                Total Beban Kas Kecil
+                <strong style="color: #dc3545;">Rp {{ number_format($summary['total_beban'] ?? 0, 0, ',', '.') }}</strong>
             </td>
             <td>
-                Total Transaksi
-                <strong>{{ number_format($summary['total_transaksi'], 0, ',', '.') }}</strong>
+                Total Laba Bersih Riil
+                <strong style="color: #28a745;">Rp {{ number_format($summary['total_laba'], 0, ',', '.') }}</strong>
             </td>
             <td>
-                Margin
-                <strong>{{ $summary['margin'] }}%</strong>
+                Total Transaksi / Margin
+                <strong>{{ number_format($summary['total_transaksi'], 0, ',', '.') }} tx ({{ $summary['margin'] }}%)</strong>
             </td>
         </tr>
     </table>
@@ -104,14 +104,15 @@
         <thead>
             <tr>
                 <th rowspan="2">Bulan</th>
-                <th colspan="3">Kinerja Finansial</th>
+                <th colspan="4">Kinerja Finansial</th>
                 <th colspan="2">Audit Kas</th>
                 <th colspan="2">Pergerakan Stok</th>
                 <th colspan="2">Kumulatif (YTD)</th>
             </tr>
             <tr>
-                <th>Total Transaksi</th>
+                <th>Transaksi</th>
                 <th>Omset (Rp)</th>
+                <th>Kas Kecil (Rp)</th>
                 <th>Laba Bersih (Rp)</th>
                 <th>Selisih Kas (Rp)</th>
                 <th>Tutup Kasir</th>
@@ -127,11 +128,12 @@
                     <td class="text-left">{{ $row['bulan'] }}</td>
                     
                     @if($row['is_future'])
-                        <td class="text-center" colspan="9"><em>-</em></td>
+                        <td class="text-center" colspan="10"><em>-</em></td>
                     @else
                         <td>{{ number_format($row['jumlah_transaksi'], 0, ',', '.') }}</td>
                         <td>{{ number_format($row['omset'], 0, ',', '.') }}</td>
-                        <td>{{ number_format($row['laba_bersih'], 0, ',', '.') }}</td>
+                        <td class="{{ ($row['beban_operasional'] ?? 0) > 0 ? 'text-danger' : '' }}">{{ number_format($row['beban_operasional'] ?? 0, 0, ',', '.') }}</td>
+                        <td class="text-success font-weight-bold">{{ number_format($row['laba_bersih'], 0, ',', '.') }}</td>
                         
                         <td class="{{ $row['selisih_kas'] < 0 ? 'text-danger' : ($row['selisih_kas'] > 0 ? 'text-success' : '') }}">
                             {{ number_format($row['selisih_kas'], 0, ',', '.') }}
@@ -142,7 +144,7 @@
                         <td class="text-center">{{ number_format($row['stok_keluar'], 0, ',', '.') }}</td>
                         
                         <td>{{ number_format($row['kumulatif_omset'], 0, ',', '.') }}</td>
-                        <td>{{ number_format($row['kumulatif_laba'], 0, ',', '.') }}</td>
+                        <td class="text-success">{{ number_format($row['kumulatif_laba'], 0, ',', '.') }}</td>
                     @endif
                 </tr>
             @endforeach

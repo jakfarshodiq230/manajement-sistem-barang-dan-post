@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Receivable extends Model
 {
-    use HasFactory, \Spatie\Activitylog\Traits\LogsActivity;
+    use HasFactory, \Spatie\Activitylog\Traits\LogsActivity, \App\Traits\ScopedByBranch;
 
     protected $fillable = [
         'sale_id',

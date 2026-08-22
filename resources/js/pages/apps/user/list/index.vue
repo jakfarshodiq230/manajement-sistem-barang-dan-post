@@ -2,12 +2,15 @@
 import { ref, computed, onMounted } from 'vue'
 import AddNewUserDrawer from '@/views/apps/user/list/AddNewUserDrawer.vue'
 import { paginationMeta } from '@/utils/paginationMeta'
+import { useSnackbarStore } from '@/stores/snackbar'
 
 definePage({
   meta: {
     public: true,
   },
 })
+
+const snackbar = useSnackbarStore()
 
 const searchQuery = ref('')
 const selectedRole = ref()
@@ -23,59 +26,151 @@ const selectedRows = ref([])
 
 // Assignment dialog state
 const isAssignmentDialogVisible = ref(false)
+const isSavingAssignments = ref(false)
 const editingUser = ref(null)
-const editingAssignments = ref([])
+const selectedBranchIds = ref([])
+const branchRoleMap = ref({})
+const defaultRoleForSelected = ref('')
+const branchSearchFilter = ref('')
 
 // Dynamic branches + roles
 const availableBranches = ref([])
 const availableRoles = ref([])
 
-onMounted(async () => {
+const loadBranchesAndRoles = async () => {
   try {
     const [branchData, roleData] = await Promise.all([
-      $api('/apps/branches'),
+      $api('/apps/branches?all=true'),
       $api('/apps/roles'),
     ])
 
-    availableBranches.value = branchData.data || branchData
-    availableRoles.value = (roleData.data || roleData).map(r => r.role || r.name)
-  } catch(e) { console.error(e) }
+    availableBranches.value = branchData.data || branchData || []
+    availableRoles.value = (roleData.data || roleData || []).map(r => r.role || r.name)
+  } catch(e) {
+    console.error('Failed to load branches/roles:', e)
+  }
+}
+
+onMounted(async () => {
+  await loadBranchesAndRoles()
+  fetchUsers()
 })
 
-const openAssignmentDialog = user => {
+const openAssignmentDialog = async user => {
   editingUser.value = { ...user }
-  editingAssignments.value = (user.assignments || []).map(a => ({ ...a }))
+  
+  if (availableBranches.value.length === 0) {
+    await loadBranchesAndRoles()
+  }
+  
+  const userAssignments = user.assignments || []
+  selectedBranchIds.value = userAssignments.map(a => a.branch_id).filter(Boolean)
+  
+  const map = {}
+  userAssignments.forEach(a => {
+    if (a.branch_id) {
+      map[a.branch_id] = a.role_name || a.role || user.role || availableRoles.value[0] || ''
+    }
+  })
+  
+  defaultRoleForSelected.value = user.role || userAssignments[0]?.role_name || availableRoles.value[0] || ''
+  
+  availableBranches.value.forEach(b => {
+    if (!map[b.id]) {
+      map[b.id] = defaultRoleForSelected.value
+    }
+  })
+  
+  branchRoleMap.value = map
+  branchSearchFilter.value = ''
   isAssignmentDialogVisible.value = true
 }
 
-const addAssignmentRow = () => {
-  editingAssignments.value.push({ branch_id: null, role_name: '' })
+const isAllBranchesSelected = computed({
+  get() {
+    if (!availableBranches.value.length) return false
+    return availableBranches.value.every(b => selectedBranchIds.value.includes(b.id))
+  },
+  set(val) {
+    if (val) {
+      selectedBranchIds.value = availableBranches.value.map(b => b.id)
+    } else {
+      selectedBranchIds.value = []
+    }
+  },
+})
+
+const modalBranchesList = computed(() => {
+  if (!branchSearchFilter.value) return availableBranches.value
+  const q = branchSearchFilter.value.toLowerCase()
+  return availableBranches.value.filter(b => 
+    b.name.toLowerCase().includes(q) || 
+    (b.address && b.address.toLowerCase().includes(q))
+  )
+})
+
+const applyDefaultRoleToSelected = () => {
+  if (!defaultRoleForSelected.value) return
+  
+  if (selectedBranchIds.value.length === 0) {
+    selectedBranchIds.value = availableBranches.value.map(b => b.id)
+  }
+
+  const newMap = { ...branchRoleMap.value }
+  selectedBranchIds.value.forEach(bId => {
+    newMap[bId] = defaultRoleForSelected.value
+  })
+  branchRoleMap.value = newMap
+  
+  snackbar.show(`Peran "${defaultRoleForSelected.value}" berhasil diterapkan ke ${selectedBranchIds.value.length} cabang terpilih`, 'success')
 }
 
-const removeAssignmentRow = index => {
-  editingAssignments.value.splice(index, 1)
+const toggleBranchSelection = branchId => {
+  const idx = selectedBranchIds.value.indexOf(branchId)
+  if (idx > -1) {
+    selectedBranchIds.value.splice(idx, 1)
+  } else {
+    selectedBranchIds.value.push(branchId)
+    if (!branchRoleMap.value[branchId]) {
+      const newMap = { ...branchRoleMap.value }
+      newMap[branchId] = defaultRoleForSelected.value || availableRoles.value[0] || ''
+      branchRoleMap.value = newMap
+    }
+  }
 }
 
 const saveAssignments = async () => {
-  await $api(`/apps/users/${editingUser.value.id}`, {
-    method: 'PUT',
-    body: {
-      fullName: editingUser.value.fullName,
-      email: editingUser.value.email,
-      assignments: editingAssignments.value.map(a => ({
-        branch_id: a.branch_id,
-        role: a.role_name,
-      })),
-    },
-  })
-  isAssignmentDialogVisible.value = false
-  fetchUsers()
+  isSavingAssignments.value = true
+  try {
+    const assignments = selectedBranchIds.value.map(branchId => ({
+      branch_id: branchId,
+      role: branchRoleMap.value[branchId] || defaultRoleForSelected.value || 'Kasir',
+    }))
+
+    await $api(`/apps/users/${editingUser.value.id}`, {
+      method: 'PUT',
+      body: {
+        fullName: editingUser.value.fullName,
+        email: editingUser.value.email,
+        assignments,
+      },
+    })
+    snackbar.show('Penugasan cabang berhasil disimpan', 'success')
+    isAssignmentDialogVisible.value = false
+    fetchUsers()
+  } catch (err) {
+    console.error('Failed to save assignments:', err)
+    snackbar.show('Gagal menyimpan penugasan cabang: ' + (err?.data?.message || err?.message || 'Error'), 'error')
+  } finally {
+    isSavingAssignments.value = false
+  }
 }
 
 const updateOptions = options => {
   page.value = options.page
   sortBy.value = options.sortBy[0]?.key
   orderBy.value = options.sortBy[0]?.order
+  fetchUsers()
 }
 
 // Headers
@@ -88,27 +183,44 @@ const headers = [
   { title: 'Aksi', key: 'actions', sortable: false, align: 'end' },
 ]
 
-const {
-  data: usersData,
-  execute: fetchUsers,
-} = await useApi(createUrl('/apps/users', {
-  query: {
-    q: searchQuery,
-    status: selectedStatus,
-    role: selectedRole,
-    branch_id: selectedBranch,
-    itemsPerPage,
-    page,
-    sortBy,
-    orderBy,
-  },
-}))
+const users = ref([])
+const totalUsers = ref(0)
+const stats = ref({})
+const isLoading = ref(false)
 
-const users = computed(() => usersData.value?.users || [])
-const totalUsers = computed(() => usersData.value?.stats?.totalUsers ?? usersData.value?.totalUsers ?? 0)
-const activeUsersCount = computed(() => usersData.value?.stats?.activeUsers ?? users.value.filter(u => u.status === 'Active').length)
-const totalBranchesCount = computed(() => usersData.value?.stats?.totalBranches ?? availableBranches.value.length)
-const totalRolesCount = computed(() => usersData.value?.stats?.totalRoles ?? availableRoles.value.length)
+const fetchUsers = async () => {
+  isLoading.value = true
+  try {
+    const params = {
+      q: searchQuery.value || undefined,
+      status: selectedStatus.value || undefined,
+      role: selectedRole.value || undefined,
+      branch_id: selectedBranch.value || undefined,
+      itemsPerPage: itemsPerPage.value,
+      page: page.value,
+      sortBy: sortBy.value || undefined,
+      orderBy: orderBy.value || undefined,
+    }
+
+    const res = await $api('/apps/users', { params })
+    users.value = res.users || res.data || []
+    totalUsers.value = res.stats?.totalUsers ?? res.totalUsers ?? users.value.length
+    stats.value = res.stats || {}
+  } catch (error) {
+    console.error('Failed to fetch users:', error)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+watch([searchQuery, selectedStatus, selectedRole, selectedBranch], () => {
+  page.value = 1
+  fetchUsers()
+})
+
+const activeUsersCount = computed(() => stats.value.activeUsers ?? users.value.filter(u => u.status === 'Active' || u.status == 1).length)
+const totalBranchesCount = computed(() => stats.value.totalBranches ?? availableBranches.value.length)
+const totalRolesCount = computed(() => stats.value.totalRoles ?? availableRoles.value.length)
 
 // Search filters
 const roles = computed(() => availableRoles.value.map(r => ({ title: r, value: r })))
@@ -544,99 +656,215 @@ const widgetData = computed(() => [
       @user-data="addNewUser"
     />
 
-    <!-- 👉 Assignment Dialog -->
+    <!-- 👉 Assignment Dialog (Multi-Branch Checklist) -->
     <VDialog
       v-model="isAssignmentDialogVisible"
-      max-width="600"
+      max-width="680"
+      persistent
     >
       <VCard v-if="editingUser" class="rounded-2xl pa-6">
+        <!-- Header -->
         <VCardItem class="pa-0 mb-4">
-          <div class="d-flex align-center gap-3">
-            <VAvatar color="primary" variant="tonal" size="48" rounded="xl">
-              <VIcon icon="ri-shield-user-line" size="26" />
-            </VAvatar>
-            <div>
-              <h3 class="text-h6 font-weight-bold mb-0">
-                Kelola Penugasan: {{ editingUser.fullName }}
-              </h3>
-              <p class="text-caption text-medium-emphasis mb-0">
-                Atur penugasan cabang dan peran untuk pengguna ini.
-              </p>
+          <div class="d-flex justify-space-between align-center flex-wrap gap-3">
+            <div class="d-flex align-center gap-3">
+              <VAvatar color="primary" variant="tonal" size="48" rounded="xl">
+                <VIcon icon="ri-shield-user-line" size="26" />
+              </VAvatar>
+              <div>
+                <h3 class="text-h6 font-weight-bold mb-0">
+                  Kelola Penugasan Cabang
+                </h3>
+                <div class="d-flex align-center gap-2 mt-1">
+                  <span class="text-body-2 font-weight-medium text-high-emphasis">{{ editingUser.fullName }}</span>
+                  <span class="text-caption text-disabled">({{ editingUser.email }})</span>
+                </div>
+              </div>
             </div>
+            <VChip
+              :color="selectedBranchIds.length > 0 ? 'primary' : 'secondary'"
+              variant="tonal"
+              size="small"
+              class="font-weight-bold"
+            >
+              <VIcon icon="ri-store-2-line" size="14" class="me-1" />
+              {{ selectedBranchIds.length }} / {{ availableBranches.length }} Cabang Ditugaskan
+            </VChip>
           </div>
         </VCardItem>
 
         <VDivider class="mb-4" />
 
         <VCardText class="pa-0 mb-4">
-          <div
-            v-for="(assignment, idx) in editingAssignments"
-            :key="idx"
-            class="d-flex gap-3 mb-3 align-center"
-          >
-            <!-- Branch -->
-            <VSelect
-              v-model="assignment.branch_id"
-              :items="availableBranches"
-              item-title="name"
-              item-value="id"
-              label="Cabang / Toko"
-              density="compact"
-              variant="outlined"
-              rounded="lg"
-              hide-details
-              style="min-width: 180px"
-            />
-            <!-- Role -->
-            <VSelect
-              v-model="assignment.role_name"
-              :items="availableRoles"
-              label="Jabatan / Peran"
-              density="compact"
-              variant="outlined"
-              rounded="lg"
-              hide-details
-              style="min-width: 160px"
-            />
-            <!-- Delete row -->
-            <IconBtn
-              color="error"
-              variant="tonal"
-              @click="removeAssignmentRow(idx)"
-            >
-              <VIcon
-                icon="ri-delete-bin-line"
-                size="18"
-              />
-            </IconBtn>
+          <!-- Quick Role Bar -->
+          <div class="bg-grey-50 rounded-xl pa-3 mb-4 border">
+            <div class="d-flex align-center justify-space-between flex-wrap gap-3">
+              <div class="flex-grow-1" style="min-width: 220px;">
+                <VSelect
+                  v-model="defaultRoleForSelected"
+                  :items="availableRoles"
+                  label="Peran / Jabatan Utama"
+                  placeholder="Pilih Peran"
+                  density="compact"
+                  variant="outlined"
+                  rounded="lg"
+                  hide-details
+                  prepend-inner-icon="ri-shield-check-line"
+                />
+              </div>
+              <VBtn
+                variant="tonal"
+                color="primary"
+                size="small"
+                prepend-icon="ri-sparkling-line"
+                class="font-weight-bold"
+                :disabled="!selectedBranchIds.length || !defaultRoleForSelected"
+                @click="applyDefaultRoleToSelected"
+              >
+                Terapkan Peran ke Semua Cabang Terpilih
+              </VBtn>
+            </div>
           </div>
 
-          <VBtn
-            variant="tonal"
-            color="primary"
-            size="small"
-            prepend-icon="ri-add-line"
-            class="mt-2 font-weight-bold"
-            @click="addAssignmentRow"
+          <!-- Branch Checklist Header & Search -->
+          <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-3">
+            <div class="d-flex align-center">
+              <VCheckbox
+                v-model="isAllBranchesSelected"
+                color="primary"
+                density="compact"
+                hide-details
+                class="font-weight-bold"
+              >
+                <template #label>
+                  <span class="font-weight-bold text-body-1 text-high-emphasis">
+                    Pilih Semua Cabang (Select All)
+                  </span>
+                </template>
+              </VCheckbox>
+            </div>
+
+            <VTextField
+              v-model="branchSearchFilter"
+              placeholder="Cari Cabang / Toko..."
+              density="compact"
+              variant="outlined"
+              rounded="lg"
+              hide-details
+              clearable
+              prepend-inner-icon="ri-search-line"
+              style="max-width: 240px;"
+            />
+          </div>
+
+          <!-- Scrollable Branch List -->
+          <div
+            class="d-flex flex-column gap-2 overflow-y-auto pe-1"
+            style="max-height: 320px;"
           >
-            Tambah Penugasan Cabang
-          </VBtn>
+            <div
+              v-for="branch in modalBranchesList"
+              :key="branch.id"
+              class="d-flex align-center justify-space-between p-3 rounded-xl border transition-all"
+              :class="selectedBranchIds.includes(branch.id) ? 'bg-primary-lighten-5 border-primary' : 'bg-surface'"
+              style="cursor: pointer; padding: 10px 14px;"
+              @click="toggleBranchSelection(branch.id)"
+            >
+              <!-- Checkbox & Branch Info -->
+              <div class="d-flex align-center gap-3">
+                <VCheckbox
+                  :model-value="selectedBranchIds.includes(branch.id)"
+                  color="primary"
+                  density="compact"
+                  hide-details
+                  @click.stop="toggleBranchSelection(branch.id)"
+                />
+                <VAvatar
+                  :color="selectedBranchIds.includes(branch.id) ? 'primary' : 'secondary'"
+                  variant="tonal"
+                  size="36"
+                  rounded="lg"
+                >
+                  <VIcon icon="ri-store-2-line" size="20" />
+                </VAvatar>
+                <div>
+                  <div class="d-flex align-center gap-2">
+                    <span class="font-weight-bold text-body-1 text-high-emphasis">
+                      {{ branch.name }}
+                    </span>
+                    <VChip
+                      v-if="branch.type"
+                      size="x-small"
+                      variant="outlined"
+                      color="secondary"
+                    >
+                      {{ branch.type }}
+                    </VChip>
+                  </div>
+                  <span class="text-caption text-medium-emphasis">
+                    {{ branch.city || branch.province || 'Cabang Resmi' }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Role Selector for Checked Branch -->
+              <div
+                v-if="selectedBranchIds.includes(branch.id)"
+                style="min-width: 170px;"
+                @click.stop
+              >
+                <VSelect
+                  v-model="branchRoleMap[branch.id]"
+                  :items="availableRoles"
+                  density="compact"
+                  variant="outlined"
+                  rounded="lg"
+                  hide-details
+                  placeholder="Pilih Peran"
+                />
+              </div>
+              <div v-else>
+                <VChip
+                  size="small"
+                  variant="tonal"
+                  color="secondary"
+                  class="text-caption"
+                >
+                  Tidak Aktif
+                </VChip>
+              </div>
+            </div>
+
+            <!-- Empty State for Search -->
+            <div
+              v-if="modalBranchesList.length === 0"
+              class="text-center py-6 text-disabled"
+            >
+              <VIcon icon="ri-store-line" size="32" class="mb-2" />
+              <p class="mb-0 text-caption">Tidak ada cabang yang cocok dengan pencarian.</p>
+            </div>
+          </div>
         </VCardText>
 
-        <VCardActions class="pa-0 d-flex justify-end gap-2">
+        <VDivider class="mb-4" />
+
+        <!-- Actions -->
+        <VCardActions class="pa-0 d-flex justify-end gap-3">
           <VBtn
             variant="tonal"
             color="secondary"
+            :disabled="isSavingAssignments"
             @click="isAssignmentDialogVisible = false"
           >
             Batal
           </VBtn>
           <VBtn
             color="primary"
-            class="font-weight-bold"
+            class="font-weight-bold px-6"
+            :loading="isSavingAssignments"
+            prepend-icon="ri-check-line"
             @click="saveAssignments"
           >
-            Simpan Penugasan
+            Simpan Penugasan ({{ selectedBranchIds.length }} Cabang)
           </VBtn>
         </VCardActions>
       </VCard>

@@ -20,13 +20,7 @@ class ReceiptSettingController extends Controller
         $user = auth()->user();
         if (!$user) return false;
 
-        if ($user->active_role_id) {
-            $role = \Spatie\Permission\Models\Role::find($user->active_role_id);
-            return $role && strtolower($role->name) === 'dev';
-        }
-
-        // fallback to standard spatie hasRole if active_role_id isn't reliable
-        return $user->hasRole('dev') || $user->hasRole('Dev');
+        return $user->can('Pengaturan Struk Write') || $user->can('Receipt Settings Write') || $user->can('manage all') || $user->can('all') || $user->can('*');
     }
 
     public function store(Request $request)

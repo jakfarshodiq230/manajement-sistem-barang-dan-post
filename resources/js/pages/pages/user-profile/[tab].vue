@@ -7,6 +7,7 @@ import UserTeam from '@/views/pages/user-profile/team/index.vue'
 
 definePage({
   meta: {
+    public: true,
     navActiveLink: 'pages-user-profile-tab',
     key: 'tab',
   },

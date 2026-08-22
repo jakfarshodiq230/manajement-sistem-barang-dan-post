@@ -8,7 +8,12 @@ use Illuminate\Support\Str;
 
 class StockTransfer extends Model
 {
-    use HasFactory, \Spatie\Activitylog\Traits\LogsActivity;
+    use HasFactory, \Spatie\Activitylog\Traits\LogsActivity, \App\Traits\ScopedByBranch;
+
+    public function getBranchScopeType(): string
+    {
+        return 'transfer_branches';
+    }
 
     protected $fillable = [
         'reference_no',

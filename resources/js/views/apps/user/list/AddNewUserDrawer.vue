@@ -36,8 +36,9 @@ onMounted(async () => {
       $api('/apps/roles'),
     ])
 
-    availableBranches.value = branchData
-    availableRoles.value = roleData.map(r => r.role)
+    availableBranches.value = branchData.data || branchData || []
+    const rawRoles = roleData.data || roleData || []
+    availableRoles.value = Array.isArray(rawRoles) ? rawRoles.map(r => r.role || r.name) : []
   } catch (error) {
     console.error(error)
   }

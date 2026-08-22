@@ -6,11 +6,11 @@ import { useGenerateImageVariant } from '@core/composable/useGenerateImageVarian
 
 const props = defineProps({
   dailyIncome: {
-    type: Number,
+    type: [Number, String],
     default: 0,
   },
   monthlyIncome: {
-    type: Number,
+    type: [Number, String],
     default: 0,
   },
 })

@@ -39,40 +39,66 @@ const items = ref([
   { product_id: null, qty: 1 },
 ])
 
-const fetchProducts = async (search = '') => {
+const extractArray = val => {
+  if (Array.isArray(val)) return val
+  if (val && Array.isArray(val.data)) return val.data
+  if (val && Array.isArray(val.products)) return val.products
+  if (val && Array.isArray(val.productBranches)) return val.productBranches
+  return []
+}
+
+const formatProductTitle = prod => {
+  if (!prod) return ''
+  if (typeof prod === 'string') return prod
+  if (typeof prod !== 'object') return String(prod)
+  
+  const skuPart = prod.sku ? `[${prod.sku}] ` : ''
+  const namePart = prod.name || 'Barang'
+  const stockPart = prod.stock !== undefined && prod.stock !== null ? ` (Stok: ${prod.stock} ${prod.unit || ''})` : ''
+  
+  return `${skuPart}${namePart}${stockPart}`
+}
+
+const fetchProducts = async (searchQuery = '') => {
   isSearchingProduct.value = true
   try {
-    let fetched = []
+    // 1. Fetch master products
+    const pParams = { itemsPerPage: -1 }
+    if (searchQuery) pParams.search = searchQuery
+    const pRes = await $api('/apps/products', { params: pParams })
+    const masterList = extractArray(pRes)
+
+    // 2. If source branch is selected, fetch branch stocks to display stock
+    let branchStockMap = new Map()
     if (source_branch_id.value) {
-      const params = {
-        branch_id: source_branch_id.value,
-        itemsPerPage: -1,
+      try {
+        const pbRes = await $api('/apps/product-branches', {
+          params: { branch_id: source_branch_id.value, itemsPerPage: -1 }
+        })
+        const pbList = extractArray(pbRes)
+        pbList.forEach(pb => {
+          if (pb.product_id) {
+            branchStockMap.set(pb.product_id, {
+              stock: pb.stock ?? 0,
+              unit: pb.product?.unit || 'Pcs',
+            })
+          }
+        })
+      } catch (e) {
+        console.warn('Could not load branch stock:', e)
       }
-      if (search) params.search = search
-      const res = await $api('/apps/product-branches', { query: params })
-      const list = res.data || res || []
-      fetched = list.map(pb => ({
-        id: pb.product_id,
-        name: pb.product?.name || 'Item',
-        sku: pb.product?.sku || '',
-        stock: pb.stock ?? 0,
-        unit: pb.product?.unit || 'Pcs',
-      }))
-    } else {
-      const params = {
-        itemsPerPage: -1,
-      }
-      if (search) params.search = search
-      const res = await $api('/apps/products', { query: params })
-      const list = res.data || res || []
-      fetched = list.map(p => ({
-        id: p.id,
-        name: p.name,
-        sku: p.sku,
-        stock: null,
-        unit: p.unit || 'Pcs',
-      }))
     }
+
+    const fetched = masterList.map(p => {
+      const branchInfo = branchStockMap.get(p.id)
+      return {
+        id: p.id,
+        name: p.name || 'Barang',
+        sku: p.sku || '',
+        stock: branchInfo ? branchInfo.stock : (source_branch_id.value ? 0 : null),
+        unit: p.unit || 'Pcs',
+      }
+    })
 
     // Merge with currently selected products so they don't disappear from dropdown
     const selectedIds = items.value.map(i => i.product_id).filter(Boolean)
@@ -277,7 +303,7 @@ const handleDrawerModelValueUpdate = val => {
                     <VAutocomplete
                       v-model="item.product_id"
                       :items="productOptions"
-                      :item-title="prod => prod.sku ? `[${prod.sku}] ${prod.name}${prod.stock !== null ? ` (Stok Cabang Asal: ${prod.stock} ${prod.unit || ''})` : ''}` : prod.name"
+                      :item-title="formatProductTitle"
                       item-value="id"
                       label="Cari Produk (Nama / SKU)"
                       placeholder="Ketik untuk mencari barang..."

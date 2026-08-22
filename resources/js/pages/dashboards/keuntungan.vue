@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { $api } from '@/utils/api'
 import VueApexCharts from 'vue3-apexcharts'
 import { useTheme } from 'vuetify'
@@ -7,22 +7,54 @@ import { useTheme } from 'vuetify'
 const vuetifyTheme = useTheme()
 
 const analyticsData = ref({
-  total_profit: 0,
-  total_revenue: 0,
+  revenue_today: 0,
+  cogs_today: 0,
+  expense_today: 0,
+  gross_profit_today: 0,
   profit_today: 0,
+
+  revenue_this_month: 0,
+  cogs_this_month: 0,
+  expense_this_month: 0,
+  gross_profit_this_month: 0,
   profit_this_month: 0,
+
+  total_revenue: 0,
+  total_cogs: 0,
+  total_expense: 0,
+  total_gross_profit: 0,
+  total_profit: 0,
+  margin: 0,
+
   chart_data: {
     categories: [],
     series: [],
+    series_gross: [],
+    series_expenses: [],
   },
 })
 
+const selectedBranch = ref('all')
+const branches = ref([])
 const isLoading = ref(true)
+
+const fetchBranches = async () => {
+  try {
+    const res = await $api('/apps/branches')
+    branches.value = res.data || res || []
+  } catch (e) {
+    console.error('Error fetching branches:', e)
+  }
+}
 
 const fetchAnalytics = async () => {
   isLoading.value = true
   try {
-    const res = await $api('/apps/dashboards/profit')
+    const params = {}
+    if (selectedBranch.value && selectedBranch.value !== 'all') {
+      params.branch_id = selectedBranch.value
+    }
+    const res = await $api('/apps/dashboards/profit', { params })
     if (res.success) {
       analyticsData.value = res.data
     }
@@ -33,8 +65,13 @@ const fetchAnalytics = async () => {
   }
 }
 
-onMounted(() => {
+watch(selectedBranch, () => {
   fetchAnalytics()
+})
+
+onMounted(async () => {
+  await fetchBranches()
+  await fetchAnalytics()
 })
 
 const formatCurrency = value => {
@@ -46,11 +83,6 @@ const formatCurrency = value => {
   }).format(value)
 }
 
-const getMargin = () => {
-  if (!analyticsData.value.total_revenue || analyticsData.value.total_revenue === 0) return 0
-  return ((analyticsData.value.total_profit / analyticsData.value.total_revenue) * 100).toFixed(1)
-}
-
 const chartOptions = computed(() => {
   const currentTheme = vuetifyTheme.current.value.colors
 
@@ -60,13 +92,17 @@ const chartOptions = computed(() => {
       parentHeightOffset: 0,
       toolbar: { show: false },
     },
-    colors: [currentTheme.success],
+    colors: [currentTheme.primary, currentTheme.error, currentTheme.success],
     plotOptions: {
       bar: {
-        borderRadius: 6,
-        columnWidth: '45%',
-        distributed: false,
+        borderRadius: 4,
+        columnWidth: '50%',
       },
+    },
+    stroke: {
+      show: true,
+      width: 2,
+      colors: ['transparent'],
     },
     dataLabels: {
       enabled: false,
@@ -87,6 +123,13 @@ const chartOptions = computed(() => {
         },
       },
     },
+    legend: {
+      position: 'top',
+      horizontalAlign: 'left',
+      labels: {
+        colors: currentTheme['on-surface'],
+      },
+    },
     grid: {
       borderColor: currentTheme['border-color'],
       strokeDashArray: 4,
@@ -103,7 +146,15 @@ const chartOptions = computed(() => {
 
 const chartSeries = computed(() => [
   {
-    name: 'Keuntungan Bersih (Profit)',
+    name: 'Laba Kotor (Gross)',
+    data: analyticsData.value.chart_data?.series_gross || [],
+  },
+  {
+    name: 'Beban Kas Kecil (Expenses)',
+    data: analyticsData.value.chart_data?.series_expenses || [],
+  },
+  {
+    name: 'Laba Bersih Riil (Net Profit)',
     data: analyticsData.value.chart_data?.series || [],
   },
 ])
@@ -111,122 +162,175 @@ const chartSeries = computed(() => [
 
 <template>
   <div class="pa-4">
-    <!-- Header -->
-    <div class="d-flex align-center justify-space-between mb-4">
+    <!-- Header with Branch Filter -->
+    <div class="d-flex flex-wrap align-center justify-space-between gap-4 mb-6">
       <div>
         <h2 class="text-h4 font-weight-bold mb-1">
-          Dashboard Keuntungan & Margin
+          Dashboard Keuntungan & Laba Rugi
         </h2>
         <p class="text-body-2 text-medium-emphasis mb-0">
-          Analisis laba bersih riil (Omzet - HPP Modal), persentase margin laba, dan performa profitabilitas.
+          Analisis laba bersih riil terintegrasi: <span class="font-weight-semibold text-primary">Omzet Penjualan &minus; HPP Modal Barang &minus; Beban Operasional Kas Kecil</span>
         </p>
       </div>
 
-      <VBtn
-        color="secondary"
-        variant="tonal"
-        prepend-icon="ri-refresh-line"
-        :loading="isLoading"
-        @click="fetchAnalytics"
-      >
-        Muat Ulang
-      </VBtn>
+      <div class="d-flex align-center gap-3">
+        <VSelect
+          v-model="selectedBranch"
+          :items="[{ id: 'all', name: '🏢 Semua Cabang' }, ...branches]"
+          item-title="name"
+          item-value="id"
+          density="compact"
+          variant="outlined"
+          style="min-width: 220px;"
+          hide-details
+          prepend-inner-icon="ri-store-2-line"
+        />
+
+        <VBtn
+          color="secondary"
+          variant="tonal"
+          prepend-icon="ri-refresh-line"
+          :loading="isLoading"
+          @click="fetchAnalytics"
+        >
+          Refresh
+        </VBtn>
+      </div>
     </div>
 
+    <!-- Highlight Total Net Profit Hero Card -->
+    <VCard elevation="3" class="mb-6 bg-gradient-primary text-white rounded-xl" :loading="isLoading">
+      <VCardText class="d-flex flex-wrap align-center justify-space-between pa-6">
+        <div>
+          <div class="text-caption font-weight-bold text-uppercase tracking-wider text-white-50">
+            TOTAL AKUMULASI LABA BERSIH RIIL (NET PROFIT)
+          </div>
+          <div class="text-h2 font-weight-extrabold text-white my-2">
+            {{ formatCurrency(analyticsData.total_profit) }}
+          </div>
+          <div class="d-flex flex-wrap align-center gap-4 text-caption text-white mt-3">
+            <div class="d-flex align-center gap-1">
+              <VIcon icon="ri-shopping-cart-line" size="16" />
+              <span>Total Omzet: <strong>{{ formatCurrency(analyticsData.total_revenue) }}</strong></span>
+            </div>
+            <div class="d-flex align-center gap-1">
+              <VIcon icon="ri-archive-line" size="16" />
+              <span>Total HPP Modal: <strong>{{ formatCurrency(analyticsData.total_cogs) }}</strong></span>
+            </div>
+            <div class="d-flex align-center gap-1">
+              <VIcon icon="ri-money-dollar-box-line" size="16" />
+              <span>Beban Kas Kecil: <strong>{{ formatCurrency(analyticsData.total_expense) }}</strong></span>
+            </div>
+            <div class="d-flex align-center gap-1">
+              <VChip size="x-small" color="white" variant="flat" class="text-primary font-weight-bold">
+                Margin Bersih: {{ analyticsData.margin }}%
+              </VChip>
+            </div>
+          </div>
+        </div>
+        <div class="d-none d-md-flex align-center gap-2">
+          <VBtn
+            to="/kas-kecil"
+            color="white"
+            variant="flat"
+            class="text-primary font-weight-bold"
+            prepend-icon="ri-wallet-3-line"
+          >
+            Kelola Kas Kecil
+          </VBtn>
+          <VBtn
+            to="/audit/rekap"
+            color="white"
+            variant="outlined"
+            prepend-icon="ri-file-chart-line"
+          >
+            Rekap Tahunan
+          </VBtn>
+        </div>
+      </VCardText>
+    </VCard>
+
     <!-- Summary KPI Row -->
-    <VRow class="mb-4">
+    <VRow class="mb-6">
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success" :loading="isLoading">
+        <VCard elevation="2" class="pa-4 rounded-xl border-s-lg border-success h-100" :loading="isLoading">
           <div class="d-flex align-center justify-space-between">
             <div>
-              <div class="text-caption text-success font-weight-bold">LABA HARI INI</div>
+              <div class="text-caption text-success font-weight-bold">LABA BERSIH HARI INI</div>
               <div class="text-h4 font-weight-bold text-success mt-1">{{ formatCurrency(analyticsData.profit_today) }}</div>
             </div>
-            <VAvatar color="success" variant="tonal" size="44">
-              <VIcon icon="ri-calendar-check-line" size="24" />
+            <VAvatar color="success" variant="tonal" size="46" rounded="lg">
+              <VIcon icon="ri-calendar-check-line" size="26" />
             </VAvatar>
           </div>
-          <div class="text-caption text-medium-emphasis mt-2">Penjualan hari ini dikurangi HPP</div>
+          <div class="text-caption text-medium-emphasis mt-2">
+            Omzet hari ini: {{ formatCurrency(analyticsData.revenue_today) }}
+          </div>
         </VCard>
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info" :loading="isLoading">
+        <VCard elevation="2" class="pa-4 rounded-xl border-s-lg border-primary h-100" :loading="isLoading">
           <div class="d-flex align-center justify-space-between">
             <div>
-              <div class="text-caption text-info font-weight-bold">LABA BULAN INI</div>
-              <div class="text-h4 font-weight-bold text-info mt-1">{{ formatCurrency(analyticsData.profit_this_month) }}</div>
+              <div class="text-caption text-primary font-weight-bold">LABA BERSIH BULAN INI</div>
+              <div class="text-h4 font-weight-bold text-primary mt-1">{{ formatCurrency(analyticsData.profit_this_month) }}</div>
             </div>
-            <VAvatar color="info" variant="tonal" size="44">
-              <VIcon icon="ri-line-chart-line" size="24" />
+            <VAvatar color="primary" variant="tonal" size="46" rounded="lg">
+              <VIcon icon="ri-line-chart-line" size="26" />
             </VAvatar>
           </div>
-          <div class="text-caption text-medium-emphasis mt-2">Akumulasi laba bulan berjalan</div>
+          <div class="text-caption text-medium-emphasis mt-2">
+            Laba kotor: {{ formatCurrency(analyticsData.gross_profit_this_month) }}
+          </div>
         </VCard>
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary" :loading="isLoading">
+        <VCard elevation="2" class="pa-4 rounded-xl border-s-lg border-error h-100" :loading="isLoading">
           <div class="d-flex align-center justify-space-between">
             <div>
-              <div class="text-caption text-primary font-weight-bold">MARGIN KEUNTUNGAN</div>
-              <div class="text-h4 font-weight-bold text-primary mt-1">{{ getMargin() }}%</div>
+              <div class="text-caption text-error font-weight-bold">BEBAN KAS KECIL BULAN INI</div>
+              <div class="text-h4 font-weight-bold text-error mt-1">{{ formatCurrency(analyticsData.expense_this_month) }}</div>
             </div>
-            <VAvatar color="primary" variant="tonal" size="44">
-              <VIcon icon="ri-percent-line" size="24" />
+            <VAvatar color="error" variant="tonal" size="46" rounded="lg">
+              <VIcon icon="ri-hand-coin-line" size="26" />
             </VAvatar>
           </div>
-          <div class="text-caption text-medium-emphasis mt-2">Rasio profit terhadap omzet</div>
+          <div class="text-caption text-medium-emphasis mt-2">
+            Listrik, galon, kurir, ATK & lembur
+          </div>
         </VCard>
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-warning" :loading="isLoading">
+        <VCard elevation="2" class="pa-4 rounded-xl border-s-lg border-warning h-100" :loading="isLoading">
           <div class="d-flex align-center justify-space-between">
             <div>
-              <div class="text-caption text-warning font-weight-bold">TOTAL OMZET KESELURUHAN</div>
+              <div class="text-caption text-warning font-weight-bold">TOTAL OMZET PENJUALAN</div>
               <div class="text-h4 font-weight-bold text-warning mt-1">{{ formatCurrency(analyticsData.total_revenue) }}</div>
             </div>
-            <VAvatar color="warning" variant="tonal" size="44">
-              <VIcon icon="ri-wallet-3-line" size="24" />
+            <VAvatar color="warning" variant="tonal" size="46" rounded="lg">
+              <VIcon icon="ri-wallet-3-line" size="26" />
             </VAvatar>
           </div>
-          <div class="text-caption text-medium-emphasis mt-2">Gross revenue all-time</div>
+          <div class="text-caption text-medium-emphasis mt-2">
+            Margin Bersih: {{ analyticsData.margin }}%
+          </div>
         </VCard>
       </VCol>
     </VRow>
 
-    <!-- Highlight Total Net Profit Card -->
-    <VCard elevation="2" class="mb-4 bg-primary text-white" :loading="isLoading">
-      <VCardText class="d-flex flex-wrap align-center justify-space-between pa-6">
-        <div>
-          <div class="text-subtitle-1 text-white-50 font-weight-medium mb-1">
-            TOTAL AKUMULASI LABA BERSIH (KESELURUHAN WAKTU)
-          </div>
-          <div class="text-h2 font-weight-bold text-white my-2">
-            {{ formatCurrency(analyticsData.total_profit) }}
-          </div>
-          <div class="d-flex align-center gap-2 text-caption text-white">
-            <VIcon icon="ri-checkbox-circle-fill" size="16" />
-            <span>Dihitung dari Total Gross Revenue dikurangi Total Beban Pokok Penjualan (HPP/COGS).</span>
-          </div>
-        </div>
-        <VAvatar color="white" variant="tonal" size="80" class="d-none d-sm-flex">
-          <VIcon icon="ri-money-dollar-circle-line" size="48" color="white" />
-        </VAvatar>
-      </VCardText>
-    </VCard>
-
-    <!-- Monthly Profit Bar Chart -->
-    <VCard elevation="2" class="mb-4" :loading="isLoading">
+    <!-- Monthly Multi-Bar Chart -->
+    <VCard elevation="2" class="mb-6 rounded-xl" :loading="isLoading">
       <VCardItem class="pb-2">
         <template #prepend>
-          <VAvatar color="success" variant="tonal" size="36" class="me-2">
-            <VIcon icon="ri-bar-chart-grouped-line" size="20" />
+          <VAvatar color="primary" variant="tonal" size="38" class="me-2" rounded="lg">
+            <VIcon icon="ri-bar-chart-grouped-line" size="22" />
           </VAvatar>
         </template>
-        <VCardTitle class="text-h6 font-weight-bold">Grafik Pertumbuhan Laba Bersih (6 Bulan Terakhir)</VCardTitle>
-        <VCardSubtitle>Tren performa profitabilitas bulanan usaha Anda</VCardSubtitle>
+        <VCardTitle class="text-h6 font-weight-bold">Grafik Laba Kotor vs Beban Operasional vs Laba Bersih</VCardTitle>
+        <VCardSubtitle>Perbandingan tren 6 bulan terakhir: Penjualan dikurangi modal dan beban kas toko</VCardSubtitle>
       </VCardItem>
       <VDivider />
 
@@ -234,53 +338,70 @@ const chartSeries = computed(() => [
         <VueApexCharts
           v-if="!isLoading"
           type="bar"
-          height="350"
+          height="360"
           :options="chartOptions"
           :series="chartSeries"
         />
       </VCardText>
     </VCard>
 
-    <!-- Accounting Formula Explanation Card -->
-    <VCard elevation="2">
+    <!-- Accounting Formula & Integration Explanation Card -->
+    <VCard elevation="2" class="rounded-xl">
       <VCardItem class="pb-2">
         <template #prepend>
-          <VAvatar color="info" variant="tonal" size="36" class="me-2">
-            <VIcon icon="ri-information-line" size="20" />
+          <VAvatar color="info" variant="tonal" size="38" class="me-2" rounded="lg">
+            <VIcon icon="ri-calculator-line" size="22" />
           </VAvatar>
         </template>
-        <VCardTitle class="text-h6 font-weight-bold">Metodologi & Standar Perhitungan Akuntansi</VCardTitle>
-        <VCardSubtitle>Rumus baku yang diterapkan oleh sistem untuk menjaga akurasi laporan laba</VCardSubtitle>
+        <VCardTitle class="text-h6 font-weight-bold">Standar Akuntansi & Integrasi Laba Rugi Toko</VCardTitle>
+        <VCardSubtitle>Struktur perhitungan terpadu antara modul POS Kasir, Gudang HPP, dan Buku Kas Kecil</VCardSubtitle>
       </VCardItem>
       <VDivider />
 
-      <VCardText class="pa-4">
+      <VCardText class="pa-5">
         <VRow>
           <VCol cols="12" md="4">
-            <div class="pa-3 bg-grey-50 rounded border">
-              <div class="font-weight-bold text-subtitle-2 mb-1 text-primary">1. Laba Bersih (Net Profit)</div>
-              <div class="text-caption text-medium-emphasis">
-                <code>Laba Bersih = Omzet - HPP (COGS)</code>
+            <div class="pa-4 bg-var-theme-surface rounded-xl border h-100">
+              <div class="font-weight-bold text-subtitle-2 mb-1 text-primary d-flex align-center gap-2">
+                <VIcon icon="ri-coins-line" size="18" />
+                1. Laba Kotor (Gross Profit)
               </div>
-              <div class="text-caption text-disabled mt-1">HPP dihitung otomatis per item berdasarkan harga modal beli saat batch masuk.</div>
+              <div class="text-caption text-medium-emphasis mt-2">
+                <code>Laba Kotor = Omzet Penjualan &minus; HPP (COGS Modal)</code>
+              </div>
+              <div class="text-caption text-disabled mt-2">
+                Dihitung otomatis saat kasir menyelesaikan transaksi POS berdasarkan batch modal barang yang masuk.
+              </div>
             </div>
           </VCol>
+
           <VCol cols="12" md="4">
-            <div class="pa-3 bg-grey-50 rounded border">
-              <div class="font-weight-bold text-subtitle-2 mb-1 text-primary">2. Margin Keuntungan (%)</div>
-              <div class="text-caption text-medium-emphasis">
-                <code>Margin = (Laba Bersih / Omzet) &times; 100%</code>
+            <div class="pa-4 bg-var-theme-surface rounded-xl border h-100">
+              <div class="font-weight-bold text-subtitle-2 mb-1 text-error d-flex align-center gap-2">
+                <VIcon icon="ri-hand-coin-line" size="18" />
+                2. Beban Operasional (Kas Kecil)
               </div>
-              <div class="text-caption text-disabled mt-1">Mengukur efisiensi laba dari setiap rupiah pendapatan yang dihasilkan.</div>
+              <div class="text-caption text-medium-emphasis mt-2">
+                <code>Total Kas Kecil = Listrik + Air + Bensin + ATK + Konsumsi</code>
+              </div>
+              <div class="text-caption text-disabled mt-2">
+                Tercatat pada menu Buku Kas Kecil cabang dan mengurangi langsung hasil laba operasional toko.
+              </div>
             </div>
           </VCol>
+
           <VCol cols="12" md="4">
-            <div class="pa-3 bg-grey-50 rounded border">
-              <div class="font-weight-bold text-subtitle-2 mb-1 text-primary">3. Nilai Persediaan Sisa</div>
-              <div class="text-caption text-medium-emphasis">
-                <code>Aset Sisa = Sisa Qty &times; Harga Beli</code>
+            <div class="pa-4 bg-var-theme-surface rounded-xl border h-100">
+              <div class="font-weight-bold text-subtitle-2 mb-1 text-success d-flex align-center gap-2">
+                <VIcon icon="ri-trophy-line" size="18" />
+                3. Laba Bersih Riil (Net Profit)
               </div>
-              <div class="text-caption text-disabled mt-1">Barang yang belum terjual tetap tercatat sebagai modal aset persediaan aktif.</div>
+              <div class="text-caption text-medium-emphasis mt-2">
+                <code>Laba Bersih = Laba Kotor &minus; Beban Operasional</code>
+              </div>
+              <div class="text-caption text-disabled mt-2">
+                Menghasilkan angka keuntungan bersih riil yang menjadi dasar pembagian dividen owner dan rekap tahunan.
+              </div>
             </div>
           </VCol>
         </VRow>
@@ -288,6 +409,12 @@ const chartSeries = computed(() => [
     </VCard>
   </div>
 </template>
+
+<style scoped>
+.bg-gradient-primary {
+  background: linear-gradient(135deg, #7367F0 0%, #4834D4 100%);
+}
+</style>
 
 <route lang="yaml">
 meta:

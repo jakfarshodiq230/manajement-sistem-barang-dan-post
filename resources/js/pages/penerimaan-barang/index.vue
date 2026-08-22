@@ -40,6 +40,12 @@ const isAllowedToEdit = computed(() => {
   return ability.can('write', 'Penerimaan Gudang') || ability.can('manage', 'all')
 })
 
+const extractArray = val => {
+  if (Array.isArray(val)) return val
+  if (val && Array.isArray(val.data)) return val.data
+  return []
+}
+
 const fetchData = async () => {
   isLoading.value = true
   try {
@@ -55,20 +61,18 @@ const fetchData = async () => {
     if (activeTab.value === 'pending') {
       params.unreceived = 'true'
       const poData = await $api('/apps/purchase-orders', { query: params })
-      pendingPOs.value = poData.data || poData
-      if (poData.total !== undefined) {
-        totalItems.value = poData.total
-      }
+      pendingPOs.value = extractArray(poData)
+      totalItems.value = poData?.total ?? (Array.isArray(pendingPOs.value) ? pendingPOs.value.length : 0)
     } else {
       const grData = await $api('/apps/goods-receipts', { query: params })
-      goodsReceipts.value = grData.data || grData
-      if (grData.total !== undefined) {
-        totalItems.value = grData.total
-      }
+      goodsReceipts.value = extractArray(grData)
+      totalItems.value = grData?.total ?? (Array.isArray(goodsReceipts.value) ? goodsReceipts.value.length : 0)
     }
   } catch (error) {
     console.error(error)
     snackbar.show('Gagal mengambil data', 'error')
+    pendingPOs.value = []
+    goodsReceipts.value = []
   } finally {
     isLoading.value = false
   }

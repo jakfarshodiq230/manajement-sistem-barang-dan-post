@@ -51,6 +51,12 @@ watch(branchId, () => {
   fetchTransactions()
 })
 
+const extractArray = val => {
+  if (Array.isArray(val)) return val
+  if (val && Array.isArray(val.data)) return val.data
+  return []
+}
+
 const fetchTransactions = async () => {
   if (!branchId.value) return
   
@@ -58,7 +64,7 @@ const fetchTransactions = async () => {
   try {
     let endpoint = referenceType.value === 'sale' ? '/apps/sales?itemsPerPage=-1' : '/apps/purchase-orders?itemsPerPage=-1'
     const res = await $api(`${endpoint}&branch_id=${branchId.value}`)
-    const list = res.data || res || []
+    const list = extractArray(res)
     
     // Filter completed transactions
     if (referenceType.value === 'sale') {

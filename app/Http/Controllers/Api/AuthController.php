@@ -46,46 +46,52 @@ class AuthController extends Controller
                 $activeRoleName = $firstAssig ? $firstAssig->role_name : (!empty($directRoles) ? $directRoles[0] : 'Super Admin');
             }
 
-            // Build ability rules based on role
+            // Build dynamic ability rules based on user's actual permissions
             $abilityRules = [];
-            
-            $isSuperAdmin = $user->hasRole('Super Admin') || $user->hasRole('Developer') || $user->hasRole('dev') 
-                || in_array('Super Admin', $directRoles) || in_array('Developer', $directRoles)
-                || $activeRoleName === 'Super Admin' || $activeRoleName === 'Developer' || $activeRoleName === 'dev'
-                || $assignments->contains('role_name', 'Super Admin') || $assignments->contains('role_name', 'Developer');
+            $userPermissions = collect();
 
-            if ($isSuperAdmin) {
+            // Collect all permissions from assigned roles in model_has_roles
+            $assignedRoleIds = $assignments->pluck('role_id')->unique()->filter();
+            if ($assignedRoleIds->isNotEmpty()) {
+                $rolePermissions = \Spatie\Permission\Models\Permission::join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+                    ->whereIn('role_has_permissions.role_id', $assignedRoleIds)
+                    ->pluck('permissions.name');
+                $userPermissions = $userPermissions->merge($rolePermissions);
+            }
+
+            // Also merge direct permissions and permissions from user direct roles
+            $userPermissions = $userPermissions->merge($user->getAllPermissions()->pluck('name'))->unique();
+
+            // Check if user has global wildcard or manage-all permission
+            if ($userPermissions->contains('manage all') || $userPermissions->contains('all') || $userPermissions->contains('*')) {
                 $abilityRules[] = ['action' => 'manage', 'subject' => 'all'];
             } else {
-                $allRoleNames = $assignments->pluck('role_name')->merge($directRoles)->unique()->filter();
-                foreach ($allRoleNames as $rName) {
-                    $role = \Spatie\Permission\Models\Role::where('name', $rName)->first();
-                    if ($role) {
-                        foreach ($role->permissions as $perm) {
-                            $parts = explode(' ', $perm->name);
-                            if (count($parts) >= 2) {
-                                $action = strtolower(array_pop($parts));
-                                $subject = implode(' ', $parts);
-                                $abilityRules[] = ['action' => $action, 'subject' => $subject];
-                            } else {
-                                $abilityRules[] = ['action' => strtolower($perm->name), 'subject' => 'all'];
-                            }
-                        }
+                foreach ($userPermissions as $permName) {
+                    $parts = explode(' ', $permName);
+                    if (count($parts) >= 2) {
+                        $action = strtolower(array_pop($parts));
+                        $subject = implode(' ', $parts);
+                        $abilityRules[] = ['action' => $action, 'subject' => $subject];
+                    } else {
+                        $abilityRules[] = ['action' => strtolower($permName), 'subject' => 'all'];
                     }
                 }
-            }    
+            }
 
-            // Selalu berikan akses dasar (Auth) bagi setiap pengguna yang berhasil login
+            // Always grant basic auth access for authenticated user
             $abilityRules[] = ['action' => 'read', 'subject' => 'Auth'];
-            $abilityRules[] = ['action' => 'read', 'subject' => 'all'];
+
+            $activeBranch = $user->branch_id ? \App\Models\Branch::find($user->branch_id) : null;
 
             $userData = [
-                'id'          => $user->id,
-                'fullName'    => $user->name,
-                'username'    => strtolower(str_replace(' ', '', $user->name)),
-                'avatar'      => '',
-                'email'       => $user->email,
-                'role'        => $activeRoleName,
+                'id'                 => $user->id,
+                'fullName'           => $user->name,
+                'username'           => strtolower(str_replace(' ', '', $user->name)),
+                'avatar'             => '',
+                'email'              => $user->email,
+                'role'               => $activeRoleName,
+                'branch_id'          => $user->branch_id,
+                'branch_name'        => $activeBranch ? $activeBranch->name : 'Semua Cabang (Global)',
                 'assignments' => $assignments->map(fn($a) => [
                     'branch_id'   => $a->branch_id,
                     'branch_name' => $a->branch_name,

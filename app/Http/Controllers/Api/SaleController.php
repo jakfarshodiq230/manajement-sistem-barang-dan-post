@@ -308,41 +308,44 @@ class SaleController extends Controller
                 $productBranch->decrement('stock', $item['qty']);
             }
 
-            $total_amount = $subtotal + $total_tax - ($request->discount ?? 0);
+            $total_amount = max(0, $subtotal + $total_tax - ($request->discount ?? 0));
+
+            $paymentMethod = $request->payment_method ?? 'cash';
             
-            if (($request->payment_method ?? 'cash') === 'cash' && $request->paid_amount !== null && $request->paid_amount < $total_amount) {
+            if ($paymentMethod === 'cash' && $request->paid_amount !== null && $request->paid_amount < $total_amount) {
                 throw new \Exception("Uang bayar tidak boleh kurang dari total tagihan.");
             }
             
             $sale->update([
                 'subtotal' => $subtotal,
+                'discount' => $request->discount ?? 0,
                 'total_tax' => $total_tax,
                 'total_amount' => $total_amount
             ]);
 
-            // Jika tempo, catat di piutang
-            if (($request->payment_method ?? 'cash') === 'tempo') {
-                if (!$request->customer_id) {
-                    throw new \Exception("Pelanggan wajib dipilih untuk pembayaran tempo.");
+            // Jika tempo atau split payment dengan piutang, catat di piutang
+            if ($paymentMethod === 'tempo' || $paymentMethod === 'split' || ($request->has_receivable && $request->credit_amount > 0)) {
+                if (!$finalCustomerId) {
+                    throw new \Exception("Pelanggan wajib dipilih untuk pembayaran tempo/piutang.");
                 }
                 
-                $dpAmount = $request->dp_amount ?? 0;
+                $dpAmount = $paymentMethod === 'tempo' ? ($request->dp_amount ?? 0) : ($request->paid_cash_amount ?? $request->paid_amount ?? 0);
 
                 if ($dpAmount > $total_amount) {
-                    throw new \Exception("Uang Muka (DP) tidak boleh lebih dari total tagihan.");
+                    throw new \Exception("Uang Muka/Bayar Tunai tidak boleh lebih dari total tagihan.");
                 }
 
                 $receivable = \App\Models\Receivable::create([
                     'sale_id' => $sale->id,
-                    'customer_id' => $request->customer_id,
+                    'customer_id' => $finalCustomerId,
                     'branch_id' => $request->branch_id,
                     'amount_due' => $total_amount,
                     'amount_paid' => $dpAmount,
-                    'due_date' => $request->due_date,
+                    'due_date' => $request->due_date ?? Carbon::now()->addDays(30)->toDateString(),
                     'status' => $dpAmount >= $total_amount ? 'paid' : ($dpAmount > 0 ? 'partial' : 'unpaid')
                 ]);
 
-                // Jika ada DP, masukkan ke tabel receivable_payments
+                // Jika ada DP/pembayaran awal, masukkan ke tabel receivable_payments
                 if ($dpAmount > 0) {
                     \App\Models\ReceivablePayment::create([
                         'receivable_id' => $receivable->id,
@@ -357,11 +360,14 @@ class SaleController extends Controller
 
             \Illuminate\Support\Facades\DB::commit();
 
-            return response()->json(['message' => 'Transaksi berhasil', 'sale' => $sale->load('items.productBranch.product', 'approver')], 201);
+            return response()->json([
+                'message' => 'Transaksi berhasil',
+                'sale' => $sale->load('items.productBranch.product', 'approver', 'customer'),
+            ], 201);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\DB::rollBack();
             \Illuminate\Support\Facades\Log::error('SaleController Store Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            return response()->json(['message' => 'Gagal memproses transaksi', 'error' => $e->getMessage()], 400);
+            return response()->json(['message' => 'Gagal memproses transaksi: ' . $e->getMessage(), 'error' => $e->getMessage()], 400);
         }
     }
 

@@ -21,6 +21,7 @@ class Customer extends Model
         'notes',
         'is_active',
         'credit_limit',
+        'points',
         'branch_id',
     ];
 
@@ -42,5 +43,10 @@ class Customer extends Model
     public function receivables()
     {
         return $this->hasMany(Receivable::class);
+    }
+
+    public function pointHistories()
+    {
+        return $this->hasMany(CustomerPointHistory::class);
     }
 }

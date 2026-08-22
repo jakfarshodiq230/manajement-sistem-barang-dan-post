@@ -9,31 +9,81 @@ const userData = useCookie('userData')
 // Switch Role dialog
 const isSwitchRoleVisible = ref(false)
 const userAssignments = ref([])
+const activeBranchId = ref(null)
 const switchingRole = ref(false)
+
+const currentBranchDisplayName = computed(() => {
+  if (userData.value?.branch_name) {
+    return userData.value.branch_name
+  }
+  const currentBId = activeBranchId.value ?? userData.value?.branch_id
+  if (currentBId) {
+    const found = userAssignments.value.find(a => a.branch_id == currentBId)
+    if (found) return found.branch_name
+    return `Cabang #${currentBId}`
+  }
+  return 'Semua Cabang'
+})
+
+onMounted(async () => {
+  try {
+    const data = await $api('/user')
+    userAssignments.value = data.assignments || []
+    activeBranchId.value = data.active_branch_id
+    if (userData.value) {
+      userData.value = {
+        ...userData.value,
+        role: data.role,
+        branch_id: data.active_branch_id,
+        branch_name: data.active_branch_name,
+      }
+    }
+  } catch(e) {
+    // silent
+  }
+})
 
 const openSwitchRole = async () => {
   try {
     const data = await $api('/user')
 
     userAssignments.value = data.assignments || []
+    activeBranchId.value = data.active_branch_id
     isSwitchRoleVisible.value = true
   } catch(e) { console.error(e) }
 }
 
+const isAssignmentActive = assignment => {
+  const currentRole = userData.value?.role
+  const currentBranchId = activeBranchId.value ?? userData.value?.branch_id ?? null
+
+  const isRoleMatch = currentRole === assignment.role_name
+  if (assignment.is_all) {
+    return isRoleMatch && (!currentBranchId)
+  }
+  return isRoleMatch && (currentBranchId == assignment.branch_id)
+}
+
 const switchRole = async assignment => {
+  if (switchingRole.value) return
   switchingRole.value = true
   try {
     const res = await $api('/apps/switch-role', {
       method: 'POST',
-      body: { role_id: assignment.role_id },
+      body: { 
+        role_id: assignment.role_id,
+        branch_id: assignment.branch_id || null,
+      },
     })
 
+    activeBranchId.value = res.active_branch_id
 
     // Update userData cookie
     if (userData.value) {
       userData.value = {
         ...userData.value,
         role: res.active_role,
+        branch_id: res.active_branch_id,
       }
     }
 
@@ -45,10 +95,14 @@ const switchRole = async assignment => {
 
     isSwitchRoleVisible.value = false
 
-    // Reload to refresh sidebar/permissions
-    window.location.reload()
-  } catch(e) { console.error(e) }
-  finally { switchingRole.value = false }
+    setTimeout(() => {
+      window.location.reload()
+    }, 150)
+  } catch(e) {
+    console.error('Failed to switch role/branch:', e)
+  } finally {
+    switchingRole.value = false
+  }
 }
 
 const logout = async () => {
@@ -59,7 +113,7 @@ const logout = async () => {
   ability.update([])
 }
 
-const userProfileList = [
+const userProfileList = computed(() => [
   { type: 'divider' },
   {
     type: 'navItem',
@@ -70,17 +124,8 @@ const userProfileList = [
       params: { id: userData.value?.id || 1 },
     },
   },
-  {
-    type: 'navItem',
-    icon: 'ri-settings-4-line',
-    title: 'Settings',
-    to: {
-      name: 'pages-account-settings-tab',
-      params: { tab: 'account' },
-    },
-  },
   { type: 'divider' },
-]
+])
 
 const roleColors = ['primary', 'success', 'warning', 'info', 'error', 'secondary']
 
@@ -150,14 +195,14 @@ const getRoleColor = roleName => {
                   v-if="userData.role"
                   size="x-small"
                   :color="getRoleColor(Array.isArray(userData.role) ? userData.role[0] : userData.role)"
-                  class="mt-1"
+                  class="mt-1 font-weight-medium"
                 >
                   <VIcon
                     start
-                    size="10"
+                    size="11"
                     icon="ri-shield-user-line"
                   />
-                  {{ Array.isArray(userData.role) ? userData.role[0] : userData.role }}
+                  {{ Array.isArray(userData.role) ? userData.role[0] : userData.role }} - {{ currentBranchDisplayName }}
                 </VChip>
               </div>
             </div>
@@ -272,36 +317,42 @@ const getRoleColor = roleName => {
         <VList
           v-else
           lines="two"
-          class="rounded border"
+          class="rounded-xl border pa-2"
         >
           <VListItem
             v-for="(assignment, idx) in userAssignments"
             :key="idx"
-            :title="assignment.role_name"
-            :subtitle="assignment.branch_name"
-            class="cursor-pointer"
-            :class="{ 'bg-primary-subtle': userData?.role === assignment.role_name }"
+            :title="assignment.is_all ? assignment.branch_name : assignment.role_name"
+            :subtitle="assignment.is_all ? 'Akses & Agregasi Seluruh Cabang (' + assignment.role_name + ')' : assignment.branch_name"
+            class="cursor-pointer mb-2 rounded-lg border transition-all"
+            :class="isAssignmentActive(assignment) ? 'bg-primary-lighten-5 border-primary' : 'bg-surface'"
             @click="switchRole(assignment)"
           >
             <template #prepend>
               <VAvatar
-                size="36"
-                :color="getRoleColor(assignment.role_name)"
+                size="38"
+                :color="assignment.is_all ? 'primary' : getRoleColor(assignment.role_name)"
                 variant="tonal"
-                class="me-1"
+                rounded="lg"
+                class="me-2"
               >
                 <VIcon
-                  icon="ri-shield-user-line"
-                  size="20"
+                  :icon="assignment.is_all ? 'ri-global-line' : 'ri-store-2-line'"
+                  size="22"
                 />
               </VAvatar>
             </template>
             <template #append>
-              <VIcon
-                v-if="userData?.role === assignment.role_name"
-                icon="ri-check-line"
+              <VChip
+                v-if="isAssignmentActive(assignment)"
+                size="small"
                 color="primary"
-              />
+                variant="flat"
+                class="font-weight-bold"
+              >
+                <VIcon icon="ri-check-line" size="14" class="me-1" />
+                Aktif
+              </VChip>
             </template>
           </VListItem>
         </VList>

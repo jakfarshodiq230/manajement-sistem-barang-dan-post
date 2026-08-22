@@ -27,6 +27,10 @@ class User extends Authenticatable
         'password',
         'pin',
         'active_role_id',
+        'branch_id',
+        'phone',
+        'address',
+        'status',
     ];
 
     /**
@@ -57,5 +61,40 @@ class User extends Authenticatable
     public function employee()
     {
         return $this->hasOne(Employee::class);
+    }
+
+    public function hasPermissionTo($permission, $guardName = null): bool
+    {
+        $permissionName = is_string($permission) ? $permission : ($permission->name ?? '');
+
+        // 1. Direct role check or manage all
+        $roleIds = \Illuminate\Support\Facades\DB::table('model_has_roles')
+            ->where('model_id', $this->id)
+            ->where('model_type', get_class($this))
+            ->pluck('role_id')
+            ->unique();
+
+        if ($roleIds->isNotEmpty()) {
+            $hasPerm = \Illuminate\Support\Facades\DB::table('role_has_permissions')
+                ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
+                ->whereIn('role_has_permissions.role_id', $roleIds)
+                ->where(function ($q) use ($permissionName) {
+                    $q->where('permissions.name', $permissionName)
+                      ->orWhere('permissions.name', 'manage all')
+                      ->orWhere('permissions.name', 'all')
+                      ->orWhere('permissions.name', '*');
+                })
+                ->exists();
+
+            if ($hasPerm) {
+                return true;
+            }
+        }
+
+        try {
+            return $this->hasDirectPermission($permission);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }

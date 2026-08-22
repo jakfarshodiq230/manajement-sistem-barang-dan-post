@@ -144,17 +144,17 @@ const tableHeaders = [
 ]
 
 const flatTableData = computed(() => {
-  let list = owners.value || []
+  let list = Array.isArray(owners.value) ? owners.value : (owners.value?.data || [])
   if (selectedType.value === 'main') {
     list = list.filter(o => !o.parent_id)
   } else if (selectedType.value === 'sub') {
     list = list.filter(o => !!o.parent_id)
   }
-  return list.map(item => ({
+  return Array.isArray(list) ? list.map(item => ({
     ...item,
     is_sub: !!item.parent_id,
     parent_name: item.parent?.name || 'Owner Utama',
-  }))
+  })) : []
 })
 </script>
 

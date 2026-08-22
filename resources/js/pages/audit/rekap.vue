@@ -114,29 +114,31 @@ const rowClass = row => {
 
 // Month table headers
 const headers = [
-  { title: 'Bulan',            key: 'bulan',            width: 130 },
-  { title: 'Transaksi',        key: 'jumlah_transaksi', align: 'center' },
-  { title: 'Omset',            key: 'omset',            align: 'end' },
-  { title: 'Modal (COGS)',     key: 'modal_cogs',       align: 'end' },
-  { title: 'Laba Bersih',      key: 'laba_bersih',      align: 'end' },
-  { title: 'Margin',           key: 'margin',           align: 'center' },
-  { title: 'Selisih Kas',      key: 'selisih_kas',      align: 'end' },
-  { title: 'Stok Masuk',       key: 'stok_masuk',       align: 'center' },
-  { title: 'Stok Keluar',      key: 'stok_keluar',      align: 'center' },
-  { title: 'Kumulatif Laba',   key: 'kumulatif_laba',   align: 'end' },
-  { title: '',                 key: 'actions',          sortable: false, width: 60 },
+  { title: 'Bulan',               key: 'bulan',            width: 120 },
+  { title: 'Transaksi',           key: 'jumlah_transaksi', align: 'center' },
+  { title: 'Omset Penjualan',     key: 'omset',            align: 'end' },
+  { title: 'Modal (COGS)',        key: 'modal_cogs',       align: 'end' },
+  { title: 'Beban Kas Kecil',     key: 'beban_operasional',align: 'end' },
+  { title: 'Laba Bersih Riil',    key: 'laba_bersih',      align: 'end' },
+  { title: 'Margin',              key: 'margin',           align: 'center' },
+  { title: 'Selisih Kas',         key: 'selisih_kas',      align: 'end' },
+  { title: 'Stok Masuk',          key: 'stok_masuk',       align: 'center' },
+  { title: 'Stok Keluar',         key: 'stok_keluar',      align: 'center' },
+  { title: 'Kumulatif Laba',      key: 'kumulatif_laba',   align: 'end' },
+  { title: 'Aksi',                key: 'actions',          sortable: false, width: 60, align: 'center' },
 ]
 
 // Detail daily headers
 const detailHeaders = [
-  { title: 'Tanggal',    key: 'tanggal' },
-  { title: 'Hari',       key: 'hari' },
-  { title: 'Transaksi',  key: 'jumlah_transaksi', align: 'center' },
-  { title: 'Omset',      key: 'omset',            align: 'end' },
-  { title: 'Laba',       key: 'laba',             align: 'end' },
-  { title: 'Stok Masuk', key: 'stok_masuk',       align: 'center' },
-  { title: 'Stok Keluar', key: 'stok_keluar',      align: 'center' },
-  { title: 'Selisih Kas', key: 'selisih_kas',      align: 'end' },
+  { title: 'Tanggal',            key: 'tanggal' },
+  { title: 'Hari',               key: 'hari' },
+  { title: 'Transaksi',          key: 'jumlah_transaksi', align: 'center' },
+  { title: 'Omset Penjualan',    key: 'omset',            align: 'end' },
+  { title: 'Beban Kas Kecil',    key: 'beban_operasional',align: 'end' },
+  { title: 'Laba Bersih',        key: 'laba',             align: 'end' },
+  { title: 'Stok Masuk',         key: 'stok_masuk',       align: 'center' },
+  { title: 'Stok Keluar',        key: 'stok_keluar',      align: 'center' },
+  { title: 'Selisih Kas',        key: 'selisih_kas',      align: 'end' },
 ]
 
 const marginCalc = row => {
@@ -147,15 +149,15 @@ const marginCalc = row => {
 </script>
 
 <template>
-  <section>
+  <section class="pa-4">
     <!-- ── Header / Filter ───────────────────────── -->
-    <div class="d-flex align-center justify-space-between mb-4 mt-2">
+    <div class="d-flex flex-wrap align-center justify-space-between gap-4 mb-6">
       <div>
-        <h2 class="text-h4 mb-0 font-weight-bold">
-          📒 Rekap Tahunan
+        <h2 class="text-h4 mb-1 font-weight-bold">
+          📒 Laporan Rekap Tahunan
         </h2>
-        <p class="text-body-1 mb-0 text-disabled mt-1">
-          Laporan rekap keuangan dan operasional per bulan, seperti buku bank
+        <p class="text-body-2 mb-0 text-medium-emphasis">
+          Rekapitulasi omzet, modal HPP, beban kas kecil operasional, laba bersih riil, dan mutasi stok bulanan.
         </p>
       </div>
       
@@ -163,10 +165,10 @@ const marginCalc = row => {
         <VSelect
           v-model="selectedYear"
           :items="yearOptions"
-          label="Pilih Tahun"
+          label="Tahun Laporan"
           density="compact"
           variant="outlined"
-          style="min-width: 130px; max-width: 160px"
+          style="min-width: 140px; max-width: 180px"
           hide-details
         />
         <VBtn
@@ -176,420 +178,357 @@ const marginCalc = row => {
           :loading="isPdfLoading"
           @click="downloadPdf"
         >
-          PDF
+          Download PDF
         </VBtn>
       </div>
     </div>
-    <VRow>
 
     <!-- ── Summary Cards ─────────────────────────── -->
-    <VCol
-      v-if="!isLoading"
-      cols="12"
-      md="3"
-    >
-      <VCard>
-        <VCardText>
-          <p class="text-sm text-medium-emphasis mb-1">
-            Total Transaksi
+    <VRow class="mb-6">
+      <VCol cols="12" sm="6" md="2" lg="2">
+        <VCard elevation="2" class="pa-3 rounded-xl border h-100" :loading="isLoading">
+          <p class="text-caption text-medium-emphasis mb-1 font-weight-bold">
+            TOTAL TRANSAKSI
           </p>
-          <h4 class="text-h4 font-weight-bold">
+          <h4 class="text-h5 font-weight-bold">
             {{ fmtNum(rekapData.summary.total_transaksi) }}
           </h4>
-        </VCardText>
-      </VCard>
-    </VCol>
-    <VCol
-      v-if="!isLoading"
-      cols="12"
-      md="3"
-    >
-      <VCard>
-        <VCardText>
-          <p class="text-sm text-medium-emphasis mb-1">
-            Total Omset
+          <span class="text-caption text-disabled">Struk Selesai</span>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3" lg="3">
+        <VCard elevation="2" class="pa-3 rounded-xl border border-s-lg border-primary h-100" :loading="isLoading">
+          <p class="text-caption text-primary mb-1 font-weight-bold">
+            TOTAL OMSET PENJUALAN
           </p>
-          <h4 class="text-h4 font-weight-bold text-primary">
+          <h4 class="text-h5 font-weight-bold text-primary">
             {{ fmt(rekapData.summary.total_omset) }}
           </h4>
-        </VCardText>
-      </VCard>
-    </VCol>
-    <VCol
-      v-if="!isLoading"
-      cols="12"
-      md="3"
-    >
-      <VCard>
-        <VCardText>
-          <p class="text-sm text-medium-emphasis mb-1">
-            Laba Bersih
+          <span class="text-caption text-disabled">Gross Revenue</span>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="2" lg="2">
+        <VCard elevation="2" class="pa-3 rounded-xl border border-s-lg border-error h-100" :loading="isLoading">
+          <p class="text-caption text-error mb-1 font-weight-bold">
+            BEBAN KAS KECIL
           </p>
-          <h4 class="text-h4 font-weight-bold text-success">
+          <h4 class="text-h5 font-weight-bold text-error">
+            {{ fmt(rekapData.summary.total_beban) }}
+          </h4>
+          <span class="text-caption text-disabled">Biaya Operasional</span>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3" lg="3">
+        <VCard elevation="2" class="pa-3 rounded-xl border border-s-lg border-success h-100" :loading="isLoading">
+          <p class="text-caption text-success mb-1 font-weight-bold">
+            LABA BERSIH RIIL
+          </p>
+          <h4 class="text-h5 font-weight-bold text-success">
             {{ fmt(rekapData.summary.total_laba) }}
           </h4>
-        </VCardText>
-      </VCard>
-    </VCol>
-    <VCol
-      v-if="!isLoading"
-      cols="12"
-      md="3"
-    >
-      <VCard>
-        <VCardText>
-          <p class="text-sm text-medium-emphasis mb-1">
-            Margin Rata-rata
+          <span class="text-caption text-disabled">Omzet &minus; HPP &minus; Kas Kecil</span>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="2" lg="2">
+        <VCard elevation="2" class="pa-3 rounded-xl border border-s-lg border-info h-100" :loading="isLoading">
+          <p class="text-caption text-info mb-1 font-weight-bold">
+            MARGIN BERSIH
           </p>
-          <h4 class="text-h4 font-weight-bold text-info">
+          <h4 class="text-h5 font-weight-bold text-info">
             {{ rekapData.summary.margin ?? 0 }}%
           </h4>
-        </VCardText>
-      </VCard>
-    </VCol>
+          <span class="text-caption text-disabled">Rasio Profitabilitas</span>
+        </VCard>
+      </VCol>
+    </VRow>
 
     <!-- ── Main Table (12 bulan) ──────────────────── -->
-    <VCol cols="12">
-      <VCard :title="`Rincian Per Bulan — Tahun ${selectedYear}`">
-        <VDataTableServer
-          v-model:items-per-page="itemsPerPage"
-          v-model:page="page"
-          :items-length="rekapData.months.length"
-          :headers="headers"
-          :items="rekapData.months"
-          :loading="isLoading"
-          item-value="bulan_num"
-          :items-per-page="-1"
-          hide-default-footer
-          density="comfortable"
-          class="text-no-wrap rekap-table"
-        >
-          <!-- Bulan -->
-          <template #item.bulan="{ item }">
-            <div class="d-flex align-center gap-2">
-              <VBadge
-                v-if="item.is_current"
-                color="primary"
-                content="Bulan Ini"
-                inline
-              />
+    <VRow class="mb-6">
+      <VCol cols="12">
+        <VCard class="rounded-xl border elevation-2">
+          <VCardItem class="pb-2">
+            <template #prepend>
+              <VAvatar color="primary" variant="tonal" size="38" class="me-2" rounded="lg">
+                <VIcon icon="ri-calendar-event-line" size="22" />
+              </VAvatar>
+            </template>
+            <VCardTitle class="text-h6 font-weight-bold">Rincian Performa Keuangan Bulanan &mdash; Tahun {{ selectedYear }}</VCardTitle>
+            <VCardSubtitle>Klik tombol mata (👁) pada baris bulan untuk melihat rincian transaksi harian</VCardSubtitle>
+          </VCardItem>
+          <VDivider />
+
+          <VDataTableServer
+            v-model:items-per-page="itemsPerPage"
+            v-model:page="page"
+            :items-length="rekapData.months.length"
+            :headers="headers"
+            :items="rekapData.months"
+            :loading="isLoading"
+            item-value="bulan_num"
+            :items-per-page="-1"
+            hide-default-footer
+            density="comfortable"
+            hover
+            class="text-no-wrap rekap-table"
+          >
+            <!-- Bulan -->
+            <template #item.bulan="{ item }">
+              <div class="d-flex align-center gap-2">
+                <VChip
+                  v-if="item.is_current"
+                  color="primary"
+                  size="x-small"
+                  variant="flat"
+                  class="font-weight-bold"
+                >
+                  Bulan Ini
+                </VChip>
+                <span :class="item.is_future ? 'text-medium-emphasis' : 'font-weight-bold'">
+                  {{ item.bulan }}
+                </span>
+              </div>
+            </template>
+
+            <!-- Transaksi -->
+            <template #item.jumlah_transaksi="{ item }">
               <span :class="item.is_future ? 'text-medium-emphasis' : 'font-weight-medium'">
-                {{ item.bulan }}
+                {{ item.is_future ? '—' : fmtNum(item.jumlah_transaksi) }}
               </span>
-            </div>
-          </template>
+            </template>
 
-          <!-- Transaksi -->
-          <template #item.jumlah_transaksi="{ item }">
-            <span :class="item.is_future ? 'text-medium-emphasis' : ''">
-              {{ item.is_future ? '—' : fmtNum(item.jumlah_transaksi) }}
-            </span>
-          </template>
-
-          <!-- Omset -->
-          <template #item.omset="{ item }">
-            {{ item.is_future ? '—' : fmt(item.omset) }}
-          </template>
-
-          <!-- Modal -->
-          <template #item.modal_cogs="{ item }">
-            {{ item.is_future ? '—' : fmt(item.modal_cogs) }}
-          </template>
-
-          <!-- Laba Bersih -->
-          <template #item.laba_bersih="{ item }">
-            <span :class="labaColor(item.laba_bersih)">
-              {{ item.is_future ? '—' : fmt(item.laba_bersih) }}
-            </span>
-          </template>
-
-          <!-- Margin -->
-          <template #item.margin="{ item }">
-            <VChip
-              v-if="!item.is_future && marginCalc(item) !== null"
-              :color="parseFloat(marginCalc(item)) >= 20 ? 'success' : parseFloat(marginCalc(item)) >= 10 ? 'warning' : 'error'"
-              size="x-small"
-            >
-              {{ marginCalc(item) }}%
-            </VChip>
-            <span
-              v-else
-              class="text-medium-emphasis"
-            >—</span>
-          </template>
-
-          <!-- Selisih Kas -->
-          <template #item.selisih_kas="{ item }">
-            <span :class="labaColor(item.selisih_kas)">
-              {{ item.is_future ? '—' : fmt(item.selisih_kas) }}
-            </span>
-          </template>
-
-          <!-- Stok Masuk -->
-          <template #item.stok_masuk="{ item }">
-            <span class="text-success">
-              {{ item.is_future ? '—' : ('+' + fmtNum(item.stok_masuk)) }}
-            </span>
-          </template>
-
-          <!-- Stok Keluar -->
-          <template #item.stok_keluar="{ item }">
-            <span class="text-error">
-              {{ item.is_future ? '—' : ('-' + fmtNum(item.stok_keluar)) }}
-            </span>
-          </template>
-
-          <!-- Kumulatif Laba (YTD) -->
-          <template #item.kumulatif_laba="{ item }">
-            <span
-              class="font-weight-bold"
-              :class="labaColor(item.kumulatif_laba)"
-            >
-              {{ item.is_future ? '—' : fmt(item.kumulatif_laba) }}
-            </span>
-          </template>
-
-          <!-- Actions -->
-          <template #item.actions="{ item }">
-            <VBtn
-              v-if="!item.is_future"
-              icon="ri-eye-line"
-              size="small"
-              variant="text"
-              color="primary"
-              @click="openDetail(item)"
-            />
-          </template>
-
-          <!-- Footer / Total Row -->
-          <template #bottom>
-            <div class="pa-4 border-t d-flex flex-wrap gap-6 text-body-2">
-              <span><strong>Total Transaksi:</strong> {{ fmtNum(rekapData.summary.total_transaksi) }}</span>
-              <span><strong>Total Omset:</strong> {{ fmt(rekapData.summary.total_omset) }}</span>
-              <span><strong>Total Laba:</strong>
-                <span :class="labaColor(rekapData.summary.total_laba)"> {{ fmt(rekapData.summary.total_laba) }}</span>
+            <!-- Omset -->
+            <template #item.omset="{ item }">
+              <span class="font-weight-medium text-primary">
+                {{ item.is_future ? '—' : fmt(item.omset) }}
               </span>
-              <span><strong>Margin:</strong> {{ rekapData.summary.margin ?? 0 }}%</span>
-            </div>
-          </template>
-        </VDataTableServer>
-      </VCard>
-    </VCol>
+            </template>
+
+            <!-- Modal COGS -->
+            <template #item.modal_cogs="{ item }">
+              <span class="text-medium-emphasis">
+                {{ item.is_future ? '—' : fmt(item.modal_cogs) }}
+              </span>
+            </template>
+
+            <!-- Beban Kas Kecil -->
+            <template #item.beban_operasional="{ item }">
+              <span v-if="!item.is_future" class="text-error font-weight-medium">
+                {{ item.beban_operasional > 0 ? ('- ' + fmt(item.beban_operasional)) : 'Rp 0' }}
+              </span>
+              <span v-else class="text-medium-emphasis">—</span>
+            </template>
+
+            <!-- Laba Bersih -->
+            <template #item.laba_bersih="{ item }">
+              <span :class="labaColor(item.laba_bersih)" class="font-weight-bold">
+                {{ item.is_future ? '—' : fmt(item.laba_bersih) }}
+              </span>
+            </template>
+
+            <!-- Margin -->
+            <template #item.margin="{ item }">
+              <VChip
+                v-if="!item.is_future && marginCalc(item) !== null"
+                :color="parseFloat(marginCalc(item)) >= 20 ? 'success' : parseFloat(marginCalc(item)) >= 10 ? 'warning' : 'error'"
+                size="x-small"
+                variant="tonal"
+                class="font-weight-bold"
+              >
+                {{ marginCalc(item) }}%
+              </VChip>
+              <span
+                v-else
+                class="text-medium-emphasis"
+              >—</span>
+            </template>
+
+            <!-- Selisih Kas -->
+            <template #item.selisih_kas="{ item }">
+              <span :class="labaColor(item.selisih_kas)">
+                {{ item.is_future ? '—' : fmt(item.selisih_kas) }}
+              </span>
+            </template>
+
+            <!-- Stok Masuk -->
+            <template #item.stok_masuk="{ item }">
+              <span class="text-success font-weight-medium">
+                {{ item.is_future ? '—' : ('+' + fmtNum(item.stok_masuk)) }}
+              </span>
+            </template>
+
+            <!-- Stok Keluar -->
+            <template #item.stok_keluar="{ item }">
+              <span class="text-error font-weight-medium">
+                {{ item.is_future ? '—' : ('-' + fmtNum(item.stok_keluar)) }}
+              </span>
+            </template>
+
+            <!-- Kumulatif Laba (YTD) -->
+            <template #item.kumulatif_laba="{ item }">
+              <span
+                class="font-weight-bold"
+                :class="labaColor(item.kumulatif_laba)"
+              >
+                {{ item.is_future ? '—' : fmt(item.kumulatif_laba) }}
+              </span>
+            </template>
+
+            <!-- Actions -->
+            <template #item.actions="{ item }">
+              <VBtn
+                v-if="!item.is_future"
+                icon="ri-eye-line"
+                size="small"
+                variant="tonal"
+                color="primary"
+                @click="openDetail(item)"
+              />
+            </template>
+
+            <!-- Footer / Total Row -->
+            <template #bottom>
+              <div class="pa-4 border-t d-flex flex-wrap align-center justify-space-between gap-4 text-body-2 bg-var-theme-surface">
+                <div><strong>Total Transaksi:</strong> {{ fmtNum(rekapData.summary.total_transaksi) }} Struk</div>
+                <div><strong>Total Omset:</strong> <span class="text-primary font-weight-bold">{{ fmt(rekapData.summary.total_omset) }}</span></div>
+                <div><strong>Total Beban Kas Kecil:</strong> <span class="text-error font-weight-bold">{{ fmt(rekapData.summary.total_beban) }}</span></div>
+                <div><strong>Total Laba Bersih Riil:</strong>
+                  <span :class="labaColor(rekapData.summary.total_laba)" class="font-weight-bold"> {{ fmt(rekapData.summary.total_laba) }}</span>
+                </div>
+                <div><strong>Margin Rata-rata:</strong> <span class="text-info font-weight-bold">{{ rekapData.summary.margin ?? 0 }}%</span></div>
+              </div>
+            </template>
+          </VDataTableServer>
+        </VCard>
+      </VCol>
+    </VRow>
 
     <!-- ── Catatan Rumus ──────────────────────────── -->
-    <VCol cols="12">
-      <VCard title="📐 Catatan Rumus & Cara Perolehan Angka">
-        <VCardText>
-          <VAlert
-            color="info"
-            variant="tonal"
-            icon="ri-information-line"
-            class="mb-5"
+    <VRow>
+      <VCol cols="12">
+        <VCard class="rounded-xl border elevation-1" title="📐 Standar Perhitungan Akuntansi Rekap Keuangan">
+          <VCardText>
+            <VAlert
+              color="info"
+              variant="tonal"
+              icon="ri-information-line"
+              class="mb-4"
+            >
+              Semua angka di halaman ini dihitung secara riil: <strong>Laba Bersih Riil = Omzet Penjualan &minus; HPP (Modal Barang Terjual) &minus; Beban Operasional Kas Kecil</strong>. Transaksi yang masuk hanya status <strong>Selesai (Completed)</strong>.
+            </VAlert>
+
+            <VRow class="g-3">
+              <VCol cols="12" md="4">
+                <div class="pa-3 bg-var-theme-surface rounded-lg border h-100">
+                  <div class="text-subtitle-2 font-weight-bold text-primary mb-1">1. Omset & HPP Modal</div>
+                  <div class="text-caption text-medium-emphasis">
+                    Omset adalah nilai bruto penjualan. HPP adalah modal dasar dari batch stok barang yang keluar saat kasir melakukan transaksi.
+                  </div>
+                </div>
+              </VCol>
+
+              <VCol cols="12" md="4">
+                <div class="pa-3 bg-var-theme-surface rounded-lg border h-100">
+                  <div class="text-subtitle-2 font-weight-bold text-error mb-1">2. Beban Kas Kecil (Petty Cash)</div>
+                  <div class="text-caption text-medium-emphasis">
+                    Akumulasi biaya rutin harian toko (Token PLN, Galon Minum, Bensin Antar Barang, ATK Thermal, dan Lembur Karyawan).
+                  </div>
+                </div>
+              </VCol>
+
+              <VCol cols="12" md="4">
+                <div class="pa-3 bg-var-theme-surface rounded-lg border h-100">
+                  <div class="text-subtitle-2 font-weight-bold text-success mb-1">3. Laba Bersih Riil (Net Profit)</div>
+                  <div class="text-caption text-medium-emphasis">
+                    Keuntungan bersih akhir yang siap dialokasikan sebagai laba ditahan atau pembagian keuntungan cabang kepada owner.
+                  </div>
+                </div>
+              </VCol>
+            </VRow>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- ── Detail Dialog (Harian per Bulan) ─────────── -->
+    <VDialog
+      v-model="detailDialog"
+      max-width="950"
+    >
+      <VCard class="rounded-xl">
+        <VCardTitle class="bg-primary text-white pa-4 d-flex align-center justify-space-between">
+          <span class="font-weight-bold">Detail Harian &mdash; {{ detailMonth?.bulan }} {{ selectedYear }}</span>
+          <VBtn icon="ri-close-line" variant="text" size="small" @click="detailDialog = false" />
+        </VCardTitle>
+
+        <VCardText class="pa-4">
+          <VDataTableServer
+            v-model:items-per-page="itemsPerPage"
+            v-model:page="page"
+            :items-length="detailData.length"
+            :headers="detailHeaders"
+            :items="detailData"
+            :loading="isLoadingDetail"
+            :items-per-page="-1"
+            hide-default-footer
+            density="compact"
+            class="text-no-wrap"
           >
-            Semua angka di halaman ini hanya dihitung dari transaksi penjualan dengan status
-            <strong>Selesai (Completed)</strong>. Transaksi draf, tertunda, atau dibatalkan
-            <strong>tidak</strong> dimasukkan ke dalam perhitungan.
-          </VAlert>
-
-          <VRow>
-            <!-- Kolom 1 -->
-            <VCol
-              cols="12"
-              md="6"
-            >
-              <p class="text-subtitle-2 font-weight-bold mb-2 text-primary">
-                💰 Penjualan & Keuangan
-              </p>
-              <VList
-                lines="two"
-                density="compact"
-              >
-                <VListItem>
-                  <template #title>
-                    <strong>Omset</strong>
-                  </template>
-                  <template #subtitle>
-                    = Jumlah <code>total_amount</code> dari semua transaksi yang selesai pada bulan tersebut.<br>
-                    <span class="text-caption text-medium-emphasis">Ini adalah total harga jual kotor sebelum dikurangi modal.</span>
-                  </template>
-                </VListItem>
-                <VDivider class="my-1" />
-                <VListItem>
-                  <template #title>
-                    <strong>Modal / COGS</strong> (Harga Pokok Penjualan)
-                  </template>
-                  <template #subtitle>
-                    = Jumlah <code>cost_price × qty</code> dari tabel <code>sale_items</code> untuk setiap transaksi selesai.<br>
-                    <span class="text-caption text-medium-emphasis">Ini adalah total nilai beli barang yang berhasil terjual.</span>
-                  </template>
-                </VListItem>
-                <VDivider class="my-1" />
-                <VListItem>
-                  <template #title>
-                    <strong>Laba Bersih</strong>
-                  </template>
-                  <template #subtitle>
-                    = <code>Omset</code> − <code>Modal/COGS</code><br>
-                    <span class="text-caption text-medium-emphasis">Keuntungan kotor dari selisih harga jual dan harga modal.</span>
-                  </template>
-                </VListItem>
-                <VDivider class="my-1" />
-                <VListItem>
-                  <template #title>
-                    <strong>Margin (%)</strong>
-                  </template>
-                  <template #subtitle>
-                    = <code>(Laba Bersih ÷ Omset) × 100%</code><br>
-                    <span class="text-caption text-medium-emphasis">
-                      🟢 ≥ 20% = Sangat baik &nbsp;|&nbsp; 🟡 ≥ 10% = Cukup &nbsp;|&nbsp; 🔴 &lt; 10% = Perlu perhatian
-                    </span>
-                  </template>
-                </VListItem>
-                <VDivider class="my-1" />
-                <VListItem>
-                  <template #title>
-                    <strong>Kumulatif Laba (YTD)</strong>
-                  </template>
-                  <template #subtitle>
-                    = Akumulasi total laba bersih dari bulan Januari hingga bulan yang bersangkutan.<br>
-                    <span class="text-caption text-medium-emphasis">Bulan mendatang tidak ikut dihitung. Berguna untuk melihat tren laba sepanjang tahun (Year-to-Date).</span>
-                  </template>
-                </VListItem>
-              </VList>
-            </VCol>
-
-            <!-- Kolom 2 -->
-            <VCol
-              cols="12"
-              md="6"
-            >
-              <p class="text-subtitle-2 font-weight-bold mb-2 text-success">
-                📦 Stok & Kas
-              </p>
-              <VList
-                lines="two"
-                density="compact"
-              >
-                <VListItem>
-                  <template #title>
-                    <strong>Stok Masuk (+)</strong>
-                  </template>
-                  <template #subtitle>
-                    = Total <code>quantity</code> dari <code>stock_movements</code> dengan <code>type = 'in'</code> pada bulan tersebut.<br>
-                    <span class="text-caption text-medium-emphasis">Mencakup penerimaan dari PO, transfer masuk, atau penambahan stok manual.</span>
-                  </template>
-                </VListItem>
-                <VDivider class="my-1" />
-                <VListItem>
-                  <template #title>
-                    <strong>Stok Keluar (-)</strong>
-                  </template>
-                  <template #subtitle>
-                    = Total nilai absolut <code>|quantity|</code> dari <code>stock_movements</code> dengan tipe selain <code>'in'</code>.<br>
-                    <span class="text-caption text-medium-emphasis">Mencakup penjualan, penyesuaian stok opname, retur, atau pengurangan manual.</span>
-                  </template>
-                </VListItem>
-                <VDivider class="my-1" />
-                <VListItem>
-                  <template #title>
-                    <strong>Selisih Kas</strong>
-                  </template>
-                  <template #subtitle>
-                    = Jumlah kolom <code>variance</code> dari semua <code>cash_reconciliations</code> pada bulan tersebut.<br>
-                    <span class="text-caption text-medium-emphasis">Positif = uang fisik lebih banyak dari sistem. Negatif = ada kekurangan kas.</span>
-                  </template>
-                </VListItem>
-                <VDivider class="my-1" />
-                <VListItem>
-                  <template #title>
-                    <strong>Bulan Mendatang</strong>
-                  </template>
-                  <template #subtitle>
-                    Tampil redup dengan tanda <strong>—</strong> karena data belum tersedia.<br>
-                    <span class="text-caption text-medium-emphasis">Rekap otomatis mengisi data begitu transaksi masuk di bulan tersebut.</span>
-                  </template>
-                </VListItem>
-                <VDivider class="my-1" />
-                <VListItem>
-                  <template #title>
-                    <strong>Detail Harian</strong> (ikon 👁)
-                  </template>
-                  <template #subtitle>
-                    Klik ikon mata di baris bulan mana pun untuk melihat rincian per hari.<br>
-                    <span class="text-caption text-medium-emphasis">Menampilkan breakdown transaksi, omset, laba, mutasi stok, dan selisih kas setiap hari dalam satu bulan.</span>
-                  </template>
-                </VListItem>
-              </VList>
-            </VCol>
-          </VRow>
+            <template #item.omset="{ item }">
+              <span class="text-primary font-weight-medium">
+                {{ item.is_future ? '—' : fmt(item.omset) }}
+              </span>
+            </template>
+            <template #item.beban_operasional="{ item }">
+              <span v-if="!item.is_future" class="text-error font-weight-medium">
+                {{ item.beban_operasional > 0 ? ('- ' + fmt(item.beban_operasional)) : 'Rp 0' }}
+              </span>
+              <span v-else class="text-medium-emphasis">—</span>
+            </template>
+            <template #item.laba="{ item }">
+              <span :class="labaColor(item.laba)" class="font-weight-bold">
+                {{ item.is_future ? '—' : fmt(item.laba) }}
+              </span>
+            </template>
+            <template #item.stok_masuk="{ item }">
+              <span class="text-success font-weight-medium">
+                {{ item.is_future ? '—' : ('+' + fmtNum(item.stok_masuk)) }}
+              </span>
+            </template>
+            <template #item.stok_keluar="{ item }">
+              <span class="text-error font-weight-medium">
+                {{ item.is_future ? '—' : ('-' + fmtNum(item.stok_keluar)) }}
+              </span>
+            </template>
+            <template #item.selisih_kas="{ item }">
+              <span :class="labaColor(item.selisih_kas)">
+                {{ item.is_future ? '—' : fmt(item.selisih_kas) }}
+              </span>
+            </template>
+            <template #item.jumlah_transaksi="{ item }">
+              {{ item.is_future ? '—' : fmtNum(item.jumlah_transaksi) }}
+            </template>
+            <template #no-data>
+              <div class="text-center py-6 text-disabled">
+                Tidak ada transaksi tercatat.
+              </div>
+            </template>
+          </VDataTableServer>
         </VCardText>
+        <VCardActions class="px-4 pb-4">
+          <VSpacer />
+          <VBtn
+            variant="tonal"
+            @click="detailDialog = false"
+          >
+            Tutup
+          </VBtn>
+        </VCardActions>
       </VCard>
-    </VCol>
-  </VRow>
-
-  <!-- ── Detail Dialog (Harian per Bulan) ─────────── -->
-  <VDialog
-    v-model="detailDialog"
-    max-width="900"
-  >
-    <VCard :title="`Detail Harian — ${detailMonth?.bulan} ${selectedYear}`">
-      <VCardText>
-        <VDataTableServer
-          v-model:items-per-page="itemsPerPage"
-          v-model:page="page"
-          :items-length="detailData.length"
-          :headers="detailHeaders"
-          :items="detailData"
-          :loading="isLoadingDetail"
-          :items-per-page="-1"
-          hide-default-footer
-          density="compact"
-          class="text-no-wrap"
-        >
-          <template #item.omset="{ item }">
-            {{ item.is_future ? '—' : fmt(item.omset) }}
-          </template>
-          <template #item.laba="{ item }">
-            <span :class="labaColor(item.laba)">
-              {{ item.is_future ? '—' : fmt(item.laba) }}
-            </span>
-          </template>
-          <template #item.stok_masuk="{ item }">
-            <span class="text-success">
-              {{ item.is_future ? '—' : ('+' + fmtNum(item.stok_masuk)) }}
-            </span>
-          </template>
-          <template #item.stok_keluar="{ item }">
-            <span class="text-error">
-              {{ item.is_future ? '—' : ('-' + fmtNum(item.stok_keluar)) }}
-            </span>
-          </template>
-          <template #item.selisih_kas="{ item }">
-            <span :class="labaColor(item.selisih_kas)">
-              {{ item.is_future ? '—' : fmt(item.selisih_kas) }}
-            </span>
-          </template>
-          <template #item.jumlah_transaksi="{ item }">
-            {{ item.is_future ? '—' : fmtNum(item.jumlah_transaksi) }}
-          </template>
-          <template #no-data>
-            <div class="text-center py-6">
-              Tidak ada data.
-            </div>
-          </template>
-        </VDataTableServer>
-      </VCardText>
-      <VCardActions class="px-4 pb-4">
-        <VSpacer />
-        <VBtn
-          variant="outlined"
-          @click="detailDialog = false"
-        >
-          Tutup
-        </VBtn>
-      </VCardActions>
-    </VCard>
-  </VDialog>
+    </VDialog>
   </section>
 </template>
 

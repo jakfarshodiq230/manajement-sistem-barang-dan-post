@@ -12,42 +12,38 @@ class BranchController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $isGlobalAdmin = false;
+        $isGlobal = false;
         $userBranchIds = [];
 
         if ($user) {
-            // Jika tidak ada active_role_id, gunakan assignment pertama seperti di AuthController
-            $activeRoleId = $user->active_role_id;
-            
-            if (!$activeRoleId) {
-                $firstAssignment = \DB::table('model_has_roles')
-                    ->where('model_id', $user->id)
-                    ->where('model_type', get_class($user))
-                    ->first();
-                if ($firstAssignment) {
-                    $activeRoleId = $firstAssignment->role_id;
-                }
+            if ($user->can('manage all') || $user->can('all') || $user->can('*') || $user->can('Cabang Create')) {
+                $isGlobal = true;
             }
 
-            if ($activeRoleId) {
-                $role = \Spatie\Permission\Models\Role::find($activeRoleId);
-                if ($role && $role->hasPermissionTo('Cabang Create')) {
-                    $isGlobalAdmin = true;
-                } else {
-                    $userBranchIds = \DB::table('model_has_roles')
-                        ->where('model_id', $user->id)
-                        ->where('model_type', get_class($user))
-                        ->where('role_id', $activeRoleId)
-                        ->pluck('branch_id')
-                        ->toArray();
-                }
+            $assignments = \DB::table('model_has_roles')
+                ->where('model_id', $user->id)
+                ->where('model_type', get_class($user))
+                ->pluck('branch_id');
+
+            if ($assignments->contains(null) && $assignments->count() > 0) {
+                $isGlobal = true;
             }
+
+            $userBranchIds = $assignments->filter()->unique()->values()->toArray();
+            if (empty($userBranchIds) && $user->branch_id) {
+                $userBranchIds = [$user->branch_id];
+            }
+        }
+
+        // For user assignment management or global branch list
+        if ($request->has('all') && ($request->all == 'true' || $request->all == '1')) {
+            return response()->json(Branch::select('id', 'name', 'type', 'address', 'status')->get());
         }
 
         // For the dropdowns (only id and name)
         if ($request->has('simple')) {
             $query = Branch::select('id', 'name');
-            if (!$isGlobalAdmin && !empty($userBranchIds)) {
+            if (!$isGlobal && !empty($userBranchIds)) {
                 $query->whereIn('id', $userBranchIds);
             }
             return response()->json($query->get());
@@ -55,7 +51,7 @@ class BranchController extends Controller
 
         // For the main data table
         $query = Branch::with('owner');
-        if (!$isGlobalAdmin && !empty($userBranchIds)) {
+        if (!$isGlobal && !empty($userBranchIds)) {
             $query->whereIn('id', $userBranchIds);
         }
 
@@ -66,8 +62,8 @@ class BranchController extends Controller
         if ($search) {
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('city', 'like', "%{$search}%")
-                  ->orWhere('province', 'like', "%{$search}%");
+                  ->orWhere('address', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%");
             });
         }
         
