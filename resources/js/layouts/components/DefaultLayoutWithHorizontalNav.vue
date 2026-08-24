@@ -11,14 +11,24 @@ import UserProfile from '@/layouts/components/UserProfile.vue'
 import NavBarI18n from '@core/components/I18n.vue'
 import { HorizontalNavLayout } from '@layouts'
 import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
+import { useAbility } from '@casl/vue'
 
 const navItems = ref([])
+const ability = useAbility()
 
 onMounted(async () => {
   try {
-    const data = await $api('/apps/modules/navigation')
+    const [navData, userData] = await Promise.all([
+      $api('/apps/modules/navigation'),
+      $api('/user').catch(() => null),
+    ])
 
-    navItems.value = data.data || data
+    navItems.value = navData.data || navData
+
+    if (userData && userData.userAbilityRules) {
+      localStorage.setItem('userAbilityRules', JSON.stringify(userData.userAbilityRules))
+      ability.update(userData.userAbilityRules)
+    }
   } catch (e) {
     console.error('Failed to load navigation', e)
   }

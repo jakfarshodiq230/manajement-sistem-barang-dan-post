@@ -17,6 +17,7 @@ class AuthController extends Controller
         ]);
 
         if (Auth::attempt($request->only('email', 'password'))) {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
 
             // Load all branch-role assignments directly with leftJoin

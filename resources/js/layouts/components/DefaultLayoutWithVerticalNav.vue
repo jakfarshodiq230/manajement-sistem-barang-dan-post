@@ -13,17 +13,25 @@ import NavBarI18n from '@core/components/I18n.vue'
 
 // @layouts plugin
 import { VerticalNavLayout } from '@layouts'
+import { useAbility } from '@casl/vue'
 
 const configStore = useConfigStore()
 const navItems = ref([{ heading: 'Apps & Pages' }])
+const ability = useAbility()
 
 onMounted(async () => {
   try {
-    const data = await $api('/apps/modules/navigation')
+    const [navData, userData] = await Promise.all([
+      $api('/apps/modules/navigation'),
+      $api('/user').catch(() => null),
+    ])
 
+    navItems.value = navData.data || navData
 
-    // Combine standard headers with dynamic menus, and also add back the Roles/Modules config
-    navItems.value = data.data || data
+    if (userData && userData.userAbilityRules) {
+      localStorage.setItem('userAbilityRules', JSON.stringify(userData.userAbilityRules))
+      ability.update(userData.userAbilityRules)
+    }
   } catch (e) {
     console.error('Failed to load navigation', e)
   }

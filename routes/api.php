@@ -235,6 +235,34 @@ Route::middleware('auth:sanctum')->get('/user', function (\Illuminate\Http\Reque
     $activeRole = $foundRole ? $foundRole->name : ($firstAssig ? $firstAssig->role_name : (!empty($directRoles) ? $directRoles[0] : 'Super Admin'));
     $activeBranch = $user->branch_id ? \App\Models\Branch::find($user->branch_id) : null;
 
+    // Calculate userAbilityRules dynamically from Spatie permissions
+    $assignedRoleIds = $rawAssignments->pluck('role_id')->unique()->filter();
+    $userPermissions = collect();
+    if ($assignedRoleIds->isNotEmpty()) {
+        $rolePermissions = \Spatie\Permission\Models\Permission::join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+            ->whereIn('role_has_permissions.role_id', $assignedRoleIds)
+            ->pluck('permissions.name');
+        $userPermissions = $userPermissions->merge($rolePermissions);
+    }
+    $userPermissions = $userPermissions->merge($user->getAllPermissions()->pluck('name'))->unique();
+
+    $abilityRules = [];
+    if ($userPermissions->contains('manage all') || $userPermissions->contains('all') || $userPermissions->contains('*')) {
+        $abilityRules[] = ['action' => 'manage', 'subject' => 'all'];
+    } else {
+        foreach ($userPermissions as $permName) {
+            $parts = explode(' ', $permName);
+            if (count($parts) >= 2) {
+                $action = strtolower(array_pop($parts));
+                $subject = implode(' ', $parts);
+                $abilityRules[] = ['action' => $action, 'subject' => $subject];
+            } else {
+                $abilityRules[] = ['action' => strtolower($permName), 'subject' => 'all'];
+            }
+        }
+    }
+    $abilityRules[] = ['action' => 'read', 'subject' => 'Auth'];
+
     return response()->json([
         'id'                 => $user->id,
         'fullName'           => $user->name,
@@ -247,6 +275,7 @@ Route::middleware('auth:sanctum')->get('/user', function (\Illuminate\Http\Reque
         'active_branch_name' => $activeBranch ? $activeBranch->name : 'Semua Cabang (Global)',
         'assignments'        => $assignments,
         'avatar'             => '',
+        'userAbilityRules'   => $abilityRules,
     ]);
 });
 
