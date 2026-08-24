@@ -15,16 +15,50 @@ use Illuminate\Support\Str;
 
 class StockTransferController extends Controller
 {
+    public function statusCounts(Request $request)
+    {
+        $query = StockTransfer::query();
+
+        if ($request->has('source_branch_id') && $request->source_branch_id) {
+            $query->where('source_branch_id', $request->source_branch_id);
+        }
+
+        if ($request->has('destination_branch_id') && $request->destination_branch_id) {
+            $query->where('destination_branch_id', $request->destination_branch_id);
+        }
+
+        $counts = $query->selectRaw("
+            COUNT(*) as total,
+            SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+            SUM(CASE WHEN status IN ('ready_for_pickup', 'approved') THEN 1 ELSE 0 END) as ready_for_pickup,
+            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+            SUM(CASE WHEN status IN ('rejected', 'cancelled') THEN 1 ELSE 0 END) as rejected_cancelled
+        ")->first();
+
+        return response()->json([
+            'total' => (int) ($counts->total ?? 0),
+            'pending' => (int) ($counts->pending ?? 0),
+            'ready_for_pickup' => (int) ($counts->ready_for_pickup ?? 0),
+            'completed' => (int) ($counts->completed ?? 0),
+            'rejected_cancelled' => (int) ($counts->rejected_cancelled ?? 0),
+        ]);
+    }
+
     public function index(Request $request)
     {
-        $query = StockTransfer::with([
-            'sourceBranch',
-            'destinationBranch',
-            'createdBy',
-            'preparedBy',
-            'approvedBy',
-            'receivedBy',
-            'items.product'
+        $query = StockTransfer::select([
+            'id',
+            'reference_no',
+            'source_branch_id',
+            'destination_branch_id',
+            'status',
+            'picked_up_by_name',
+            'pickup_notes',
+            'created_at',
+            'updated_at',
+        ])->with([
+            'sourceBranch:id,name',
+            'destinationBranch:id,name',
         ]);
 
         $search = $request->query('search');

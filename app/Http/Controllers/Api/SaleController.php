@@ -89,7 +89,8 @@ class SaleController extends Controller
 
     public function store(Request $request)
     {
-        if (!request()->user()->can('Kasir (POS) Create')) {
+        $user = $request->user() ?: auth()->user();
+        if ($user && !$user->can('Kasir (POS) Create')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -130,18 +131,20 @@ class SaleController extends Controller
             return response()->json(['message' => 'Gagal: Cabang ini sudah melakukan Closing Kasir untuk tanggal ' . $requestedDate . '. Anda tidak bisa menambah transaksi penjualan baru!'], 400);
         }
 
+        $userId = $user ? $user->id : auth()->id();
+
         // Check if there are any previous days with sales that haven't been closed
         $today = \Carbon\Carbon::today()->toDateString();
         $unclosedDates = \Illuminate\Support\Facades\DB::table('sales')
             ->where('branch_id', $request->branch_id)
-            ->where('user_id', $request->user()->id)
+            ->where('user_id', $userId)
             ->where('date', '<', $today)
             ->groupBy('date')
             ->pluck('date');
             
         foreach ($unclosedDates as $pastDate) {
             $hasClosed = \App\Models\CashReconciliation::where('branch_id', $request->branch_id)
-                ->where('user_id', $request->user()->id)
+                ->where('user_id', $userId)
                 ->where('date', $pastDate)
                 ->exists();
                 
@@ -151,6 +154,17 @@ class SaleController extends Controller
             }
         }
         try {
+            if ($request->payment_method === 'tempo') {
+                if (!$request->customer_id && !$request->filled('customer_name')) {
+                    \Illuminate\Support\Facades\DB::rollBack();
+                    return response()->json(['message' => 'Transaksi utang/tempo wajib memilih atau mengisi data pelanggan!'], 422);
+                }
+                if (!$request->filled('due_date')) {
+                    \Illuminate\Support\Facades\DB::rollBack();
+                    return response()->json(['message' => 'Transaksi utang/tempo wajib mengisi tanggal jatuh tempo!'], 422);
+                }
+            }
+
             $invoice_number = 'INV-' . date('YmdHis') . '-' . rand(100, 999);
 
             $finalCustomerId = $request->customer_id;
@@ -171,7 +185,7 @@ class SaleController extends Controller
             $sale = \App\Models\Sale::create([
                 'invoice_number' => $invoice_number,
                 'branch_id' => $request->branch_id,
-                'user_id' => $request->user()->id,
+                'user_id' => $userId,
                 'approved_by' => $request->approved_by,
                 'date' => $request->date,
                 'subtotal' => 0,

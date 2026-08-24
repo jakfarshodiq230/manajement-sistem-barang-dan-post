@@ -75,20 +75,18 @@ const extractArray = val => {
 // Fetch options once on mount
 const fetchInitialOptions = async () => {
   try {
-    const [branchData, employeeData] = await Promise.all([
-      $api('/apps/branches'),
-      $api('/apps/employees', { query: { itemsPerPage: 100 } }).catch(() => ({ data: [] })),
-    ])
+    const branchData = await $api('/apps/branches')
     branches.value = extractArray(branchData)
-    employees.value = extractArray(employeeData)
   } catch (e) {
     console.error('Failed to load initial options:', e)
     branches.value = []
-    employees.value = []
   }
 }
 
+let isFetching = false
 const fetchData = async () => {
+  if (isFetching) return
+  isFetching = true
   isLoading.value = true
   try {
     const params = {
@@ -123,6 +121,7 @@ const fetchData = async () => {
     mutasiList.value = []
   } finally {
     isLoading.value = false
+    isFetching = false
   }
 }
 
@@ -154,13 +153,37 @@ const tableHeaders = [
   { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
 ]
 
-const countPending = computed(() => {
-  return mutasiList.value.filter(item => item.status === 'pending').length
+const statusCounts = ref({
+  total: 0,
+  pending: 0,
+  ready_for_pickup: 0,
+  completed: 0,
+  rejected_cancelled: 0,
 })
 
-const countReadyForPickup = computed(() => {
-  return mutasiList.value.filter(item => item.status === 'ready_for_pickup' || item.status === 'approved').length
-})
+const countPending = computed(() => statusCounts.value.pending)
+const countReadyForPickup = computed(() => statusCounts.value.ready_for_pickup)
+
+const fetchStatusCounts = async () => {
+  try {
+    const params = {}
+    if (selectedSourceBranch.value) params.source_branch_id = selectedSourceBranch.value
+    if (selectedDestinationBranch.value) params.destination_branch_id = selectedDestinationBranch.value
+    
+    const res = await $api('/apps/stock-transfers/status-counts', { query: params })
+    if (res) {
+      statusCounts.value = {
+        total: res.total ?? 0,
+        pending: res.pending ?? 0,
+        ready_for_pickup: res.ready_for_pickup ?? 0,
+        completed: res.completed ?? 0,
+        rejected_cancelled: res.rejected_cancelled ?? 0,
+      }
+    }
+  } catch (e) {
+    console.error('Failed to fetch status counts:', e)
+  }
+}
 
 const openTrackingDialog = async mutasi => {
   try {
@@ -287,11 +310,19 @@ const submitReject = async () => {
 }
 
 // Pickup Dialog Handlers (Tahap 3)
-const openPickupDialog = mutasi => {
+const openPickupDialog = async mutasi => {
   pickupMutasi.value = mutasi
   pickupEmployeeName.value = ''
   pickupNotes.value = ''
   isPickupDialogVisible.value = true
+  if (employees.value.length === 0) {
+    try {
+      const employeeData = await $api('/apps/employees', { query: { itemsPerPage: 100 } })
+      employees.value = extractArray(employeeData)
+    } catch (e) {
+      console.error('Failed to load employees:', e)
+    }
+  }
 }
 
 const submitPickup = async () => {

@@ -122,6 +122,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     // Petty Cash (Kas Kecil Cabang)
     Route::apiResource('petty-cashes', \App\Http\Controllers\Api\PettyCashController::class);
 
+    Route::get('stock-transfers/status-counts', [\App\Http\Controllers\Api\StockTransferController::class, 'statusCounts']);
     Route::apiResource('stock-transfers', \App\Http\Controllers\Api\StockTransferController::class)->except(['update', 'destroy']);
     Route::get('stock-transfers/{id}/delivery-note', [\App\Http\Controllers\Api\StockTransferController::class, 'deliveryNote']);
     Route::post('stock-transfers/{id}/prepare', [\App\Http\Controllers\Api\StockTransferController::class, 'prepare']);

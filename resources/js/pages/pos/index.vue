@@ -726,8 +726,9 @@ const submitCheckout = async () => {
     targetCustomerName = customerSearch.value.trim()
   }
 
-  if (!targetCustomerId && !targetCustomerName) {
-    snackbar.show('Mohon pilih atau ketik nama pelanggan! (Wajib untuk semua transaksi)', 'warning')
+  // Wajib jika transaksi Utang (Tempo/Piutang)
+  if (transactionType.value === 'utang' && !targetCustomerId && !targetCustomerName) {
+    snackbar.show('Mohon pilih atau ketik nama pelanggan! (Wajib diisi untuk transaksi utang/tempo)', 'warning')
     
     return
   }
@@ -761,6 +762,8 @@ const submitCheckout = async () => {
     }
   } else if (targetCustomerId) {
     customerId.value = targetCustomerId
+  } else {
+    customerId.value = null
   }
 
   if (transactionType.value === 'utang') {
@@ -1497,10 +1500,15 @@ const startNewTransaction = () => {
             />
           </VRadioGroup>
 
-          <!-- Customer Selection (Always visible & Required) -->
+          <!-- Customer Selection (Optional for regular, Mandatory for Utang) -->
           <div class="mt-4">
             <div class="d-flex align-center justify-space-between mb-1">
-              <span class="text-caption font-weight-medium">Pelanggan (Wajib)</span>
+              <span class="text-caption font-weight-medium">
+                Pelanggan
+                <span :class="transactionType === 'utang' ? 'text-error font-weight-bold' : 'text-medium-emphasis'">
+                  ({{ transactionType === 'utang' ? 'Wajib untuk Pembelian Utang' : 'Opsional' }})
+                </span>
+              </span>
               <VBtn
                 variant="text"
                 size="small"
@@ -1517,11 +1525,11 @@ const startNewTransaction = () => {
               :items="customers"
               item-title="name"
               item-value="id"
-              placeholder="Pilih atau ketik nama pelanggan baru..."
+              :placeholder="transactionType === 'utang' ? 'Pilih atau ketik nama pelanggan (Wajib)...' : 'Pilih atau ketik nama pelanggan (Opsional)...'"
               density="compact"
               clearable
               :loading="isSearchingCustomer"
-              :error-messages="(!selectedCustomer && !customerSearch) ? ['Pelanggan wajib dipilih / diketik'] : []"
+              :error-messages="(transactionType === 'utang' && !selectedCustomer && !customerSearch) ? ['Pelanggan wajib dipilih / diketik untuk transaksi utang'] : []"
               class="mb-4"
               @update:search="onCustomerSearchInput"
             >
