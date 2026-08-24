@@ -74,9 +74,6 @@ class AuthController extends Controller
                         $action = strtolower(array_pop($parts));
                         $subject = implode(' ', $parts);
                         $abilityRules[] = ['action' => $action, 'subject' => $subject];
-                        if ($subject === 'Data Piutang') {
-                            $abilityRules[] = ['action' => $action, 'subject' => 'Piutang'];
-                        }
                     } else {
                         $abilityRules[] = ['action' => strtolower($permName), 'subject' => 'all'];
                     }

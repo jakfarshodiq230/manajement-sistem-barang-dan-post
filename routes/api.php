@@ -171,9 +171,6 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
                         $action = strtolower(array_pop($parts));
                         $subject = implode(' ', $parts);
                         $abilityRules[] = ['action' => $action, 'subject' => $subject];
-                        if ($subject === 'Data Piutang') {
-                            $abilityRules[] = ['action' => $action, 'subject' => 'Piutang'];
-                        }
                     } else {
                         $abilityRules[] = ['action' => strtolower($perm), 'subject' => 'all'];
                     }
