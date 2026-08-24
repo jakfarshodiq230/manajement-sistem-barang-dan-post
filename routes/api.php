@@ -158,13 +158,11 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
         $role = \Spatie\Permission\Models\Role::find($roleId);
 
         $abilityRules = [];
-        $isSuperOrDev = $role && in_array($role->name, ['Super Admin', 'Developer', 'Dev']);
-
-        if ($isSuperOrDev) {
-            $abilityRules = [['action' => 'manage', 'subject' => 'all']];
-        } else {
-            if ($role) {
-                $permissions = $role->permissions->pluck('name');
+        if ($role) {
+            $permissions = $role->permissions->pluck('name');
+            if ($permissions->contains('manage all') || $permissions->contains('all') || $permissions->contains('*')) {
+                $abilityRules[] = ['action' => 'manage', 'subject' => 'all'];
+            } else {
                 foreach ($permissions as $perm) {
                     $parts = explode(' ', $perm);
                     if (count($parts) >= 2) {
@@ -176,17 +174,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
                     }
                 }
             }
+        }
 
-            // Optimasi RBAC: Jika memiliki 'manage all', kembalikan HANYA permission tersebut. 
-            $hasManageAll = collect($abilityRules)->contains(function($rule) {
-                return $rule['action'] === 'manage' && $rule['subject'] === 'all';
-            });
-
-            if ($hasManageAll) {
-                $abilityRules = [['action' => 'manage', 'subject' => 'all']];
-            } else if (empty($abilityRules)) {
-                $abilityRules[] = ['action' => 'read', 'subject' => 'Auth'];
-            }
+        if (empty($abilityRules)) {
+            $abilityRules[] = ['action' => 'read', 'subject' => 'Auth'];
         }
 
         $activeBranch = $user->branch_id ? \App\Models\Branch::find($user->branch_id) : null;

@@ -46,7 +46,7 @@ class AuthController extends Controller
                 $activeRoleName = $firstAssig ? $firstAssig->role_name : (!empty($directRoles) ? $directRoles[0] : 'Super Admin');
             }
 
-            // Build dynamic ability rules based on user's actual permissions
+            // Build dynamic ability rules strictly based on user's assigned role permissions in Spatie
             $abilityRules = [];
             $userPermissions = collect();
 
@@ -62,10 +62,8 @@ class AuthController extends Controller
             // Also merge direct permissions and permissions from user direct roles
             $userPermissions = $userPermissions->merge($user->getAllPermissions()->pluck('name'))->unique();
 
-            $isSuperOrDev = in_array($activeRoleName, ['Super Admin', 'Developer', 'Dev']) || $user->hasRole('Super Admin') || $user->hasRole('Developer') || $user->hasRole('Dev');
-
-            // Check if user has global wildcard or manage-all permission or is Super Admin / Developer
-            if ($isSuperOrDev || $userPermissions->contains('manage all') || $userPermissions->contains('all') || $userPermissions->contains('*')) {
+            // Check if user has global wildcard or manage-all permission in Spatie database
+            if ($userPermissions->contains('manage all') || $userPermissions->contains('all') || $userPermissions->contains('*')) {
                 $abilityRules[] = ['action' => 'manage', 'subject' => 'all'];
             } else {
                 foreach ($userPermissions as $permName) {
