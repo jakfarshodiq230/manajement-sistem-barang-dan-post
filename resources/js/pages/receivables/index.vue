@@ -484,5 +484,5 @@ const executeDelete = async () => {
 <route lang="yaml">
 meta:
   action: read
-  subject: Piutang
+  subject: Data Piutang
 </route>

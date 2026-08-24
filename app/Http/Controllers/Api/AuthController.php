@@ -62,8 +62,10 @@ class AuthController extends Controller
             // Also merge direct permissions and permissions from user direct roles
             $userPermissions = $userPermissions->merge($user->getAllPermissions()->pluck('name'))->unique();
 
-            // Check if user has global wildcard or manage-all permission
-            if ($userPermissions->contains('manage all') || $userPermissions->contains('all') || $userPermissions->contains('*')) {
+            $isSuperOrDev = in_array($activeRoleName, ['Super Admin', 'Developer', 'Dev']) || $user->hasRole('Super Admin') || $user->hasRole('Developer') || $user->hasRole('Dev');
+
+            // Check if user has global wildcard or manage-all permission or is Super Admin / Developer
+            if ($isSuperOrDev || $userPermissions->contains('manage all') || $userPermissions->contains('all') || $userPermissions->contains('*')) {
                 $abilityRules[] = ['action' => 'manage', 'subject' => 'all'];
             } else {
                 foreach ($userPermissions as $permName) {
@@ -72,6 +74,9 @@ class AuthController extends Controller
                         $action = strtolower(array_pop($parts));
                         $subject = implode(' ', $parts);
                         $abilityRules[] = ['action' => $action, 'subject' => $subject];
+                        if ($subject === 'Data Piutang') {
+                            $abilityRules[] = ['action' => $action, 'subject' => 'Piutang'];
+                        }
                     } else {
                         $abilityRules[] = ['action' => strtolower($permName), 'subject' => 'all'];
                     }
