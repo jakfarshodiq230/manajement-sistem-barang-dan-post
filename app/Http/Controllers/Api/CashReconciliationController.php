@@ -210,6 +210,12 @@ class CashReconciliationController extends Controller
         ], 201);
     }
 
+    public function show($id)
+    {
+        $reconciliation = CashReconciliation::with(['user:id,name', 'branch:id,name'])->findOrFail($id);
+        return response()->json($reconciliation);
+    }
+
     public function update(Request $request, $id)
     {
         $reconciliation = CashReconciliation::findOrFail($id);
