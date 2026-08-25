@@ -45,6 +45,74 @@ const paymentForm = ref({
   transfer_phone_number: '',
 })
 
+// Email logs and send email dialog
+const emailLogs = ref([])
+const isLoadingEmailLogs = ref(false)
+const isSendEmailDialogVisible = ref(false)
+const emailInput = ref('')
+const isSendingEmail = ref(false)
+const isRetryingEmail = ref({})
+
+const fetchEmailLogs = async id => {
+  if (!id) return
+  isLoadingEmailLogs.value = true
+  try {
+    const res = await $api(`/apps/receivables/${id}/email-logs`)
+    emailLogs.value = res.data || []
+  } catch (e) {
+    console.error('Failed to fetch email logs:', e)
+  } finally {
+    isLoadingEmailLogs.value = false
+  }
+}
+
+const openSendEmailDialog = () => {
+  emailInput.value = receivable.value?.customer?.email || ''
+  isSendEmailDialogVisible.value = true
+}
+
+const submitSendEmail = async () => {
+  if (!emailInput.value) {
+    snackbar.show('Alamat email penerima wajib diisi', 'warning')
+    return
+  }
+  isSendingEmail.value = true
+  try {
+    const res = await $api(`/apps/receivables/${receivable.value.id}/send-email`, {
+      method: 'POST',
+      body: { email: emailInput.value },
+    })
+    snackbar.show(res.message || 'Surat tagihan berhasil dikirim ke email', 'success')
+    isSendEmailDialogVisible.value = false
+    await fetchEmailLogs(receivable.value.id)
+  } catch (error) {
+    console.error(error)
+    const errText = error.response?._data?.message || error.data?.message || error.message || 'Gagal mengirim email tagihan'
+    snackbar.show(errText, 'error')
+    await fetchEmailLogs(receivable.value.id)
+  } finally {
+    isSendingEmail.value = false
+  }
+}
+
+const retryEmail = async logId => {
+  isRetryingEmail.value[logId] = true
+  try {
+    const res = await $api(`/apps/email-logs/${logId}/retry`, {
+      method: 'POST',
+    })
+    snackbar.show(res.message || 'Email berhasil dikirim ulang', 'success')
+    await fetchEmailLogs(receivable.value.id)
+  } catch (error) {
+    console.error(error)
+    const errText = error.response?._data?.message || error.data?.message || error.message || 'Gagal mengirim ulang email'
+    snackbar.show(errText, 'error')
+    await fetchEmailLogs(receivable.value.id)
+  } finally {
+    isRetryingEmail.value[logId] = false
+  }
+}
+
 const fetchReceivable = async id => {
   isLoading.value = true
   try {
@@ -52,6 +120,7 @@ const fetchReceivable = async id => {
 
     receivable.value = response.data || response
     paymentForm.value.amount = remainingBalance.value
+    fetchEmailLogs(id)
   } catch (error) {
     console.error(error)
     snackbar.show('Gagal memuat detail piutang', 'error')
@@ -65,6 +134,7 @@ watch(() => props.receivableId, newId => {
     fetchReceivable(newId)
   } else {
     receivable.value = null
+    emailLogs.value = []
   }
 }, { immediate: true })
 
@@ -212,18 +282,29 @@ const printReceipt = () => {
         v-else-if="receivable"
         class="pa-6"
       >
-        <!-- Button Print Terakhir (jika ada pembayaran) -->
-        <VBtn 
-          v-if="receivable.payments?.length > 0" 
-          color="secondary" 
-          variant="outlined" 
-          block 
-          class="mb-4" 
-          prepend-icon="ri-printer-line"
-          @click="() => { lastPayment = receivable.payments[receivable.payments.length - 1]; printReceipt(); }"
-        >
-          Cetak Struk Pembayaran Terakhir
-        </VBtn>
+        <!-- Action Buttons -->
+        <div class="d-flex flex-wrap gap-2 mb-4">
+          <VBtn 
+            v-if="receivable.payments?.length > 0" 
+            color="secondary" 
+            variant="outlined" 
+            class="flex-grow-1" 
+            prepend-icon="ri-printer-line"
+            @click="() => { lastPayment = receivable.payments[receivable.payments.length - 1]; printReceipt(); }"
+          >
+            Cetak Struk
+          </VBtn>
+
+          <VBtn
+            color="info"
+            variant="flat"
+            class="flex-grow-1 font-weight-bold"
+            prepend-icon="ri-mail-send-line"
+            @click="openSendEmailDialog"
+          >
+            Kirim Email Tagihan
+          </VBtn>
+        </div>
 
         <!-- Info Ringkas -->
         <VCard
@@ -470,9 +551,146 @@ const printReceipt = () => {
             </tr>
           </tbody>
         </VTable>
+
+        <!-- Section Riwayat Email Log & Audit Trail -->
+        <div class="d-flex align-center justify-space-between mt-6 mb-2">
+          <p class="font-weight-bold mb-0 d-flex align-center gap-1">
+            <VIcon icon="ri-mail-check-line" size="18" color="primary" />
+            Riwayat Log Pengiriman Email
+          </p>
+          <VBtn
+            size="x-small"
+            variant="text"
+            icon="ri-refresh-line"
+            :loading="isLoadingEmailLogs"
+            @click="fetchEmailLogs(receivable.id)"
+          />
+        </div>
+
+        <VCard class="border" variant="flat">
+          <VTable density="compact">
+            <thead>
+              <tr>
+                <th>Penerima</th>
+                <th>Tipe / Mode</th>
+                <th>Status</th>
+                <th class="text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="emailLogs.length === 0">
+                <td colspan="4" class="text-center text-medium-emphasis py-3 text-caption">
+                  Belum ada riwayat email untuk piutang ini
+                </td>
+              </tr>
+              <tr v-for="log in emailLogs" :key="log.id">
+                <td class="py-2">
+                  <div class="font-weight-medium text-caption">{{ log.recipient_email }}</div>
+                  <div class="text-disabled" style="font-size: 10px;">{{ log.created_at ? formatDate(log.created_at) : '-' }}</div>
+                </td>
+                <td>
+                  <div class="text-caption font-weight-bold">
+                    {{ log.email_type === 'receivable_invoice' ? 'Tagihan Faktur' : (log.email_type === 'receivable_receipt' ? 'Kwitansi Cicilan' : 'Pengingat Tempo') }}
+                  </div>
+                  <span class="text-disabled text-caption" style="font-size: 10px;">{{ log.trigger_mode === 'automatic' ? 'Otomatis' : 'Manual' }}</span>
+                </td>
+                <td>
+                  <VChip
+                    :color="log.status === 'sent' ? 'success' : (log.status === 'failed' ? 'error' : 'warning')"
+                    size="x-small"
+                    variant="elevated"
+                    class="font-weight-bold"
+                  >
+                    {{ log.status === 'sent' ? 'Terkirim' : (log.status === 'failed' ? 'Gagal' : 'Pending') }}
+                  </VChip>
+                  <div v-if="log.error_message" class="text-error mt-1 text-truncate" style="max-width: 120px; font-size: 10px;" :title="log.error_message">
+                    {{ log.error_message }}
+                  </div>
+                </td>
+                <td class="text-right">
+                  <VBtn
+                    v-if="log.status === 'failed'"
+                    size="x-small"
+                    color="error"
+                    variant="tonal"
+                    prepend-icon="ri-refresh-line"
+                    :loading="isRetryingEmail[log.id]"
+                    @click="retryEmail(log.id)"
+                  >
+                    Kirim Ulang
+                  </VBtn>
+                  <VIcon v-else-if="log.status === 'sent'" icon="ri-check-double-line" color="success" size="16" />
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+        </VCard>
       </div>
     </div>
   </VNavigationDrawer>
+
+  <!-- Dialog Konfirmasi Kirim Email Tagihan -->
+  <VDialog
+    v-model="isSendEmailDialogVisible"
+    max-width="480"
+  >
+    <VCard>
+      <VCardTitle class="bg-primary text-white pa-4 d-flex align-center justify-space-between">
+        <div class="d-flex align-center gap-2">
+          <VIcon icon="ri-mail-send-line" />
+          <span>Kirim Surat Tagihan ke Email</span>
+        </div>
+        <VBtn icon="ri-close-line" variant="text" size="small" @click="isSendEmailDialogVisible = false" />
+      </VCardTitle>
+
+      <VCardText class="pa-5">
+        <p class="text-body-2 text-medium-emphasis mb-4">
+          Kirim rincian invoice nota tagihan piutang resmi ke email pelanggan:
+        </p>
+
+        <VTextField
+          v-model="emailInput"
+          label="Alamat Email Penerima *"
+          placeholder="contoh: pelanggan@email.com"
+          prepend-inner-icon="ri-mail-line"
+          type="email"
+          variant="outlined"
+          density="compact"
+          class="mb-3"
+        />
+
+        <div class="pa-3 rounded bg-light-primary border text-caption">
+          <div class="d-flex justify-space-between mb-1">
+            <span>Pelanggan:</span>
+            <strong>{{ receivable?.customer?.name || '-' }}</strong>
+          </div>
+          <div class="d-flex justify-space-between mb-1">
+            <span>No. Nota:</span>
+            <strong>{{ receivable?.sale?.invoice_number || '-' }}</strong>
+          </div>
+          <div class="d-flex justify-space-between">
+            <span>Sisa Tagihan:</span>
+            <strong class="text-error">{{ formatCurrency(remainingBalance) }}</strong>
+          </div>
+        </div>
+      </VCardText>
+
+      <VCardActions class="pa-4 pt-0 justify-end gap-2">
+        <VBtn variant="tonal" color="secondary" @click="isSendEmailDialogVisible = false">
+          Batal
+        </VBtn>
+        <VBtn
+          color="primary"
+          class="font-weight-bold"
+          prepend-icon="ri-send-plane-fill"
+          :loading="isSendingEmail"
+          @click="submitSendEmail"
+        >
+          Kirim Sekarang
+        </VBtn>
+      </VCardActions>
+    </VCard>
+  </VDialog>
 
   <!-- Success Dialog for Printing -->
   <VDialog

@@ -155,6 +155,13 @@ class ReceivableController extends Controller
 
             DB::commit();
 
+            // Auto-send Receipt Email jika pelanggan memiliki email
+            try {
+                \App\Services\EmailNotificationService::sendReceivableReceipt($payment, null, 'automatic', auth()->id());
+            } catch (\Throwable $mailEx) {
+                \Log::warning("Auto receipt email warning: " . $mailEx->getMessage());
+            }
+
             return response()->json([
                 'message' => 'Payment processed successfully.',
                 'payment' => $payment,
@@ -167,18 +174,97 @@ class ReceivableController extends Controller
         }
     }
 
+    /**
+     * Kirim manual surat tagihan invoice piutang ke email pelanggan.
+     */
+    public function sendEmail(Request $request, Receivable $receivable)
+    {
+        $request->validate([
+            'email' => 'nullable|email',
+        ]);
+
+        $customEmail = $request->email;
+
+        try {
+            $log = \App\Services\EmailNotificationService::sendReceivableInvoice(
+                $receivable,
+                $customEmail,
+                'manual',
+                auth()->id()
+            );
+
+            if ($log->status === 'sent') {
+                return response()->json([
+                    'message' => 'Surat tagihan berhasil dikirim ke ' . $log->recipient_email,
+                    'log' => $log,
+                ]);
+            } else {
+                return response()->json([
+                    'message' => 'Pengiriman email gagal: ' . ($log->error_message ?? 'Terjadi kesalahan SMTP'),
+                    'log' => $log,
+                ], 422);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 400);
+        }
+    }
+
+    /**
+     * Ambil histori log email untuk piutang ini.
+     */
+    public function emailLogs(Receivable $receivable)
+    {
+        $paymentIds = $receivable->payments()->pluck('id')->toArray();
+
+        $logs = \App\Models\EmailLog::with(['user:id,name'])
+            ->where(function($q) use ($receivable, $paymentIds) {
+                $q->where(function($q1) use ($receivable) {
+                    $q1->where('reference_type', Receivable::class)
+                       ->where('reference_id', (string) $receivable->id);
+                })->orWhere(function($q2) use ($paymentIds) {
+                    $q2->where('reference_type', ReceivablePayment::class)
+                       ->whereIn('reference_id', $paymentIds);
+                });
+            })
+            ->latest()
+            ->get();
+
+        return response()->json(['data' => $logs]);
+    }
+
+    /**
+     * Retry pengiriman email yang gagal.
+     */
+    public function retryEmail(Request $request, $id)
+    {
+        try {
+            $log = \App\Services\EmailNotificationService::retry($id);
+
+            return response()->json([
+                'message' => 'Email berhasil dikirim ulang ke ' . $log->recipient_email,
+                'log' => $log,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Gagal mengirim ulang email: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
+
     public function destroy(Request $request, Receivable $receivable)
     {
         // Delete Receivable will actually void the entire Sale transaction.
         // We will call the SaleController's destroy logic.
         $sale = $receivable->sale;
         
-        if (!$sale) {
-            return response()->json(['message' => 'Transaksi Penjualan tidak ditemukan'], 404);
+        if ($sale) {
+            $saleController = new \App\Http\Controllers\Api\SaleController();
+            return $saleController->destroy($request, $sale->id);
         }
 
-        // We can just simulate a request to SaleController@destroy
-        $saleController = new \App\Http\Controllers\Api\SaleController();
-        return $saleController->destroy($request, $sale->id);
+        $receivable->delete();
+        return response()->json(['message' => 'Receivable deleted successfully']);
     }
 }
