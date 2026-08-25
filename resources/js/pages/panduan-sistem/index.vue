@@ -25,7 +25,8 @@ const categories = [
   { id: 'retur_piutang', title: '4. Retur & Piutang', icon: 'ri-exchange-dollar-line' },
   { id: 'audit_laporan', title: '5. Audit & Opname', icon: 'ri-archive-stack-line' },
   { id: 'keuangan', title: '6. Keuangan & Laporan', icon: 'ri-file-chart-line' },
-  { id: 'security', title: '7. Keamanan & RBAC', icon: 'ri-shield-keyhole-line' },
+  { id: 'modal_roi', title: '7. Modal & ROI Cabang', icon: 'ri-hand-coin-line' },
+  { id: 'security', title: '8. Keamanan & RBAC', icon: 'ri-shield-keyhole-line' },
 ]
 
 // Visual Architecture Flow Steps
@@ -78,6 +79,14 @@ const visualFlowSteps = [
     desc: 'Closing harian kasir, kalkulasi HPP riil, neraca, dan cetak PDF tahunan.',
     route: '/audit/rekap',
   },
+  {
+    step: 7,
+    title: 'Modal & ROI Cabang',
+    icon: 'ri-hand-coin-line',
+    color: 'primary',
+    desc: 'Injeksi modal, pengajuan proposal PDF, approval setoran laba & KPI ROI %.',
+    route: '/apps/branch-capitals',
+  },
 ]
 
 // Detailed Module Guides
@@ -87,20 +96,32 @@ const guides = [
     category: 'master',
     icon: 'ri-database-2-line',
     color: 'primary',
-    title: '1. Master Data (Kategori, Produk, Barcode SKU, Supplier & Pelanggan)',
-    subtitle: 'Fondasi utama katalog inventaris dan entitas bisnis sebelum operasional dimulai',
+    title: '1. Master Data & Inventori Cabang (Struktur 3 Tingkat Harga, Markup & Pajak POS)',
+    subtitle: 'Fondasi utama katalog inventaris, penetapan harga jual, batas nego kasir, dan perlakuan PPN',
     steps: [
       {
         title: 'Kategori Barang & Satuan Produk',
-        desc: 'Buka menu Master Data > Kategori Barang. Buat kategori utama (Sembako, Makanan, Minuman, Elektronik, dll) dan tentukan satuan barang (Pcs, Box, Kg). Kategori mempermudah filtering laporan penjualan dan pengelompokan Stock Opname.',
+        desc: 'Buka menu Master Data > Kategori Barang. Buat kategori utama (Sembako, Aki & Baterai, Elektronik, dll) dan tentukan satuan barang (Pcs, Dus, Box, Karton). Kategori mempermudah filtering laporan penjualan dan pengelompokan Stock Opname.',
         link: '/kategori-barang',
         linkText: 'Buka Kategori Barang',
       },
       {
-        title: 'Katalog Produk, Barcode & Metode Stok',
-        desc: 'Daftarkan setiap item produk dengan Barcode unik, SKU, Nama Barang, Merk, Satuan, Kategori, Metode Stok (FIFO/FEFO/LIFO), Harga Beli Acuan, Harga Jual standar, dan batas Minimum Nego. Sistem otomatis membuat barcode yang bisa langsung discan di kasir.',
+        title: 'Katalog Produk & Barcode SKU',
+        desc: 'Daftarkan setiap item produk dengan Barcode unik, SKU, Nama Barang, Merk, Satuan, Kategori, Metode Stok (FIFO/FEFO/LIFO), dan Isi Konversi (misal 1 Dus = 24 Pcs). Sistem otomatis membuat barcode yang siap discan di kasir.',
         link: '/master-data-produk',
         linkText: 'Buka Master Produk',
+      },
+      {
+        title: 'Penetapan Struktur 3 Tingkat Harga & Markup Otomatis',
+        desc: 'Buka menu Inventori & Harga Cabang. Setiap produk memiliki 3 lapis harga:\n• 1. Harga Modal (HPP Real): Modal bersih per unit yang otomatis mencakup diskon supplier dan PPN Masukan 11%.\n• 2. Harga Jual Normal: Harga pricelist kasir. Gunakan tombol pintas kalkulasi cepat Markup (+20%, +25%, +30%, +35%, +40%) dari modal.\n• 3. Harga Nego Minimum: Batas harga terendah tawar-menawar kasir. Gunakan tombol pintas margin minimal (+10%, +15%, +20% Modal).',
+        link: '/inventori-cabang',
+        linkText: 'Buka Inventori Cabang',
+      },
+      {
+        title: 'Pengaturan Pajak Penjualan POS (PPN Keluaran Kasir)',
+        desc: 'Di menu Inventori Cabang, tentukan apakah kasir membebankan PPN tambahan ke pembeli:\n• Harga Final (Netto / 0%): Toko menjual harga bersih tanpa membebankan pajak tambahan di struk.\n• + PPN 11%: Kasir akan menambahkan 11% PPN pada struk transaksi ke konsumen akhir.',
+        link: '/inventori-cabang',
+        linkText: 'Atur Pajak POS Cabang',
       },
       {
         title: 'Data Supplier & Pelanggan (Credit Limit)',
@@ -109,44 +130,48 @@ const guides = [
         linkText: 'Buka Data Supplier',
       },
     ],
-    tips: 'Pastikan barcode produk tidak duplikat agar proses scanning kasir dan opname gudang berjalan 100% akurat.',
+    tips: 'Gunakan tombol kalkulasi markup cepat di Inventori Cabang agar harga jual dan batas nego langsung terhitung otomatis sesuai target laba toko.',
   },
   {
     id: 'pengadaan-gudang',
     category: 'gudang',
     icon: 'ri-truck-line',
     color: 'info',
-    title: '2. Pengadaan Barang, Penerimaan Gudang & Mutasi Antar Cabang',
-    subtitle: 'Alur logistik dari pesanan ke supplier hingga distribusi stok ke cabang toko',
+    title: '2. Pengadaan Barang, Multi-Column Diskon PO & Penerimaan Gudang',
+    subtitle: 'Alur pesanan pembelian (PO) dengan diskon bertingkat hingga 5 tingkat, kalkulasi HPP real, dan mutasi stok',
     steps: [
       {
-        title: 'Pembuatan Purchase Order (PO)',
-        desc: 'Pilih Supplier, tentukan cabang tujuan pengiriman, masukkan daftar barang yang dipesan beserta kuantitas dan harga beli kesepakatan.',
+        title: 'Pembuatan Purchase Order (PO) & Multi-Column Diskon (D1 s/d D5)',
+        desc: 'Buka menu Purchase Order. Masukkan No. Faktur Supplier, pilih Supplier dan Cabang Tujuan. Masukkan barang pesanan:\n• Mendukung multi-kolom Diskon Bertingkat: D1 (%), D2 (%), D3 (%), D4 (%), D5 (%), dan Diskon Rp.\n• Smart Quick Input: Cukup ketik format string seperti 10+5+2+2+1 pada kolom Format Cepat, sistem akan otomatis mengisi D1 s/d D5.\n• Rumus Netto: Harga Bruto x (1 - D1%) x (1 - D2%) x (1 - D3%) x (1 - D4%) x (1 - D5%) - Diskon Rp.',
         link: '/purchase-orders',
         linkText: 'Buka Purchase Order',
       },
       {
+        title: 'Perlakuan PPN Faktur Supplier & HPP Real per Pcs',
+        desc: 'Pilih perlakuan PPN faktur supplier:\n• Include PPN (Harga sudah termasuk PPN 11%)\n• Exclude PPN (+11% PPN ditambahkan ke total tagihan)\n• Non-PPN (Bebas pajak).\nSistem secara real-time menghitung Live HPP Modal per Pcs = Total DPP Netto / (Qty Beli x Isi Satuan).',
+      },
+      {
         title: 'Penerimaan Barang & Pencatatan Batch (Goods Receipt)',
-        desc: 'Saat barang fisik tiba, buka menu Penerimaan Barang. Cocokkan kuantitas fisik dengan faktur supplier. Masukkan Nomor Batch dan Tanggal Kadaluarsa (Expired Date). Stok cabang otomatis bertambah (+).',
+        desc: 'Saat barang fisik tiba di gudang/toko, buka menu Penerimaan Barang. Cocokkan kuantitas fisik dengan surat jalan. Masukkan Nomor Batch dan Tanggal Kadaluarsa (Expired Date). Stok fisik cabang otomatis bertambah (+).',
         link: '/penerimaan-barang',
         linkText: 'Buka Penerimaan Barang',
       },
       {
-        title: 'Mutasi / Transfer Stok Antar Cabang (Stock Transfer)',
-        desc: 'Kirim barang dari Gudang Pusat ke Cabang Toko (atau antar cabang) melalui menu Mutasi Stok. Pilih cabang asal, cabang tujuan, dan kuantitas. Stok cabang asal otomatis berkurang (-) dan cabang tujuan bertambah (+).',
+        title: 'Mutasi / Transfer Stok Antar Cabang (Surat Jalan Digital & QR Code)',
+        desc: 'Kirim barang antar cabang melalui menu Mutasi Stok. Dilengkapi Surat Jalan resmi dengan Tanda Tangan Digital 3 Pihak (Pengirim, Driver, Penerima) dan QR Code Verifikasi Keamanan.',
         link: '/mutasi-stok',
         linkText: 'Buka Mutasi Stok',
       },
     ],
-    tips: 'Setiap penerimaan barang otomatis membentuk identitas Batch untuk mendukung valuasi HPP akurat dan metode FEFO/FIFO.',
+    tips: 'Setiap barang yang diterima dari PO otomatis memperbarui modal HPP di Master Produk & Inventori Cabang secara akurat.',
   },
   {
     id: 'kasir-pos',
     category: 'pos',
     icon: 'ri-shopping-cart-2-line',
     color: 'success',
-    title: '3. Operasional Transaksi Kasir (Point of Sale / POS)',
-    subtitle: 'Proses checkout cepat, scan barcode, diskon/nego, multi-pembayaran, dan cetak struk',
+    title: '3. Operasional Transaksi Kasir (POS), Diskon Total & Otorisasi Nego',
+    subtitle: 'Proses checkout cepat, scan barcode, diskon total faktur, otorisasi PIN supervisor, dan cetak struk',
     steps: [
       {
         title: 'Buka Shift Kasir & Saldo Kas Awal',
@@ -156,22 +181,26 @@ const guides = [
       },
       {
         title: 'Pindai Barcode / Cari Produk & Pelanggan',
-        desc: 'Kasir cukup men-scan barcode barang menggunakan scanner barcode USB/Bluetooth, atau mengetik nama/SKU (tekan F2). Pilih pelanggan umum (*Walk-in*) atau pelanggan terdaftar.',
+        desc: 'Kasir cukup men-scan barcode barang menggunakan scanner barcode USB/Bluetooth, atau mengetik nama/SKU (tekan F2). Pilih pelanggan umum (*Walk-in*) atau pelanggan terdaftar (tekan F4).',
         link: '/pos',
         linkText: 'Ke Halaman Kasir',
       },
       {
-        title: 'Nego Harga & Otorisasi PIN Supervisor',
-        desc: 'Kasir dapat mengubah harga item pada keranjang. Jika harga berada di bawah batas Minimum Nego yang ditentukan Owner, sistem meminta input PIN Supervisor.',
+        title: 'Diskon Total Bon Belanja (Bebas Input)',
+        desc: 'Pada ringkasan keranjang belanja kasir, kolom Diskon Total dapat langsung diisi nominal potongan harga khusus faktur (misal Rp 20.000). Total tagihan bersih otomatis terpotong.',
       },
       {
-        title: 'Metode Pembayaran (Cash, Transfer, QRIS, Tempo) & Cetak Struk',
-        desc: 'Pilih metode bayar. Jika Tunai, gunakan tombol pecahan uang pas/cepat. Jika Tempo, pilih Pelanggan Terdaftar. Setelah pembayaran selesai, printer thermal otomatis mencetak struk belanja.',
+        title: 'Tawar-Menawar (Nego) & Otorisasi PIN Supervisor',
+        desc: 'Kasir dapat mengedit harga jual item di keranjang:\n• Jika harga tawar masih di atas atau sama dengan Harga Nego Minimum, kasir bisa langsung memproses transaksi.\n• Jika harga tawar berada di bawah Harga Nego Minimum, sistem otomatis mengunci dan meminta input PIN Otorisasi Supervisor/Owner (Master PIN: 123456).',
+      },
+      {
+        title: 'Multi-Pembayaran (Cash, Transfer, QRIS, Tempo) & Cetak Struk',
+        desc: 'Pilih metode bayar. Jika Tunai, gunakan tombol pecahan uang pas/cepat (F9). Jika Tempo, pilih Pelanggan Terdaftar & isi tanggal jatuh tempo. Printer thermal otomatis mencetak struk belanja.',
         link: '/transaksi',
         linkText: 'Buka Riwayat Transaksi',
       },
     ],
-    tips: 'Gunakan tombol pintasan keyboard kasir: F2 (Cari Produk), F4 (Pilih Pelanggan), F8 (Checkout Bayar), dan F9 (Uang Pas).',
+    tips: 'Gunakan tombol pintasan keyboard kasir: F1/F2 (Cari/Scan), F3/F4 (Pelanggan), F6 (Hold Tahan Bon), F7 (Daftar Bon Ditahan), F8 (Checkout), F9 (Uang Pas), dan Enter (Konfirmasi Bayar).',
   },
   {
     id: 'retur-barang',
@@ -203,8 +232,8 @@ const guides = [
     category: 'retur_piutang',
     icon: 'ri-wallet-3-line',
     color: 'warning',
-    title: '5. Buku Piutang Usaha & Pembayaran Cicilan (Receivables)',
-    subtitle: 'Pelacakan nota tempo kasbon, umur piutang jatuh tempo, dan kwitansi angsuran',
+    title: '5. Buku Piutang Usaha, Pengiriman Email Tagihan & Kwitansi Otomatis',
+    subtitle: 'Pelacakan nota tempo kasbon, pengiriman invoice ke email pelanggan, kwitansi cicilan otomatis, dan pengingat jatuh tempo',
     steps: [
       {
         title: 'Monitoring Buku Piutang Pelanggan',
@@ -213,15 +242,23 @@ const guides = [
         linkText: 'Buka Buku Piutang',
       },
       {
-        title: 'Pencatatan Pembayaran Cicilan (Installment)',
-        desc: 'Klik tombol Bayar Piutang pada pelanggan terkait. Masukkan nominal uang yang disetorkan (bisa cicil bertahap atau langsung lunas). Sistem otomatis memotong saldo sisa piutang.',
+        title: 'Kirim Surat Tagihan Faktur Resmi ke Email Pelanggan',
+        desc: 'Klik tombol Kirim Email Tagihan pada drawer detail piutang. Sistem otomatis menyusun email HTML elegan berisi rincian faktur penjualan, daftar barang, termin jatuh tempo, dan rincian rekening pembayaran toko.',
       },
       {
-        title: 'Cetak Kwitansi Pembayaran Resmi',
-        desc: 'Setelah pembayaran cicilan disimpan, kasir dapat langsung mencetak Kwitansi Pembayaran Resmi sebagai bukti sah penerimaan uang.',
+        title: 'Pencatatan Pembayaran Cicilan & Kwitansi Otomatis',
+        desc: 'Klik tombol Bayar Piutang pada pelanggan terkait. Masukkan nominal cicilan atau pelunasan. Sistem otomatis mencatat kas masuk, memotong sisa piutang, mencetak struk kasir, serta mengirimkan Kwitansi Tanda Terima Resmi ke email pelanggan secara otomatis.',
+      },
+      {
+        title: 'Pengingat Otomatis Jatuh Tempo Harian (Automated Scheduler)',
+        desc: 'Sistem menjalankan scheduler otomatis harian (receivables:send-reminders) yang mengecek piutang H-3 jatuh tempo dan piutang menunggak (overdue) untuk mengirimkan surat pengingat santun ke email pelanggan.',
+      },
+      {
+        title: 'Audit Trail Riwayat Log Pengiriman Email & Fitur Kirim Ulang (Retry)',
+        desc: 'Setiap pengiriman email tercatat rapi pada tabel email_logs lengkap dengan status (Terkirim / Gagal / Pending) dan pesan error jika SMTP bermasalah. Kasir/Admin dapat menekan tombol [ 🔄 Kirim Ulang ] seketika.',
       },
     ],
-    tips: 'Gunakan filter "Jatuh Tempo" untuk memprioritaskan penagihan piutang yang sudah melewati batas waktu.',
+    tips: 'Gunakan fitur Kirim Email Tagihan agar pelanggan menerima rincian invoice formal langsung di smartphone mereka.',
   },
   {
     id: 'stock-opname',
@@ -263,15 +300,15 @@ const guides = [
         linkText: 'Buka Closing Harian',
       },
       {
-        title: 'Input Form Closing & Rekonsiliasi Selisih',
-        desc: 'Masukkan jumlah Uang Fisik. Sistem otomatis membandingkan dengan Uang Sistem (Penjualan Tunai + DP + Cicilan Piutang) dan menampilkan Selisih Kas.',
+        title: 'Input Form Closing & Rekonsiliasi Selisih Lengkap',
+        desc: 'Masukkan jumlah Uang Fisik riil di laci. Sistem secara real-time menampilkan estimasi kas sistem: (Penjualan Tunai + DP Kas + Pelunasan Piutang + Injeksi Modal Masuk) dikurangi (Cicilan/Setoran Modal ke Owner + Pengeluaran Kas Kecil). Selisih kas (Variance) otomatis terhitung.',
       },
       {
         title: 'Penguncian Tanggal (Lock System)',
-        desc: 'Setelah closing disetujui (Approved), sistem otomatis mengunci tanggal tersebut sehingga tidak ada manipulasi transaksi di tanggal yang sudah ditutup.',
+        desc: 'Setelah closing disetujui (Final/Completed), sistem otomatis mengunci tanggal tersebut sehingga tidak ada manipulasi transaksi di tanggal yang sudah ditutup.',
       },
     ],
-    tips: 'Kasir wajib mengisi kolom catatan keterangan jika terdapat selisih uang.',
+    tips: 'Pastikan seluruh setoran cicilan modal ke Owner dan kas kecil hari tersebut sudah dicatat agar perhitungan kas laci kasir sinkron 100%.',
   },
   {
     id: 'rekap-keuangan',
@@ -305,21 +342,25 @@ const guides = [
     category: 'security',
     icon: 'ri-shield-keyhole-line',
     color: 'primary',
-    title: '9. Manajemen Hak Akses (RBAC), Supervisor PIN & Audit Log',
-    subtitle: 'Pengaturan otorisasi karyawan dan pelacakan jejak rekam audit forensik',
+    title: '9. Manajemen Hak Akses Murni Database (RBAC) & Penugasan Multi-Cabang',
+    subtitle: 'Pengaturan otorisasi granular Spatie RBAC, penugasan peran per toko, dan PIN keamanan supervisor',
     steps: [
       {
-        title: 'Kelola Pengguna & Hak Akses (RBAC)',
-        desc: 'Buka menu Manajemen Pengguna. Daftarkan akun karyawan, tentukan peran (Super Admin, Kasir, Admin Gudang), dan atur hak akses modul.',
-        link: '/apps/employees',
-        linkText: 'Buka Manajemen Karyawan',
+        title: 'Kelola Pengguna & Hak Akses Database (RBAC)',
+        desc: 'Buka menu Pengaturan Pengguna. Daftarkan akun karyawan dan atur izin akses (Permissions) secara granular per modul (Create, Read, Write, Delete, Approve, Export, Import, PIN). Tidak ada peran yang dikunci secara kaku (hardcoded), seluruhnya dikelola dinamis melalui database.',
+        link: '/apps/pengaturan-pengguna',
+        linkText: 'Buka Pengaturan Pengguna',
       },
       {
-        title: 'PIN Otorisasi Supervisor',
-        desc: 'Atur 6-digit PIN keamanan pada profil pengguna. PIN ini wajib diinput saat melakukan tindakan berisiko tinggi (void nota, hapus piutang, diskon di bawah batas nego).',
+        title: 'Penugasan Multi-Cabang & Peran Ganda (Branch Assignments)',
+        desc: 'Satu pengguna dapat ditugaskan pada beberapa cabang sekaligus dengan peran berbeda (misal: Admin di Toko A, namun Kasir di Toko B). Fitur Switch Role di profil memungkinkan pengguna berganti konteks toko secara instan.',
       },
       {
-        title: 'Jejak Audit Keamanan (Audit Log)',
+        title: 'PIN Otorisasi Supervisor Dinamis',
+        desc: 'Setiap otorisasi tindakan berisiko tinggi (diskon di bawah batas nego, void nota, penghapusan piutang) diverifikasi melalui PIN 6-digit pengguna yang memiliki hak akses approval dari database.',
+      },
+      {
+        title: 'Jejak Audit Keamanan (Audit Trail Log)',
         desc: 'Buka Dashboard Audit untuk melacak seluruh histori aktivitas: siapa yang mengedit data, kapan waktu terjadinya, dan nilai sebelum vs sesudah diedit.',
         link: '/dashboards/audit',
         linkText: 'Buka Dashboard Audit',
@@ -327,12 +368,76 @@ const guides = [
     ],
     tips: 'Ganti PIN supervisor secara berkala untuk menjaga kerahasiaan otorisasi tindakan kritis.',
   },
+  {
+    id: 'modal-roi',
+    category: 'modal_roi',
+    icon: 'ri-hand-coin-line',
+    color: 'warning',
+    title: '10. Manajemen Modal, Notifikasi Email Owner & Pengembalian ROI Cabang',
+    subtitle: 'Alur terpadu penyertaan modal Owner, pengajuan dana proposal PDF, setoran laba, dan pengiriman laporan rekap ke email Owner',
+    steps: [
+      {
+        title: 'Injeksi Modal Langsung (Owner → Cabang)',
+        desc: 'Digunakan oleh Owner / Kantor Pusat untuk menyuntikkan modal awal pendirian toko atau penambahan modal kerja secara langsung. Lengkap dengan nominal Rupiah terformat otomatis, pilihan rekening bank, dan lampiran bukti transfer dana.',
+        link: '/apps/branch-capitals',
+        linkText: 'Buka Modal & ROI Cabang',
+      },
+      {
+        title: 'Pengajuan Permintaan Modal Tambahan & Dokumen Proposal PDF',
+        desc: 'Kepala Toko / Admin Cabang dapat mengajukan permohonan dana tambahan lengkap dengan alasan justifikasi dan lampiran dokumen resmi Proposal / RAB format PDF.',
+        link: '/apps/branch-capitals',
+        linkText: 'Ajukan Permintaan Modal',
+      },
+      {
+        title: 'Verifikasi & Otorisasi Penyaluran Dana oleh Owner (Approval Workflow)',
+        desc: 'Permohonan berstatus Pending masuk ke dashboard Owner. Owner dapat membaca dokumen PDF proposal, menyetujui (Approve) dengan mengunggah struk transfer penyaluran, atau menolak (Reject) dengan alasan resmi.',
+      },
+      {
+        title: 'Setoran Pengembalian Modal & Notifikasi Email Otomatis ke Owner',
+        desc: 'Cabang menyetorkan surplus laba closing shift / cicilan modal ke rekening Owner. Sistem otomatis mengirimkan Notifikasi Email Setoran Masuk ke inbox Owner lengkap dengan rincian mutasi kas.',
+      },
+      {
+        title: 'Kirim Rekapitulasi Portofolio Modal & ROI ke Email Owner',
+        desc: 'Klik tombol "Kirim Rekap Modal ke Email Owner" di dashboard eksekutif untuk mengirimkan ringkasan portofolio konsolidasi permodalan, saldo modal tertanam, dan tingkat pengembalian (% ROI) langsung ke email Owner.',
+      },
+      {
+        title: 'Executive KPI Dashboard & Monitoring Payback Progress (% ROI)',
+        desc: 'Pantau secara real-time: Total Modal Diberikan, Total Modal Dikembalikan, Sisa Modal Tertanam (Outstanding), serta progress bar Payback ROI (%) per cabang maupun konsolidasi seluruh toko.',
+      },
+    ],
+    tips: 'Gunakan fitur Kirim Rekap Modal ke Email Owner untuk mengirimkan laporan mingguan atau bulanan secara praktis.',
+  },
+  {
+    id: 'notifikasi-redis',
+    category: 'security',
+    icon: 'ri-notification-3-line',
+    color: 'warning',
+    title: '11. Notifikasi Real-Time (Cabang & Jabatan) & Akselerasi Redis',
+    subtitle: 'Notifikasi otomatis per cabang/jabatan untuk approval modal, selisih closing kasir, mutasi stok, dan ancaman keamanan',
+    steps: [
+      {
+        title: 'Notifikasi Terarah Berbasis Cabang (Branch-Scoped)',
+        desc: 'Notifikasi transaksi operasional (injeksi modal cabang, mutasi stok masuk, piutang jatuh tempo) otomatis dikirimkan hanya kepada staf dan kasir yang bertugas di cabang terkait.',
+      },
+      {
+        title: 'Notifikasi Terarah Berbasis Jabatan (Role-Scoped)',
+        desc: 'Pengajuan permohonan modal, selisih kas closing harian, dan alert ancaman hacker dikirimkan langsung ke lonceng notifikasi Owner, Super Admin, dan Auditor.',
+      },
+      {
+        title: 'Akselerasi In-Memory Caching & Background Queue Redis',
+        desc: 'Katalog produk POS dan pengecekan blacklist IP dicache di RAM dengan respon 0ms. Tugas berat diproses di background tanpa membuat kasir menunggu.',
+      },
+    ],
+    tips: 'Klik langsung item notifikasi di lonceng navbar untuk membuka dokumen transaksi atau approval terkait secara instan.',
+  },
 ]
 
 // Keyboard Shortcuts
 const shortcuts = [
   { key: 'F1 / F2', name: 'Cari Produk / Scan Barcode', desc: 'Fokus instan ke kolom pencarian produk atau scan barcode scanner' },
-  { key: 'F4', name: 'Pilih / Tambah Pelanggan', desc: 'Membuka drawer pelanggan terdaftar untuk transaksi kredit/tempo/kasbon' },
+  { key: 'F3 / F4', name: 'Pilih / Tambah Pelanggan', desc: 'Membuka drawer pelanggan terdaftar untuk transaksi kredit/tempo/kasbon' },
+  { key: 'F6', name: 'Hold / Tahan Transaksi', desc: 'Menahan keranjang transaksi pelanggan saat ini ke antrean pending' },
+  { key: 'F7', name: 'Daftar Transaksi Ditahan', desc: 'Membuka popup antrean transaksi tertahan untuk dimuat kembali (Resume)' },
   { key: 'F8', name: 'Checkout / Bayar', desc: 'Membuka pop-up pembayaran kasir saat keranjang belanja terisi' },
   { key: 'F9', name: 'Uang Pas', desc: 'Memilih nominal bayar sesuai total tagihan nota secara instan' },
   { key: 'Esc', name: 'Batal / Reset', desc: 'Menutup dialog modal yang sedang aktif atau membatalkan aksi' },

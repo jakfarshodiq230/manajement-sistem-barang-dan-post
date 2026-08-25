@@ -34,6 +34,8 @@ Route::get('/fix-permissions', function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/apps/update-pin', [\App\Http\Controllers\Api\AuthController::class, 'updatePin']);
     Route::post('/apps/users/{id}/update-pin', [\App\Http\Controllers\Api\UserController::class, 'updatePin']);
+    Route::post('/apps/users/{id}/assignments', [\App\Http\Controllers\Api\UserController::class, 'updateAssignments']);
+    Route::post('/users/{id}/assignments', [\App\Http\Controllers\Api\UserController::class, 'updateAssignments']);
     Route::post('/apps/verify-pin', [\App\Http\Controllers\Api\AuthController::class, 'verifyPin']);
 });
 
@@ -51,6 +53,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     // Audit Modules
     Route::get('cash-reconciliations/monitoring', [\App\Http\Controllers\Api\CashReconciliationController::class, 'monitoring']);
     Route::get('cash-reconciliations/required-date', [\App\Http\Controllers\Api\CashReconciliationController::class, 'getRequiredDate']);
+    Route::get('cash-reconciliations/preview', [\App\Http\Controllers\Api\CashReconciliationController::class, 'preview']);
     Route::apiResource('cash-reconciliations', \App\Http\Controllers\Api\CashReconciliationController::class);
     
     Route::put('stock-opnames/batch/{batchId}', [\App\Http\Controllers\Api\StockOpnameController::class, 'updateBatch']);
@@ -67,6 +70,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     Route::get('/rekap/tahunan', [\App\Http\Controllers\Api\RekapController::class, 'tahunan']);
     Route::get('/rekap/bulanan', [\App\Http\Controllers\Api\RekapController::class, 'bulanan']);
 
+    // Users & Assignments
+    Route::post('users/{id}/assignments', [\App\Http\Controllers\Api\UserController::class, 'updateAssignments']);
     Route::apiResource('users', \App\Http\Controllers\Api\UserController::class);
     Route::apiResource('roles', \App\Http\Controllers\Api\RoleController::class);
     Route::apiResource('permissions', \App\Http\Controllers\Api\PermissionController::class);
@@ -92,6 +97,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     Route::apiResource('customers', \App\Http\Controllers\CustomerController::class);
     Route::apiResource('receivables', \App\Http\Controllers\ReceivableController::class)->except(['store', 'update']);
     Route::post('receivables/{receivable}/pay', [\App\Http\Controllers\ReceivableController::class, 'pay']);
+    Route::post('receivables/{receivable}/send-email', [\App\Http\Controllers\ReceivableController::class, 'sendEmail']);
+    Route::get('receivables/{receivable}/email-logs', [\App\Http\Controllers\ReceivableController::class, 'emailLogs']);
+    Route::post('email-logs/{id}/retry', [\App\Http\Controllers\ReceivableController::class, 'retryEmail']);
     
     Route::apiResource('receipt-settings', \App\Http\Controllers\Api\ReceiptSettingController::class);
 
@@ -122,10 +130,30 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     // Petty Cash (Kas Kecil Cabang)
     Route::apiResource('petty-cashes', \App\Http\Controllers\Api\PettyCashController::class);
 
+    // Branch Capitals (Manajemen Modal & Pengembalian Modal Cabang)
+    Route::get('branch-capitals/summary', [\App\Http\Controllers\Api\BranchCapitalController::class, 'summary']);
+    Route::post('branch-capitals/send-summary-email', [\App\Http\Controllers\Api\BranchCapitalController::class, 'sendSummaryEmail']);
+    Route::post('branch-capitals/{id}/send-email', [\App\Http\Controllers\Api\BranchCapitalController::class, 'sendEmail']);
+    Route::get('branch-capitals/{id}/email-logs', [\App\Http\Controllers\Api\BranchCapitalController::class, 'emailLogs']);
+    Route::post('branch-capitals/{id}/approve', [\App\Http\Controllers\Api\BranchCapitalController::class, 'approve']);
+    Route::post('branch-capitals/{id}/reject', [\App\Http\Controllers\Api\BranchCapitalController::class, 'reject']);
+    Route::post('branch-capitals/{id}/void', [\App\Http\Controllers\Api\BranchCapitalController::class, 'void']);
+    Route::post('branch-capitals/{id}', [\App\Http\Controllers\Api\BranchCapitalController::class, 'update']);
+    Route::apiResource('branch-capitals', \App\Http\Controllers\Api\BranchCapitalController::class);
+
+    // Security, IP Tracking & Anti-Hacker Logs
+    Route::get('security/logs', [\App\Http\Controllers\Api\SecurityController::class, 'index']);
+    Route::get('security/summary', [\App\Http\Controllers\Api\SecurityController::class, 'summary']);
+    Route::get('security/blocked-ips', [\App\Http\Controllers\Api\SecurityController::class, 'getBlockedIps']);
+    Route::post('security/block-ip', [\App\Http\Controllers\Api\SecurityController::class, 'blockIp']);
+    Route::post('security/unblock-ip', [\App\Http\Controllers\Api\SecurityController::class, 'unblockIp']);
+    Route::delete('security/logs/clear', [\App\Http\Controllers\Api\SecurityController::class, 'clearOldLogs']);
+
     Route::get('stock-transfers/status-counts', [\App\Http\Controllers\Api\StockTransferController::class, 'statusCounts']);
     Route::apiResource('stock-transfers', \App\Http\Controllers\Api\StockTransferController::class)->except(['update', 'destroy']);
     Route::get('stock-transfers/{id}/delivery-note', [\App\Http\Controllers\Api\StockTransferController::class, 'deliveryNote']);
     Route::post('stock-transfers/{id}/prepare', [\App\Http\Controllers\Api\StockTransferController::class, 'prepare']);
+    Route::post('stock-transfers/{id}/pickup', [\App\Http\Controllers\Api\StockTransferController::class, 'pickup']);
     Route::post('stock-transfers/{id}/receive', [\App\Http\Controllers\Api\StockTransferController::class, 'receive']);
     Route::post('stock-transfers/{id}/approve', [\App\Http\Controllers\Api\StockTransferController::class, 'approve']);
     Route::post('stock-transfers/{id}/reject', [\App\Http\Controllers\Api\StockTransferController::class, 'reject']);
@@ -232,30 +260,55 @@ Route::middleware('auth:sanctum')->get('/user', function (\Illuminate\Http\Reque
     $directRoles = $user->roles->pluck('name')->toArray();
     $foundRole = $user->active_role_id ? \Spatie\Permission\Models\Role::find($user->active_role_id) : null;
     $firstAssig = $rawAssignments->first();
-    $activeRole = $foundRole ? $foundRole->name : ($firstAssig ? $firstAssig->role_name : (!empty($directRoles) ? $directRoles[0] : 'Super Admin'));
+    $activeRole = $foundRole ? $foundRole->name : ($firstAssig ? $firstAssig->role_name : (!empty($directRoles) ? $directRoles[0] : 'User'));
     $activeBranch = $user->branch_id ? \App\Models\Branch::find($user->branch_id) : null;
 
-    // Calculate userAbilityRules dynamically from Spatie permissions
+    // Calculate userAbilityRules dynamically from Spatie permissions in database
     $assignedRoleIds = $rawAssignments->pluck('role_id')->unique()->filter();
     $userPermissions = collect();
-    if ($assignedRoleIds->isNotEmpty()) {
+
+    // 1. Load permissions from active role (if switched) or assigned roles
+    if ($user->active_role_id) {
+        $activeRoleModel = \Spatie\Permission\Models\Role::find($user->active_role_id);
+        if ($activeRoleModel) {
+            $userPermissions = $userPermissions->merge($activeRoleModel->permissions->pluck('name'));
+        }
+    } elseif ($assignedRoleIds->isNotEmpty()) {
         $rolePermissions = \Spatie\Permission\Models\Permission::join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
             ->whereIn('role_has_permissions.role_id', $assignedRoleIds)
             ->pluck('permissions.name');
         $userPermissions = $userPermissions->merge($rolePermissions);
     }
+
+    // 2. Merge direct user permissions from database
     $userPermissions = $userPermissions->merge($user->getAllPermissions()->pluck('name'))->unique();
 
     $abilityRules = [];
+
+    // 3. Dynamic CASL Rule Generation (100% DB-driven, zero hardcoded role names)
     if ($userPermissions->contains('manage all') || $userPermissions->contains('all') || $userPermissions->contains('*')) {
         $abilityRules[] = ['action' => 'manage', 'subject' => 'all'];
     } else {
         foreach ($userPermissions as $permName) {
-            $parts = explode(' ', $permName);
+            $parts = explode(' ', trim($permName));
             if (count($parts) >= 2) {
                 $action = strtolower(array_pop($parts));
                 $subject = implode(' ', $parts);
                 $abilityRules[] = ['action' => $action, 'subject' => $subject];
+
+                // Aliases for compatibility with Vue route action checks
+                if ($action === 'write' || $action === 'update') {
+                    $abilityRules[] = ['action' => 'write', 'subject' => $subject];
+                    $abilityRules[] = ['action' => 'update', 'subject' => $subject];
+                    $abilityRules[] = ['action' => 'edit', 'subject' => $subject];
+                }
+
+                if (in_array(strtolower($subject), ['log keamanan', 'keamanan sistem', 'security logs', 'log keamanan & akses ip'])) {
+                    $abilityRules[] = ['action' => $action, 'subject' => 'Log Keamanan'];
+                    $abilityRules[] = ['action' => $action, 'subject' => 'Security Logs'];
+                    $abilityRules[] = ['action' => $action, 'subject' => 'Keamanan Sistem'];
+                    $abilityRules[] = ['action' => $action, 'subject' => 'Log Keamanan & Akses IP'];
+                }
             } else {
                 $abilityRules[] = ['action' => strtolower($permName), 'subject' => 'all'];
             }
