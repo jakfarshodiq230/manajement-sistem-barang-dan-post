@@ -2079,106 +2079,108 @@ const printDeliveryNote = () => {
           <!-- 3-Party Digital Signature & QR Code Block (Clean without label texts) -->
           <div class="mt-4 pt-3 border-t signatures-section">
             <table class="w-100 signatures-table" style="width: 100%; border: none; border-collapse: collapse;">
-              <tr>
-                <!-- 1. Cabang Asal -->
-                <td style="width: 33.33%; text-align: center; vertical-align: top; border: none; padding: 0 8px;">
-                  <div class="text-caption font-weight-bold mb-2 text-uppercase" style="font-size: 11px; text-align: center;">
-                    1. DISERAHKAN (CABANG ASAL)
-                  </div>
-                  
-                  <div
-                    v-if="deliveryNoteData.prepared_at || ['ready_for_pickup', 'in_transit', 'completed', 'approved'].includes(deliveryNoteData.status)"
-                    style="text-align: center; margin: 4px auto 8px auto; width: 100%; display: flex; justify-content: center; align-items: center;"
-                  >
-                    <div
-                      style="display: inline-block; margin: 0 auto; text-align: center; border: 1px solid #ddd; padding: 3px; border-radius: 4px; background: #fff;"
-                      class="cursor-pointer qr-sig-hover"
-                      title="Klik untuk melihat bukti TTD Elektronik"
-                      @click="openSignatureDetail('sender', deliveryNoteData)"
-                    >
-                      <QrcodeVue
-                        :value="getVerifyUrl(deliveryNoteData.uuid)"
-                        :size="84"
-                        level="M"
-                        render-as="svg"
-                      />
+              <tbody>
+                <tr>
+                  <!-- 1. Cabang Asal -->
+                  <td style="width: 33.33%; text-align: center; vertical-align: top; border: none; padding: 0 8px;">
+                    <div class="text-caption font-weight-bold mb-2 text-uppercase" style="font-size: 11px; text-align: center;">
+                      1. DISERAHKAN (CABANG ASAL)
                     </div>
-                  </div>
-                  <div v-else class="my-6 text-caption text-disabled border border-dashed rounded pa-3 mx-2" style="font-size: 10px; text-align: center;">
-                    (Menunggu Validasi Asal)
-                  </div>
-
-                  <div class="sig-name-box">
-                    ( {{ deliveryNoteData.prepared_by?.name || deliveryNoteData.created_by?.name || 'Petugas Gudang' }} )
-                  </div>
-                </td>
-
-                <!-- 2. Kurir Penjemput -->
-                <td style="width: 33.33%; text-align: center; vertical-align: top; border: none; padding: 0 8px;">
-                  <div class="text-caption font-weight-bold mb-2 text-uppercase text-purple" style="font-size: 11px; text-align: center;">
-                    2. DIBAWA / KURIR PENJEMPUT
-                  </div>
-
-                  <div
-                    v-if="deliveryNoteData.picked_up_at || ['in_transit', 'completed'].includes(deliveryNoteData.status)"
-                    style="text-align: center; margin: 4px auto 8px auto; width: 100%; display: flex; justify-content: center; align-items: center;"
-                  >
+                    
                     <div
-                      style="display: inline-block; margin: 0 auto; text-align: center; border: 1px solid #ddd; padding: 3px; border-radius: 4px; background: #fff;"
-                      class="cursor-pointer qr-sig-hover"
-                      title="Klik untuk melihat bukti TTD Elektronik"
-                      @click="openSignatureDetail('courier', deliveryNoteData)"
+                      v-if="deliveryNoteData.prepared_at || ['ready_for_pickup', 'in_transit', 'completed', 'approved'].includes(deliveryNoteData.status)"
+                      style="text-align: center; margin: 4px auto 8px auto; width: 100%; display: flex; justify-content: center; align-items: center;"
                     >
-                      <QrcodeVue
-                        :value="getVerifyUrl(deliveryNoteData.uuid)"
-                        :size="84"
-                        level="M"
-                        render-as="svg"
-                      />
+                      <div
+                        style="display: inline-block; margin: 0 auto; text-align: center; border: 1px solid #ddd; padding: 3px; border-radius: 4px; background: #fff;"
+                        class="cursor-pointer qr-sig-hover"
+                        title="Klik untuk melihat bukti TTD Elektronik"
+                        @click="openSignatureDetail('sender', deliveryNoteData)"
+                      >
+                        <QrcodeVue
+                          :value="getVerifyUrl(deliveryNoteData.uuid)"
+                          :size="84"
+                          level="M"
+                          render-as="svg"
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div v-else class="my-6 text-caption text-disabled border border-dashed rounded pa-3 mx-2" style="font-size: 10px; text-align: center;">
-                    (Menunggu Penjemputan)
-                  </div>
+                    <div v-else class="my-6 text-caption text-disabled border border-dashed rounded pa-3 mx-2" style="font-size: 10px; text-align: center;">
+                      (Menunggu Validasi Asal)
+                    </div>
 
-                  <div class="sig-name-box">
-                    ( {{ deliveryNoteData.picked_up_by_name || 'Driver / Kurir' }} )
-                  </div>
-                </td>
+                    <div class="sig-name-box">
+                      ( {{ deliveryNoteData.prepared_by?.name || deliveryNoteData.created_by?.name || 'Petugas Gudang' }} )
+                    </div>
+                  </td>
 
-                <!-- 3. Cabang Pemohon -->
-                <td style="width: 33.33%; text-align: center; vertical-align: top; border: none; padding: 0 8px;">
-                  <div class="text-caption font-weight-bold mb-2 text-uppercase text-success" style="font-size: 11px; text-align: center;">
-                    3. DITERIMA (CABANG PEMOHON)
-                  </div>
+                  <!-- 2. Kurir Penjemput -->
+                  <td style="width: 33.33%; text-align: center; vertical-align: top; border: none; padding: 0 8px;">
+                    <div class="text-caption font-weight-bold mb-2 text-uppercase text-purple" style="font-size: 11px; text-align: center;">
+                      2. DIBAWA / KURIR PENJEMPUT
+                    </div>
 
-                  <div
-                    v-if="deliveryNoteData.received_at || deliveryNoteData.status === 'completed'"
-                    style="text-align: center; margin: 4px auto 8px auto; width: 100%; display: flex; justify-content: center; align-items: center;"
-                  >
                     <div
-                      style="display: inline-block; margin: 0 auto; text-align: center; border: 1px solid #ddd; padding: 3px; border-radius: 4px; background: #fff;"
-                      class="cursor-pointer qr-sig-hover"
-                      title="Klik untuk melihat bukti TTD Elektronik"
-                      @click="openSignatureDetail('receiver', deliveryNoteData)"
+                      v-if="deliveryNoteData.picked_up_at || ['in_transit', 'completed'].includes(deliveryNoteData.status)"
+                      style="text-align: center; margin: 4px auto 8px auto; width: 100%; display: flex; justify-content: center; align-items: center;"
                     >
-                      <QrcodeVue
-                        :value="getVerifyUrl(deliveryNoteData.uuid)"
-                        :size="84"
-                        level="M"
-                        render-as="svg"
-                      />
+                      <div
+                        style="display: inline-block; margin: 0 auto; text-align: center; border: 1px solid #ddd; padding: 3px; border-radius: 4px; background: #fff;"
+                        class="cursor-pointer qr-sig-hover"
+                        title="Klik untuk melihat bukti TTD Elektronik"
+                        @click="openSignatureDetail('courier', deliveryNoteData)"
+                      >
+                        <QrcodeVue
+                          :value="getVerifyUrl(deliveryNoteData.uuid)"
+                          :size="84"
+                          level="M"
+                          render-as="svg"
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div v-else class="my-6 text-caption text-disabled border border-dashed rounded pa-3 mx-2" style="font-size: 10px; text-align: center;">
-                    (Menunggu Penerimaan)
-                  </div>
+                    <div v-else class="my-6 text-caption text-disabled border border-dashed rounded pa-3 mx-2" style="font-size: 10px; text-align: center;">
+                      (Menunggu Penjemputan)
+                    </div>
 
-                  <div class="sig-name-box">
-                    ( {{ deliveryNoteData.received_by?.name || 'Petugas Penerima' }} )
-                  </div>
-                </td>
-              </tr>
+                    <div class="sig-name-box">
+                      ( {{ deliveryNoteData.picked_up_by_name || 'Driver / Kurir' }} )
+                    </div>
+                  </td>
+
+                  <!-- 3. Cabang Pemohon -->
+                  <td style="width: 33.33%; text-align: center; vertical-align: top; border: none; padding: 0 8px;">
+                    <div class="text-caption font-weight-bold mb-2 text-uppercase text-success" style="font-size: 11px; text-align: center;">
+                      3. DITERIMA (CABANG PEMOHON)
+                    </div>
+
+                    <div
+                      v-if="deliveryNoteData.received_at || deliveryNoteData.status === 'completed'"
+                      style="text-align: center; margin: 4px auto 8px auto; width: 100%; display: flex; justify-content: center; align-items: center;"
+                    >
+                      <div
+                        style="display: inline-block; margin: 0 auto; text-align: center; border: 1px solid #ddd; padding: 3px; border-radius: 4px; background: #fff;"
+                        class="cursor-pointer qr-sig-hover"
+                        title="Klik untuk melihat bukti TTD Elektronik"
+                        @click="openSignatureDetail('receiver', deliveryNoteData)"
+                      >
+                        <QrcodeVue
+                          :value="getVerifyUrl(deliveryNoteData.uuid)"
+                          :size="84"
+                          level="M"
+                          render-as="svg"
+                        />
+                      </div>
+                    </div>
+                    <div v-else class="my-6 text-caption text-disabled border border-dashed rounded pa-3 mx-2" style="font-size: 10px; text-align: center;">
+                      (Menunggu Penerimaan)
+                    </div>
+
+                    <div class="sig-name-box">
+                      ( {{ deliveryNoteData.received_by?.name || 'Petugas Penerima' }} )
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
             </table>
 
             <div class="text-center mt-4 text-caption text-medium-emphasis d-flex align-center justify-center gap-1 d-print-none" style="font-size: 11px;">

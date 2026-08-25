@@ -487,7 +487,7 @@ class BranchCapitalController extends Controller
             'email' => 'nullable|email',
         ]);
 
-        $capital = BranchCapital::with(['branch', 'creator'])->findOrFail($id);
+        $capital = BranchCapital::with(['branch', 'user'])->findOrFail($id);
 
         try {
             $log = \App\Services\EmailNotificationService::sendCapitalInstallmentAlert(

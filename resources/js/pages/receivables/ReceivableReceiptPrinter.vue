@@ -171,26 +171,28 @@ const remainingBalance = computed(() => {
         class="w-100 text-caption font-weight-bold mb-2"
         style="line-height: 1.2; font-size: 12px;"
       >
-        <tr>
-          <td>Total Utang Awal</td>
-          <td class="text-right">
-            {{ formatCurrency(receivable.amount_due) }}
-          </td>
-        </tr>
-        <tr>
-          <td>Total Dibayar</td>
-          <td class="text-right">
-            {{ formatCurrency(receivable.amount_paid) }}
-          </td>
-        </tr>
-        <tr style="font-size: 14px; margin-top: 5px;">
-          <td class="pt-2 text-error">
-            Sisa Utang
-          </td>
-          <td class="text-right pt-2 text-error">
-            {{ formatCurrency(remainingBalance) }}
-          </td>
-        </tr>
+        <tbody>
+          <tr>
+            <td>Total Utang Awal</td>
+            <td class="text-right">
+              {{ formatCurrency(receivable.amount_due) }}
+            </td>
+          </tr>
+          <tr>
+            <td>Total Dibayar</td>
+            <td class="text-right">
+              {{ formatCurrency(receivable.amount_paid) }}
+            </td>
+          </tr>
+          <tr style="font-size: 14px; margin-top: 5px;">
+            <td class="pt-2 text-error">
+              Sisa Utang
+            </td>
+            <td class="text-right pt-2 text-error">
+              {{ formatCurrency(remainingBalance) }}
+            </td>
+          </tr>
+        </tbody>
       </table>
 
       <div class="divider-dashed mb-2" />
@@ -210,18 +212,20 @@ const remainingBalance = computed(() => {
           class="w-100 text-caption"
           style="line-height: 1.2; font-size: 10px;"
         >
-          <tr
-            v-for="(payment, index) in receivable.payments"
-            :key="payment.id"
-          >
-            <td style="width: 20px;">
-              {{ index + 1 }}.
-            </td>
-            <td>{{ formatDate(payment.payment_date).split(' ')[0] }}</td>
-            <td class="text-right">
-              {{ formatCurrency(payment.amount) }}
-            </td>
-          </tr>
+          <tbody>
+            <tr
+              v-for="(payment, index) in receivable.payments"
+              :key="payment.id"
+            >
+              <td style="width: 20px;">
+                {{ index + 1 }}.
+              </td>
+              <td>{{ formatDate(payment.payment_date).split(' ')[0] }}</td>
+              <td class="text-right">
+                {{ formatCurrency(payment.amount) }}
+              </td>
+            </tr>
+          </tbody>
         </table>
       </div>
       
@@ -238,21 +242,23 @@ const remainingBalance = computed(() => {
         class="w-100 text-caption mb-3"
         style="line-height: 1.2; font-size: 12px;"
       >
-        <tr>
-          <td>Metode</td>
-          <td class="text-right text-uppercase">
-            {{ lastPayment.payment_method }}
-          </td>
-        </tr>
-        <tr
-          class="font-weight-bold"
-          style="font-size: 14px;"
-        >
-          <td>Nominal Bayar</td>
-          <td class="text-right">
-            {{ formatCurrency(lastPayment.amount) }}
-          </td>
-        </tr>
+        <tbody>
+          <tr>
+            <td>Metode</td>
+            <td class="text-right text-uppercase">
+              {{ lastPayment.payment_method }}
+            </td>
+          </tr>
+          <tr
+            class="font-weight-bold"
+            style="font-size: 14px;"
+          >
+            <td>Nominal Bayar</td>
+            <td class="text-right">
+              {{ formatCurrency(lastPayment.amount) }}
+            </td>
+          </tr>
+        </tbody>
       </table>
       
       <div
