@@ -391,6 +391,19 @@ const fetchData = async () => {
     customers.value = customerData.data || customerData || []
     receiptSettings.value = receiptSettingsData.data || receiptSettingsData || []
     
+    // Auto-select format based on active default receipt setting from pengaturan-struk
+    if (activeReceiptSetting.value) {
+      const w = String(activeReceiptSetting.value.width || '').toLowerCase()
+      const n = String(activeReceiptSetting.value.name || '').toLowerCase()
+      if (w.includes('58') || w.includes('80') || n.includes('thermal')) {
+        selectedPrintFormat.value = 'thermal'
+      } else if (w.includes('148') || n.includes('kwitansi') || n.includes('kuitansi') || n.includes('a5')) {
+        selectedPrintFormat.value = 'kwitansi'
+      } else {
+        selectedPrintFormat.value = 'continuous_form'
+      }
+    }
+    
     await Promise.all([
       checkCurrentShift(),
       fetchHeldBills(),
@@ -1958,6 +1971,7 @@ const startNewTransaction = () => {
       :branch="branches.find(b => b.id === activeBranchId)" 
       :cashier-name="userData?.fullName || userData?.name || userData?.username"
       :print-format="selectedPrintFormat"
+      :setting="activeReceiptSetting"
     />
 
     <!-- QR Catalog Dialog -->

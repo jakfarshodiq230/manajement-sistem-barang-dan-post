@@ -235,26 +235,28 @@ defineExpose({ print })
         </div>
         <div class="dotmatrix-meta">
           <table>
-            <tr>
-              <td>NO. FAKTUR</td>
-              <td>:</td>
-              <td class="font-bold">{{ sale.invoice_number }}</td>
-            </tr>
-            <tr>
-              <td>TANGGAL</td>
-              <td>:</td>
-              <td>{{ formatDate(sale.transaction_date) }}</td>
-            </tr>
-            <tr>
-              <td>KASIR</td>
-              <td>:</td>
-              <td>{{ cashierName || 'KASIR' }}</td>
-            </tr>
-            <tr>
-              <td>PELANGGAN</td>
-              <td>:</td>
-              <td>{{ sale.customer?.name || 'UMUM' }}</td>
-            </tr>
+            <tbody>
+              <tr>
+                <td>NO. FAKTUR</td>
+                <td>:</td>
+                <td class="font-bold">{{ sale.invoice_number }}</td>
+              </tr>
+              <tr>
+                <td>TANGGAL</td>
+                <td>:</td>
+                <td>{{ formatDate(sale.transaction_date) }}</td>
+              </tr>
+              <tr>
+                <td>KASIR</td>
+                <td>:</td>
+                <td>{{ cashierName || 'KASIR' }}</td>
+              </tr>
+              <tr>
+                <td>PELANGGAN</td>
+                <td>:</td>
+                <td>{{ sale.customer?.name || 'UMUM' }}</td>
+              </tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -315,36 +317,38 @@ defineExpose({ print })
 
         <div class="dotmatrix-bottom-right">
           <table class="dotmatrix-totals-table">
-            <tr>
-              <td>SUBTOTAL</td>
-              <td>:</td>
-              <td style="text-align: right;">{{ formatCurrency(sale.total_amount) }}</td>
-            </tr>
-            <tr v-if="sale.discount > 0">
-              <td>DISKON</td>
-              <td>:</td>
-              <td style="text-align: right;">-{{ formatCurrency(sale.discount) }}</td>
-            </tr>
-            <tr v-if="sale.tax_amount > 0">
-              <td>PPN</td>
-              <td>:</td>
-              <td style="text-align: right;">{{ formatCurrency(sale.tax_amount) }}</td>
-            </tr>
-            <tr class="dotmatrix-grand-total">
-              <td>GRAND TOTAL</td>
-              <td>:</td>
-              <td style="text-align: right;">Rp {{ formatCurrency(sale.grand_total) }}</td>
-            </tr>
-            <tr>
-              <td>BAYAR (TUNAI)</td>
-              <td>:</td>
-              <td style="text-align: right;">Rp {{ formatCurrency(sale.paid_amount || sale.grand_total) }}</td>
-            </tr>
-            <tr>
-              <td>KEMBALI</td>
-              <td>:</td>
-              <td style="text-align: right;">Rp {{ formatCurrency(sale.change_amount || 0) }}</td>
-            </tr>
+            <tbody>
+              <tr>
+                <td>SUBTOTAL</td>
+                <td>:</td>
+                <td style="text-align: right;">{{ formatCurrency(sale.total_amount) }}</td>
+              </tr>
+              <tr v-if="sale.discount > 0">
+                <td>DISKON</td>
+                <td>:</td>
+                <td style="text-align: right;">-{{ formatCurrency(sale.discount) }}</td>
+              </tr>
+              <tr v-if="sale.tax_amount > 0">
+                <td>PPN</td>
+                <td>:</td>
+                <td style="text-align: right;">{{ formatCurrency(sale.tax_amount) }}</td>
+              </tr>
+              <tr class="dotmatrix-grand-total">
+                <td>GRAND TOTAL</td>
+                <td>:</td>
+                <td style="text-align: right;">Rp {{ formatCurrency(sale.grand_total) }}</td>
+              </tr>
+              <tr>
+                <td>BAYAR (TUNAI)</td>
+                <td>:</td>
+                <td style="text-align: right;">Rp {{ formatCurrency(sale.paid_amount || sale.grand_total) }}</td>
+              </tr>
+              <tr>
+                <td>KEMBALI</td>
+                <td>:</td>
+                <td style="text-align: right;">Rp {{ formatCurrency(sale.change_amount || 0) }}</td>
+              </tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -372,81 +376,87 @@ defineExpose({ print })
       
       <!-- Meta -->
       <table style="width: 100%; font-size: 11px; line-height: 1.3;" class="mb-2">
-        <tr>
-          <td style="width: 45px;">Faktur</td>
-          <td>:</td>
-          <td>{{ sale.invoice_number }}</td>
-        </tr>
-        <tr>
-          <td>Waktu</td>
-          <td>:</td>
-          <td>{{ formatDate(sale.transaction_date) }}</td>
-        </tr>
-        <tr>
-          <td>Kasir</td>
-          <td>:</td>
-          <td>{{ cashierName || 'Kasir' }}</td>
-        </tr>
-        <tr>
-          <td>Plgn</td>
-          <td>:</td>
-          <td>{{ sale.customer?.name || 'Umum' }}</td>
-        </tr>
+        <tbody>
+          <tr>
+            <td style="width: 45px;">Faktur</td>
+            <td>:</td>
+            <td>{{ sale.invoice_number }}</td>
+          </tr>
+          <tr>
+            <td>Waktu</td>
+            <td>:</td>
+            <td>{{ formatDate(sale.transaction_date) }}</td>
+          </tr>
+          <tr>
+            <td>Kasir</td>
+            <td>:</td>
+            <td>{{ cashierName || 'Kasir' }}</td>
+          </tr>
+          <tr>
+            <td>Plgn</td>
+            <td>:</td>
+            <td>{{ sale.customer?.name || 'Umum' }}</td>
+          </tr>
+        </tbody>
       </table>
       
       <div class="divider-dashed mb-2" />
       
       <!-- Items -->
       <table style="width: 100%; font-size: 11px; line-height: 1.3;" class="mb-2">
-        <template v-for="item in sale.items" :key="item.id">
-          <tr>
-            <td colspan="3" class="pb-1">
-              {{ item.product?.name || item.product_name }}
-            </td>
-          </tr>
-          <tr>
-            <td style="width: 45%;">
-              {{ item.quantity }} x {{ formatCurrency(item.unit_price) }}
-            </td>
-            <td v-if="item.discount > 0" style="width: 15%;">
-              -{{ formatCurrency(item.discount) }}
-            </td>
-            <td v-else style="width: 15%;" />
-            <td style="width: 40%; text-align: right;" class="pb-1">
-              {{ formatCurrency(item.subtotal) }}
-            </td>
-          </tr>
-        </template>
+        <tbody>
+          <template v-for="item in sale.items" :key="item.id">
+            <tr>
+              <td colspan="3" class="pb-1">
+                {{ item.product?.name || item.product_name }}
+              </td>
+            </tr>
+            <tr>
+              <td style="width: 45%;">
+                {{ item.quantity }} x {{ formatCurrency(item.unit_price) }}
+              </td>
+              <td v-if="item.discount > 0" style="width: 15%;">
+                -{{ formatCurrency(item.discount) }}
+              </td>
+              <td v-else style="width: 15%;" />
+              <td style="width: 40%; text-align: right;" class="pb-1">
+                {{ formatCurrency(item.subtotal) }}
+              </td>
+            </tr>
+          </template>
+        </tbody>
       </table>
       
       <div class="divider-dashed mb-2" />
       
       <!-- Totals -->
       <table style="width: 100%; font-size: 11px; line-height: 1.3;" class="mb-3">
-        <tr>
-          <td>Subtotal</td>
-          <td style="text-align: right;">{{ formatCurrency(sale.total_amount) }}</td>
-        </tr>
-        <tr v-if="sale.discount > 0">
-          <td>Diskon</td>
-          <td style="text-align: right;">-{{ formatCurrency(sale.discount) }}</td>
-        </tr>
-        <tr v-if="sale.tax_amount > 0">
-          <td>Pajak</td>
-          <td style="text-align: right;">{{ formatCurrency(sale.tax_amount) }}</td>
-        </tr>
-        <tr style="font-weight: bold; font-size: 12px;">
-          <td class="pt-1">Total</td>
-          <td style="text-align: right;" class="pt-1">{{ formatCurrency(sale.grand_total) }}</td>
-        </tr>
-        <tr>
-          <td class="pt-1">Tunai / Bayar</td>
-          <td style="text-align: right;" class="pt-1">{{ formatCurrency(sale.paid_amount || sale.grand_total) }}</td>
-        </tr>
-        <tr>
-          <td>Kembali</td>
-          <td style="text-align: right;">{{ formatCurrency(sale.change_amount || 0) }}</td>
-        </tr>
+        <tbody>
+          <tr>
+            <td>Subtotal</td>
+            <td style="text-align: right;">{{ formatCurrency(sale.total_amount) }}</td>
+          </tr>
+          <tr v-if="sale.discount > 0">
+            <td>Diskon</td>
+            <td style="text-align: right;">-{{ formatCurrency(sale.discount) }}</td>
+          </tr>
+          <tr v-if="sale.tax_amount > 0">
+            <td>Pajak</td>
+            <td style="text-align: right;">{{ formatCurrency(sale.tax_amount) }}</td>
+          </tr>
+          <tr style="font-weight: bold; font-size: 12px;">
+            <td class="pt-1">Total</td>
+            <td style="text-align: right;" class="pt-1">{{ formatCurrency(sale.grand_total) }}</td>
+          </tr>
+          <tr>
+            <td class="pt-1">Tunai / Bayar</td>
+            <td style="text-align: right;" class="pt-1">{{ formatCurrency(sale.paid_amount || sale.grand_total) }}</td>
+          </tr>
+          <tr>
+            <td>Kembali</td>
+            <td style="text-align: right;">{{ formatCurrency(sale.change_amount || 0) }}</td>
+          </tr>
+        </tbody>
       </table>
       
       <!-- Footer -->
@@ -477,18 +487,20 @@ defineExpose({ print })
         
         <div class="kwitansi-meta">
           <table>
-            <tr>
-              <td>Tgl Kwitansi</td>
-              <td>: {{ formatDateOnly(sale.transaction_date) }}</td>
-            </tr>
-            <tr>
-              <td>Faktur No</td>
-              <td>: {{ sale.invoice_number }}</td>
-            </tr>
-            <tr>
-              <td>No Pelanggan</td>
-              <td>: {{ sale.customer?.code || '-' }}</td>
-            </tr>
+            <tbody>
+              <tr>
+                <td>Tgl Kwitansi</td>
+                <td>: {{ formatDateOnly(sale.transaction_date) }}</td>
+              </tr>
+              <tr>
+                <td>Faktur No</td>
+                <td>: {{ sale.invoice_number }}</td>
+              </tr>
+              <tr>
+                <td>No Pelanggan</td>
+                <td>: {{ sale.customer?.code || '-' }}</td>
+              </tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -497,14 +509,16 @@ defineExpose({ print })
       
       <div class="kwitansi-received-from">
         <table>
-          <tr>
-            <td style="width: 140px;">Telah terima dari</td>
-            <td>: {{ sale.customer?.name || 'Pelanggan Umum' }}</td>
-          </tr>
-          <tr>
-            <td>Sejumlah uang</td>
-            <td>: {{ formatCurrency(sale.grand_total) }}</td>
-          </tr>
+          <tbody>
+            <tr>
+              <td style="width: 140px;">Telah terima dari</td>
+              <td>: {{ sale.customer?.name || 'Pelanggan Umum' }}</td>
+            </tr>
+            <tr>
+              <td>Sejumlah uang</td>
+              <td>: {{ formatCurrency(sale.grand_total) }}</td>
+            </tr>
+          </tbody>
         </table>
         
         <div class="kwitansi-terbilang-box">
@@ -532,22 +546,24 @@ defineExpose({ print })
       <div class="kwitansi-footer">
         <div class="kwitansi-footer-left">
           <table>
-            <tr>
-              <td style="width: 100px;">Total</td>
-              <td>: {{ formatCurrency(sale.total_amount) }}</td>
-            </tr>
-            <tr v-if="sale.discount > 0">
-              <td>Diskon</td>
-              <td>: {{ formatCurrency(sale.discount) }}</td>
-            </tr>
-            <tr>
-              <td>Grand Total</td>
-              <td>: {{ formatCurrency(sale.grand_total) }}</td>
-            </tr>
-            <tr>
-              <td>Status</td>
-              <td>: {{ sale.payment_status === 'paid' ? 'Lunas' : 'Belum Lunas' }}</td>
-            </tr>
+            <tbody>
+              <tr>
+                <td style="width: 100px;">Total</td>
+                <td>: {{ formatCurrency(sale.total_amount) }}</td>
+              </tr>
+              <tr v-if="sale.discount > 0">
+                <td>Diskon</td>
+                <td>: {{ formatCurrency(sale.discount) }}</td>
+              </tr>
+              <tr>
+                <td>Grand Total</td>
+                <td>: {{ formatCurrency(sale.grand_total) }}</td>
+              </tr>
+              <tr>
+                <td>Status</td>
+                <td>: {{ sale.payment_status === 'paid' ? 'Lunas' : 'Belum Lunas' }}</td>
+              </tr>
+            </tbody>
           </table>
           
           <div class="kwitansi-perhatian-box">
