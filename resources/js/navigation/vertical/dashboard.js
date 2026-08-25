@@ -33,8 +33,14 @@ export default [
         action: 'read',
         subject: 'Dashboard Audit',
       },
+      {
+        title: 'Keamanan & Log IP',
+        to: 'dashboards-security',
+        action: 'read',
+        subject: 'Log Keamanan',
+      },
     ],
-    badgeContent: '5',
+    badgeContent: '6',
     badgeClass: 'bg-error',
   },
   {

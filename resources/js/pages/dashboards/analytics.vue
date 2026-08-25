@@ -1,6 +1,10 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { $api } from '@/utils/api'
+import VueApexCharts from 'vue3-apexcharts'
+import { useTheme } from 'vuetify'
+
+const vuetifyTheme = useTheme()
 
 // Components
 import AnalyticsCongratulationsJohn from '@/views/dashboards/analytics/AnalyticsCongratulationsJohn.vue'
@@ -12,6 +16,13 @@ const analyticsData = ref({
     daily: 0,
     monthly: 0,
     yearly: 0,
+  },
+  purchases: {
+    monthly: 0,
+    pending_count: 0,
+  },
+  discounts: {
+    monthly: 0,
   },
   receivables: {
     outstanding: 0,
@@ -55,8 +66,81 @@ const formatCurrency = value => {
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(value)
 }
+
+const chartOptions = computed(() => {
+  const currentTheme = vuetifyTheme.current.value.colors
+
+  return {
+    chart: {
+      type: 'area',
+      parentHeightOffset: 0,
+      toolbar: { show: false },
+    },
+    dataLabels: { enabled: false },
+    stroke: {
+      curve: 'smooth',
+      width: 2.5,
+    },
+    colors: [currentTheme.primary],
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 0.8,
+        opacityFrom: 0.6,
+        opacityTo: 0.1,
+        stops: [0, 90, 100],
+      },
+    },
+    xaxis: {
+      categories: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
+      labels: {
+        style: {
+          colors: currentTheme['on-surface'],
+          fontSize: '12px',
+        },
+      },
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+    },
+    yaxis: {
+      labels: {
+        formatter: val => {
+          if (val >= 1000000000) return 'Rp ' + (val / 1000000000).toFixed(1) + ' M'
+          if (val >= 1000000) return 'Rp ' + (val / 1000000).toFixed(1) + ' jt'
+          if (val >= 1000) return 'Rp ' + (val / 1000).toFixed(0) + ' rb'
+          return 'Rp ' + val
+        },
+        style: {
+          colors: currentTheme['on-surface'],
+          fontSize: '12px',
+        },
+      },
+    },
+    tooltip: {
+      y: {
+        formatter: val => formatCurrency(val),
+      },
+    },
+    grid: {
+      borderColor: 'rgba(var(--v-border-color), 0.12)',
+      strokeDashArray: 4,
+    },
+  }
+})
+
+const chartSeries = computed(() => {
+  return [
+    {
+      name: 'Omzet Penjualan',
+      data: analyticsData.value.chart?.monthly_income?.length === 12 
+        ? analyticsData.value.chart.monthly_income 
+        : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    },
+  ]
+})
 </script>
 
 <template>
@@ -109,72 +193,164 @@ const formatCurrency = value => {
       </VCol>
     </VRow>
 
-    <!-- Row of 4 Stats: Piutang, Retur, Yearly Income, Opname -->
+    <!-- Row of 6 Key Business Stats -->
     <VRow class="mb-4">
-      <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-warning">
+      <!-- 1. Pendapatan Tahun Ini -->
+      <VCol cols="12" sm="6" md="4" lg="2">
+        <VCard elevation="2" class="pa-4 border-s-lg border-info h-100">
           <div class="d-flex align-center justify-space-between">
             <div>
-              <div class="text-caption text-warning font-weight-bold">TOTAL PIUTANG AKTIF</div>
-              <div class="text-h4 font-weight-bold text-warning mt-1">{{ formatCurrency(analyticsData.receivables.outstanding) }}</div>
+              <div class="text-caption text-info font-weight-bold">OMZET TAHUN INI</div>
+              <div class="text-h6 font-weight-bold text-info mt-1">{{ formatCurrency(analyticsData.income.yearly) }}</div>
             </div>
-            <VAvatar color="warning" variant="tonal" rounded size="46">
-              <VIcon icon="ri-hand-coin-line" size="26" />
+            <VAvatar color="info" variant="tonal" rounded size="40">
+              <VIcon icon="ri-bank-line" size="22" />
             </VAvatar>
           </div>
-          <div class="text-caption text-medium-emphasis mt-2">Sisa tagihan belum lunas</div>
+          <div class="text-caption text-medium-emphasis mt-2">Tahun berjalan</div>
         </VCard>
       </VCol>
 
-      <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-error">
+      <!-- 2. Pengadaan PO Bulan Ini -->
+      <VCol cols="12" sm="6" md="4" lg="2">
+        <VCard elevation="2" class="pa-4 border-s-lg border-primary h-100" to="/purchase-orders">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-primary font-weight-bold">PENGADAAN (PO)</div>
+              <div class="text-h6 font-weight-bold text-primary mt-1">{{ formatCurrency(analyticsData.purchases?.monthly || 0) }}</div>
+            </div>
+            <VAvatar color="primary" variant="tonal" rounded size="40">
+              <VIcon icon="ri-truck-line" size="22" />
+            </VAvatar>
+          </div>
+          <div class="d-flex align-center gap-1 mt-2">
+            <VChip v-if="analyticsData.purchases?.pending_count > 0" size="x-small" color="warning" variant="elevated">
+              {{ analyticsData.purchases.pending_count }} PO Pending
+            </VChip>
+            <span v-else class="text-caption text-medium-emphasis">Bulan berjalan</span>
+          </div>
+        </VCard>
+      </VCol>
+
+      <!-- 3. Total Diskon Kasir -->
+      <VCol cols="12" sm="6" md="4" lg="2">
+        <VCard elevation="2" class="pa-4 border-s-lg border-success h-100">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-success font-weight-bold">DISKON KASIR</div>
+              <div class="text-h6 font-weight-bold text-success mt-1">{{ formatCurrency(analyticsData.discounts?.monthly || 0) }}</div>
+            </div>
+            <VAvatar color="success" variant="tonal" rounded size="40">
+              <VIcon icon="ri-discount-percent-line" size="22" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Total diskon bon</div>
+        </VCard>
+      </VCol>
+
+      <!-- 4. Total Piutang Aktif -->
+      <VCol cols="12" sm="6" md="4" lg="2">
+        <VCard elevation="2" class="pa-4 border-s-lg border-warning h-100" to="/receivables">
+          <div class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-caption text-warning font-weight-bold">PIUTANG AKTIF</div>
+              <div class="text-h6 font-weight-bold text-warning mt-1">{{ formatCurrency(analyticsData.receivables.outstanding) }}</div>
+            </div>
+            <VAvatar color="warning" variant="tonal" rounded size="40">
+              <VIcon icon="ri-hand-coin-line" size="22" />
+            </VAvatar>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Sisa tagihan tempo</div>
+        </VCard>
+      </VCol>
+
+      <!-- 5. Retur Bulan Ini -->
+      <VCol cols="12" sm="6" md="4" lg="2">
+        <VCard elevation="2" class="pa-4 border-s-lg border-error h-100" to="/retur">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-error font-weight-bold">RETUR BULAN INI</div>
-              <div class="text-h4 font-weight-bold text-error mt-1">{{ formatCurrency(analyticsData.returns.monthly) }}</div>
+              <div class="text-h6 font-weight-bold text-error mt-1">{{ formatCurrency(analyticsData.returns.monthly) }}</div>
             </div>
-            <VAvatar color="error" variant="tonal" rounded size="46">
-              <VIcon icon="ri-arrow-go-back-line" size="26" />
+            <VAvatar color="error" variant="tonal" rounded size="40">
+              <VIcon icon="ri-arrow-go-back-line" size="22" />
             </VAvatar>
           </div>
-          <div class="text-caption text-medium-emphasis mt-2">Pengembalian barang</div>
+          <div class="text-caption text-medium-emphasis mt-2">Retur barang</div>
         </VCard>
       </VCol>
 
-      <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+      <!-- 6. Selisih Opname Terakhir -->
+      <VCol cols="12" sm="6" md="4" lg="2">
+        <VCard elevation="2" class="pa-4 border-s-lg border-secondary h-100" to="/audit/stock-opname">
           <div class="d-flex align-center justify-space-between">
             <div>
-              <div class="text-caption text-info font-weight-bold">PENDAPATAN TAHUN INI</div>
-              <div class="text-h4 font-weight-bold text-info mt-1">{{ formatCurrency(analyticsData.income.yearly) }}</div>
-            </div>
-            <VAvatar color="info" variant="tonal" rounded size="46">
-              <VIcon icon="ri-bank-line" size="26" />
-            </VAvatar>
-          </div>
-          <div class="text-caption text-medium-emphasis mt-2">Akumulasi omzet tahun berjalan</div>
-        </VCard>
-      </VCol>
-
-      <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-secondary">
-          <div class="d-flex align-center justify-space-between">
-            <div>
-              <div class="text-caption text-secondary font-weight-bold">SELISIH OPNAME TERAKHIR</div>
-              <div class="text-h4 font-weight-bold text-secondary mt-1">
-                {{ analyticsData.latest_opname ? analyticsData.latest_opname.total_discrepancy : '0' }} <span class="text-caption text-medium-emphasis">Pcs</span>
+              <div class="text-caption text-secondary font-weight-bold">SELISIH OPNAME</div>
+              <div class="text-h6 font-weight-bold text-secondary mt-1">
+                {{ analyticsData.latest_opname ? analyticsData.latest_opname.total_discrepancy : '0' }} <span class="text-caption">Pcs</span>
               </div>
             </div>
-            <VAvatar color="secondary" variant="tonal" rounded size="46">
-              <VIcon icon="ri-survey-line" size="26" />
+            <VAvatar color="secondary" variant="tonal" rounded size="40">
+              <VIcon icon="ri-survey-line" size="22" />
             </VAvatar>
           </div>
-          <div class="text-caption text-medium-emphasis mt-2">
-            {{ analyticsData.latest_opname ? ('Audit ' + new Date(analyticsData.latest_opname.date).toLocaleDateString('id-ID')) : 'Belum ada data opname' }}
-          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Audit terakhir</div>
         </VCard>
       </VCol>
     </VRow>
+
+    <!-- Quick Shortcuts Navigation -->
+    <VCard elevation="2" class="mb-4 pa-4 rounded-xl bg-var-theme-background border">
+      <div class="d-flex align-center justify-space-between flex-wrap gap-3">
+        <div class="d-flex align-center gap-2">
+          <VIcon icon="ri-flashlight-line" color="primary" size="22" />
+          <span class="font-weight-bold text-subtitle-2">Akses Cepat Modul Utama:</span>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <VBtn size="small" variant="elevated" color="primary" prepend-icon="ri-shopping-cart-2-line" to="/pos">
+            Kasir POS
+          </VBtn>
+          <VBtn size="small" variant="tonal" color="info" prepend-icon="ri-truck-line" to="/purchase-orders">
+            Purchase Order
+          </VBtn>
+          <VBtn size="small" variant="tonal" color="success" prepend-icon="ri-store-2-line" to="/inventori-cabang">
+            Inventori Cabang
+          </VBtn>
+          <VBtn size="small" variant="tonal" color="warning" prepend-icon="ri-archive-stack-line" to="/audit/stock-opname">
+            Stock Opname
+          </VBtn>
+          <VBtn size="small" variant="tonal" color="secondary" prepend-icon="ri-line-chart-line" to="/dashboards/keuntungan">
+            Laba Rugi
+          </VBtn>
+          <VBtn size="small" variant="outlined" color="primary" prepend-icon="ri-book-read-line" to="/panduan-sistem">
+            Panduan Sistem
+          </VBtn>
+        </div>
+      </div>
+    </VCard>
+
+    <!-- 12-Month Sales Income Trend Chart -->
+    <VCard elevation="2" class="mb-4">
+      <VCardItem class="pb-0">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+          <div>
+            <VCardTitle class="text-h6 font-weight-bold">Tren Omzet Penjualan Bulanan (12 Bulan)</VCardTitle>
+            <VCardSubtitle>Performa pendapatan kasir tahun berjalan</VCardSubtitle>
+          </div>
+          <VBtn size="small" variant="text" color="primary" to="/laporan" append-icon="ri-arrow-right-line">
+            Buka Laporan Lengkap
+          </VBtn>
+        </div>
+      </VCardItem>
+      <VCardText class="pt-2">
+        <VueApexCharts
+          type="area"
+          height="260"
+          :options="chartOptions"
+          :series="chartSeries"
+        />
+      </VCardText>
+    </VCard>
 
     <!-- Row: Low Stock & Expiring Batches -->
     <VRow class="mb-4">

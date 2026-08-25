@@ -1,6 +1,8 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const notifications = ref([])
 const pollingInterval = ref(null)
 
@@ -14,15 +16,19 @@ const fetchNotifications = async () => {
   }
 }
 
+const onCustomRefresh = () => fetchNotifications()
+
 onMounted(() => {
   fetchNotifications()
 
-  // Poll every 15 seconds
-  pollingInterval.value = setInterval(fetchNotifications, 15000)
+  // Poll every 10 seconds & listen to instant refresh events
+  pollingInterval.value = setInterval(fetchNotifications, 10000)
+  window.addEventListener('refresh-notifications', onCustomRefresh)
 })
 
 onUnmounted(() => {
   if (pollingInterval.value) clearInterval(pollingInterval.value)
+  window.removeEventListener('refresh-notifications', onCustomRefresh)
 })
 
 const removeNotification = async notificationId => {
@@ -49,8 +55,6 @@ const markRead = async notificationIds => {
 }
 
 const markUnRead = notificationIds => {
-  // Database notification API currently only supports markAsRead.
-  // We can just visually mark them unread or add an endpoint for it if really needed.
   notifications.value.forEach(item => {
     if (notificationIds.includes(item.id)) item.isSeen = false
   })
@@ -62,8 +66,11 @@ const handleNotificationClick = async notification => {
   }
     
   if (notification.url) {
-    // Navigate if there's an attached URL
-    window.location.href = notification.url
+    if (notification.url.startsWith('http')) {
+      window.location.href = notification.url
+    } else {
+      router.push(notification.url)
+    }
   }
 }
 </script>

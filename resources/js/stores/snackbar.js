@@ -8,9 +8,15 @@ export const useSnackbarStore = defineStore('snackbar', () => {
   const timeout = ref(4000)
 
   const show = (msg, msgColor = 'success', msgTimeout = 4000) => {
-    message.value = msg
-    color.value = msgColor
-    timeout.value = msgTimeout
+    if (typeof msg === 'object' && msg !== null) {
+      message.value = msg.text || msg.message || ''
+      color.value = msg.color || msgColor
+      timeout.value = msg.timeout || msgTimeout
+    } else {
+      message.value = msg
+      color.value = msgColor
+      timeout.value = msgTimeout
+    }
     isVisible.value = true
   }
 

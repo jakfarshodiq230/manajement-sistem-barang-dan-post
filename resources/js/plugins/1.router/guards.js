@@ -8,7 +8,7 @@ export const setupGuards = router => {
          * If it's a public route, continue navigation. This kind of pages are allowed to visited by login & non-login users. Basically, without any restrictions.
          * Examples of public routes are, 404, under maintenance, etc.
          */
-    if (to.meta.public)
+    if (to.meta.public || to.path.startsWith('/verify/') || to.name === 'verify-uuid')
       return
 
     /**

@@ -75,6 +75,29 @@ class DashboardController extends Controller
             ->limit(10)
             ->get();
 
+        // Purchase Orders (Pengadaan Bulan Ini & Pending PO)
+        $monthlyPurchases = \App\Models\PurchaseOrder::whereMonth('date', $thisMonth)
+            ->whereYear('date', $thisYear)
+            ->where('status', '!=', 'cancelled')
+            ->sum('total_amount') ?? 0;
+
+        $pendingPoCount = \App\Models\PurchaseOrder::where('status', 'pending')->count();
+
+        // Discounts given in POS this month
+        $monthlyDiscounts = (clone $query)->whereMonth('date', $thisMonth)
+            ->whereYear('date', $thisYear)
+            ->sum('discount') ?? 0;
+
+        // Monthly Income Chart Data (12 Months)
+        $monthlyIncomeChart = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $monthIncome = Sale::where('status', 'completed')
+                ->whereMonth('date', $m)
+                ->whereYear('date', $thisYear)
+                ->sum('total_amount');
+            $monthlyIncomeChart[] = (float)$monthIncome;
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -84,6 +107,13 @@ class DashboardController extends Controller
                     'daily' => $dailyIncome,
                     'monthly' => $monthlyIncome,
                     'yearly' => $yearlyIncome,
+                ],
+                'purchases' => [
+                    'monthly' => (float)$monthlyPurchases,
+                    'pending_count' => (int)$pendingPoCount,
+                ],
+                'discounts' => [
+                    'monthly' => (float)$monthlyDiscounts,
                 ],
                 'receivables' => [
                     'outstanding' => (float)$outstandingReceivables,
@@ -103,7 +133,7 @@ class DashboardController extends Controller
                 ] : null,
                 'recent_sales' => (clone $query)->with(['user', 'branch'])->orderBy('created_at', 'desc')->limit(5)->get(),
                 'chart' => [
-                    'monthly_income' => []
+                    'monthly_income' => $monthlyIncomeChart
                 ]
             ]
         ]);
@@ -246,13 +276,55 @@ class DashboardController extends Controller
             return round((($cur - $past) / $past) * 100, 1);
         };
 
+        $aov = $curCount > 0 ? round($curRevenue / $curCount) : 0;
+        $totalDiscount = (clone $query)->sum('discount') ?? 0;
+
+        // Payment Methods Breakdown
+        $paymentBreakdown = (clone $query)->select('payment_method', DB::raw('count(*) as count'), DB::raw('sum(total_amount) as total'))
+            ->groupBy('payment_method')
+            ->get();
+
+        // Top 5 Best Selling Products
+        $saleIds = $currentSales->pluck('id');
+        $topProducts = [];
+        if ($saleIds->isNotEmpty()) {
+            $topProducts = DB::table('sale_items')
+                ->join('product_branches', 'sale_items.product_branch_id', '=', 'product_branches.id')
+                ->join('products', 'product_branches.product_id', '=', 'products.id')
+                ->whereIn('sale_items.sale_id', $saleIds)
+                ->select(
+                    'products.id',
+                    'products.name',
+                    'products.sku',
+                    DB::raw('SUM(sale_items.qty) as total_qty'),
+                    DB::raw('SUM(sale_items.subtotal) as total_revenue')
+                )
+                ->groupBy('products.id', 'products.name', 'products.sku')
+                ->orderByDesc('total_revenue')
+                ->limit(5)
+                ->get();
+        }
+
+        // Recent 5 Sales Transactions
+        $recentTransactions = (clone $query)
+            ->with(['user:id,name', 'customer:id,name', 'branch:id,name'])
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get();
+
         return response()->json([
             'summary' => [
                 'sales' => ['value' => $curCount, 'growth' => $calcGrowth($curCount, $pastCount)],
                 'revenue' => ['value' => $curRevenue, 'growth' => $calcGrowth($curRevenue, $pastRevenue)],
                 'profit' => ['value' => $curProfit, 'growth' => $calcGrowth($curProfit, $pastProfit)],
+                'aov' => ['value' => $aov],
+                'discount' => ['value' => (float)$totalDiscount],
+                'margin' => $curRevenue > 0 ? round(($curProfit / $curRevenue) * 100, 1) : 0,
             ],
-            'chart' => $chartData
+            'chart' => $chartData,
+            'payment_breakdown' => $paymentBreakdown,
+            'top_products' => $topProducts,
+            'recent_transactions' => $recentTransactions,
         ]);
     }
 

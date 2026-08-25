@@ -41,13 +41,13 @@ const totalUnreadNotifications = computed(() => props.notifications.filter(item 
 <template>
   <IconBtn id="notification-btn">
     <VBadge
-      dot
       v-bind="props.badgeProps"
-      :model-value="props.notifications.some(n => !n.isSeen)"
+      :model-value="totalUnreadNotifications > 0"
+      :content="totalUnreadNotifications > 99 ? '99+' : totalUnreadNotifications"
       color="error"
       bordered
-      offset-x="1"
-      offset-y="1"
+      offset-x="2"
+      offset-y="2"
       class="notification-badge"
     >
       <VIcon icon="ri-notification-2-line" />
@@ -64,18 +64,18 @@ const totalUnreadNotifications = computed(() => props.notifications.filter(item 
         <!-- 👉 Header -->
         <VCardItem class="notification-section">
           <h6 class="text-h6 text-truncate">
-            Notifications
+            Notifikasi
           </h6>
 
           <template #append>
             <VChip
-              v-show="!!isAllMarkRead"
+              v-show="totalUnreadNotifications > 0"
               size="small"
-              class="me-2"
+              class="me-2 font-weight-bold"
               variant="tonal"
               color="primary"
             >
-              {{ totalUnreadNotifications }} new
+              {{ totalUnreadNotifications }} baru
             </VChip>
 
             <IconBtn
@@ -92,7 +92,7 @@ const totalUnreadNotifications = computed(() => props.notifications.filter(item 
                 activator="parent"
                 location="start"
               >
-                {{ !isAllMarkRead ? 'Mark all as unread' : 'Mark all as read' }}
+                {{ !isAllMarkRead ? 'Tandai semua belum dibaca' : 'Tandai semua sudah dibaca' }}
               </VTooltip>
             </IconBtn>
           </template>
@@ -184,10 +184,9 @@ const totalUnreadNotifications = computed(() => props.notifications.filter(item 
 
             <VListItem
               v-show="!props.notifications.length"
-              class="text-center text-medium-emphasis"
-              style="block-size: 56px;"
+              class="text-center text-medium-emphasis pa-4"
             >
-              <VListItemTitle>No Notification Found!</VListItemTitle>
+              <VListItemTitle>Belum ada notifikasi baru</VListItemTitle>
             </VListItem>
           </VList>
         </PerfectScrollbar>
@@ -204,7 +203,7 @@ const totalUnreadNotifications = computed(() => props.notifications.filter(item 
             size="small"
             to="/notifications"
           >
-            View All Notifications
+            Lihat Semua Notifikasi
           </VBtn>
         </VCardText>
       </VCard>
