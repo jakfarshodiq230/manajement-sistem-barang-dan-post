@@ -151,6 +151,12 @@ const closeShiftNotes = ref('')
 const isSubmittingShift = ref(false)
 const shiftSummary = ref(null)
 
+// Capital Return during Closing Shift
+const isDepositingCapitalReturn = ref(false)
+const capitalReturnAmountInput = ref('')
+const capitalReturnBankName = ref('')
+const capitalReturnProofFile = ref(null)
+
 const checkCurrentShift = async () => {
   try {
     const res = await $api('/apps/cash-shifts/current')
@@ -195,6 +201,10 @@ const openCloseShiftDialog = async () => {
   await checkCurrentShift()
   actualCashInput.value = ''
   closeShiftNotes.value = ''
+  isDepositingCapitalReturn.value = false
+  capitalReturnAmountInput.value = ''
+  capitalReturnBankName.value = ''
+  capitalReturnProofFile.value = null
   isCloseShiftDialogOpen.value = true
 }
 
@@ -205,14 +215,21 @@ const submitCloseShift = async () => {
   }
   isSubmittingShift.value = true
   try {
+    const formData = new FormData()
+    formData.append('actual_cash', parseInputRupiah(actualCashInput.value))
+    if (closeShiftNotes.value) formData.append('notes', closeShiftNotes.value)
+
+    if (isDepositingCapitalReturn.value && parseInputRupiah(capitalReturnAmountInput.value) > 0) {
+      formData.append('capital_return_amount', parseInputRupiah(capitalReturnAmountInput.value))
+      if (capitalReturnBankName.value) formData.append('bank_name', capitalReturnBankName.value)
+      if (capitalReturnProofFile.value) formData.append('proof_file', capitalReturnProofFile.value)
+    }
+
     const res = await $api('/apps/cash-shifts/close', {
       method: 'POST',
-      body: {
-        actual_cash: parseInputRupiah(actualCashInput.value),
-        notes: closeShiftNotes.value,
-      },
+      body: formData,
     })
-    snackbar.show('Shift kasir berhasil ditutup', 'success')
+    snackbar.show('Shift kasir berhasil ditutup' + (isDepositingCapitalReturn.value ? ' dan pengembalian modal telah diajukan' : ''), 'success')
     isCloseShiftDialogOpen.value = false
     shiftSummary.value = res.summary
     hasActiveShift.value = false
@@ -462,19 +479,33 @@ const handleKeyDown = event => {
   if (event.key === 'F1' || event.key === 'F2') {
     event.preventDefault()
     if (searchInputRef.value) {
-      searchInputRef.value.focus?.()
-      const inputEl = searchInputRef.value.$el?.querySelector('input')
-      if (inputEl) {
+      const inputEl = searchInputRef.value.$el?.querySelector('input') || searchInputRef.value
+      if (inputEl && inputEl.focus) {
         inputEl.focus()
-        inputEl.select()
+        inputEl.select?.()
       }
     }
   } 
-  // F4: Pilih / Tambah Pelanggan
-  else if (event.key === 'F4') {
+  // F3 or F4: Pilih / Tambah Pelanggan
+  else if (event.key === 'F3' || event.key === 'F4') {
     event.preventDefault()
     isAddCustomerDrawerVisible.value = !isAddCustomerDrawerVisible.value
   } 
+  // F6: Hold / Tahan Transaksi Saat Ini
+  else if (event.key === 'F6') {
+    event.preventDefault()
+    if (cart.value.length > 0 && !isCheckoutDialogVisible.value && !isHoldingBill.value) {
+      holdCurrentBill()
+    }
+  }
+  // F7: Buka / Lihat Daftar Transaksi Ditahan (Held Bills)
+  else if (event.key === 'F7') {
+    event.preventDefault()
+    isHeldBillsDialogOpen.value = !isHeldBillsDialogOpen.value
+    if (isHeldBillsDialogOpen.value) {
+      fetchHeldBills()
+    }
+  }
   // F8: Checkout / Bayar
   else if (event.key === 'F8') {
     event.preventDefault()
@@ -497,23 +528,30 @@ const handleKeyDown = event => {
       isBatchDialogVisible.value = false
     } else if (isShiftSummaryVisible.value) {
       isShiftSummaryVisible.value = false
-    } else if (isHeldBillsVisible.value) {
-      isHeldBillsVisible.value = false
+    } else if (isHeldBillsDialogOpen.value) {
+      isHeldBillsDialogOpen.value = false
+    } else if (isConfirmDialogVisible.value) {
+      isConfirmDialogVisible.value = false
+    } else if (isErrorDialogVisible.value) {
+      isErrorDialogVisible.value = false
     } else if (isCheckoutDialogVisible.value) {
       isCheckoutDialogVisible.value = false
     }
   } 
   // Enter: Konfirmasi Bayar saat modal checkout terbuka
   else if (event.key === 'Enter') {
-    if (isCheckoutDialogVisible.value && !isProcessing.value) {
-      const isCredit = paymentMethod.value === 'credit'
+    if (isConfirmDialogVisible.value) {
+      event.preventDefault()
+      confirmAndSubmitCheckout()
+    } else if (isCheckoutDialogVisible.value && !isProcessing.value) {
+      const isCredit = transactionType.value === 'utang'
       const isDueValid = isCredit ? !!dueDate.value : true
-      const isCashValid = !isCredit ? (paidAmount.value >= finalTotal.value) : true
+      const isCashValid = !isCredit ? (paidAmountRaw.value >= totalAmount.value) : true
       const isCustomerValid = !!selectedCustomer.value || !!customerSearch.value
 
       if (isCustomerValid && isDueValid && isCashValid) {
         event.preventDefault()
-        processPayment()
+        handleCheckoutSubmit()
       }
     }
   }
@@ -679,7 +717,7 @@ const totalTax = computed(() => {
 })
 
 const totalAmount = computed(() => {
-  return subtotal.value + totalTaxExclude.value - discount.value
+  return Math.max(0, subtotal.value + totalTaxExclude.value - (Number(discount.value) || 0))
 })
 
 const handleCheckoutClick = () => {
@@ -925,10 +963,17 @@ const handleApprovalCancel = () => {
   pendingCheckoutData.value = null
 }
 
+const selectedPrintFormat = ref('continuous_form')
+const receiptPrinterRef = ref(null)
+
 const printReceipt = () => {
-  setTimeout(() => {
-    window.print()
-  }, 100)
+  if (receiptPrinterRef.value?.print) {
+    receiptPrinterRef.value.print()
+  } else {
+    setTimeout(() => {
+      window.print()
+    }, 100)
+  }
 }
 
 const startNewTransaction = () => {
@@ -1282,10 +1327,11 @@ const startNewTransaction = () => {
                   size="x-small"
                   variant="elevated"
                   class="font-weight-bold cursor-pointer"
+                  title="Tekan F7 untuk membuka daftar antrean ditahan"
                   @click="isHeldBillsDialogOpen = true"
                 >
                   <VIcon icon="ri-pause-line" size="12" class="me-1" />
-                  {{ heldBills.length }} Ditahan
+                  {{ heldBills.length }} Ditahan (F7)
                 </VChip>
                 <VChip v-if="cart.length > 0" color="white" size="x-small" variant="elevated" class="text-primary font-weight-bold">
                   {{ cart.length }} Item
@@ -1410,10 +1456,13 @@ const startNewTransaction = () => {
               <span class="text-caption"><i>(Pajak di dalam harga: {{ formatRupiah(totalTaxInclude) }})</i></span>
             </div>
             <div class="d-flex justify-space-between align-center mb-4">
-              <span class="text-body-1">Diskon Total</span>
+              <div class="d-flex flex-column">
+                <span class="text-body-1 font-weight-medium">Diskon Total</span>
+                <span class="text-caption text-medium-emphasis" style="font-size: 11px;">Potongan faktur bon</span>
+              </div>
               <div
                 class="flex-grow-1 ms-8"
-                style="max-width: 200px;"
+                style="max-width: 220px;"
               >
                 <VTextField
                   :model-value="formatInputRupiah(discount)"
@@ -1421,8 +1470,11 @@ const startNewTransaction = () => {
                   density="compact"
                   hide-details
                   prefix="Rp"
+                  placeholder="0"
                   class="text-right"
-                  readonly
+                  clearable
+                  @update:model-value="val => discount = parseInputRupiah(val)"
+                  @click:clear="discount = 0"
                 />
               </div>
             </div>
@@ -1444,7 +1496,7 @@ const startNewTransaction = () => {
                 class="font-weight-bold"
                 @click="holdCurrentBill"
               >
-                Hold (F4)
+                Hold (F6)
               </VBtn>
               <VBtn
                 color="primary"
@@ -1861,15 +1913,30 @@ const startNewTransaction = () => {
             Pembayaran telah diterima dan dicatat dalam sistem.
           </p>
           
+          <div class="mb-4 text-start">
+            <label class="text-caption font-weight-bold mb-1 d-block">Pilihan Format Printer:</label>
+            <VSelect
+              v-model="selectedPrintFormat"
+              :items="[
+                { title: 'Continuous Form (Dot Matrix - 9.5 x 5.5 Inch)', value: 'continuous_form' },
+                { title: 'Struk Kasir Thermal (58mm / 80mm)', value: 'thermal' },
+                { title: 'Kwitansi Formal (A4 / Folio)', value: 'kwitansi' }
+              ]"
+              density="compact"
+              prepend-inner-icon="ri-printer-line"
+              hide-details
+            />
+          </div>
+          
           <VBtn
             color="primary"
             block
             size="large"
-            class="mb-3"
+            class="mb-3 font-weight-bold"
             prepend-icon="ri-printer-line"
             @click="printReceipt"
           >
-            Cetak Struk (Print)
+            Cetak Faktur / Struk
           </VBtn>
           <VBtn
             color="secondary"
@@ -1886,9 +1953,11 @@ const startNewTransaction = () => {
 
     <ReceiptPrinter 
       v-if="completedSaleData"
+      ref="receiptPrinterRef"
       :sale="completedSaleData"
       :branch="branches.find(b => b.id === activeBranchId)" 
       :cashier-name="userData?.fullName || userData?.name || userData?.username"
+      :print-format="selectedPrintFormat"
     />
 
     <!-- QR Catalog Dialog -->
@@ -2153,6 +2222,51 @@ const startNewTransaction = () => {
             variant="outlined"
             density="compact"
           />
+
+          <!-- Opsi Setor Pengembalian Modal ke Owner -->
+          <VDivider class="my-3" />
+          <div class="d-flex align-center justify-space-between mb-2">
+            <span class="text-caption font-weight-bold text-uppercase text-primary">
+              <VIcon icon="ri-arrow-go-back-line" size="14" class="me-1" />
+              Setor Pengembalian Modal ke Owner
+            </span>
+            <VSwitch
+              v-model="isDepositingCapitalReturn"
+              density="compact"
+              color="primary"
+              hide-details
+            />
+          </div>
+
+          <div v-if="isDepositingCapitalReturn" class="pa-3 mb-3 rounded border bg-var-theme-background">
+            <VTextField
+              :model-value="capitalReturnAmountInput"
+              label="Nominal Setor ke Owner (Rp) *"
+              prefix="Rp"
+              placeholder="0"
+              variant="outlined"
+              density="compact"
+              class="mb-2"
+              @update:model-value="val => capitalReturnAmountInput = formatInputRupiah(val)"
+            />
+            <VTextField
+              v-model="capitalReturnBankName"
+              label="Nama Bank Rekening Owner"
+              placeholder="BCA / Mandiri"
+              variant="outlined"
+              density="compact"
+              class="mb-2"
+            />
+            <VFileInput
+              v-model="capitalReturnProofFile"
+              label="Lampirkan Struk / Bukti Transfer"
+              variant="outlined"
+              density="compact"
+              prepend-icon=""
+              prepend-inner-icon="ri-attachment-line"
+              accept="image/*,application/pdf"
+            />
+          </div>
         </VCardText>
 
         <VCardActions class="pa-4 pt-0 justify-end gap-2">

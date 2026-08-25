@@ -166,6 +166,33 @@ class CashShiftController extends Controller
             'notes' => $request->notes ?? $shift->notes,
         ]);
 
+        // Optional: Automatic Capital Return to Owner from Closing Shift Cash
+        $capitalReturn = null;
+        if ($request->filled('capital_return_amount') && (float) $request->capital_return_amount > 0) {
+            $proofPath = null;
+            if ($request->hasFile('proof_file')) {
+                $proofPath = $request->file('proof_file')->store('branch_capitals', 'public');
+            }
+
+            $capitalReturn = \App\Models\BranchCapital::create([
+                'reference_no' => 'CAP-RET-' . date('Ym') . '-' . strtoupper(substr(uniqid(), -5)),
+                'branch_id' => $shift->branch_id ?: ($user->branch_id ?: 1),
+                'cash_shift_id' => $shift->id,
+                'user_id' => $user->id,
+                'type' => 'return',
+                'category' => 'Setoran Laba Closing Shift',
+                'amount' => (float) $request->capital_return_amount,
+                'date' => Carbon::now()->toDateString(),
+                'payment_method' => $request->payment_method ?: 'Transfer Bank',
+                'bank_name' => $request->bank_name,
+                'account_number' => $request->account_number,
+                'account_name' => $request->account_name,
+                'proof_file' => $proofPath,
+                'notes' => 'Setoran pengembalian modal dari Closing Shift #' . $shift->id . ($request->notes ? " - " . $request->notes : ""),
+                'status' => 'pending',
+            ]);
+        }
+
         return response()->json([
             'message' => 'Shift kasir berhasil ditutup.',
             'shift' => $shift,

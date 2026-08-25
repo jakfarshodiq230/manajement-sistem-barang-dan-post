@@ -16,7 +16,7 @@ class PettyCashController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $isGlobalUser = $user && $user->hasAnyRole(['Developer', 'Super Admin', 'Owner', 'Auditor']);
+        $isGlobalUser = $user && ($user->can('manage all') || $user->can('Kasir (POS) Approve') || $user->can('Audit & Laporan Read') || !$user->branch_id);
         $branchId = $request->query('branch_id');
         
         // If not requested explicitly and not global admin, lock to user's assigned branch

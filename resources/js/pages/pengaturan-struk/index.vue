@@ -92,7 +92,21 @@ const closeDelete = () => {
 }
 
 const applyPreset = type => {
-  if (type === '58mm') {
+  if (type === 'dotmatrix_half') {
+    editedItem.value.name = 'Continuous Form 9.5 x 5.5 Inch (Dot Matrix)'
+    editedItem.value.width = '241mm'
+    editedItem.value.margin_top = 4
+    editedItem.value.margin_bottom = 4
+    editedItem.value.margin_left = 6
+    editedItem.value.margin_right = 6
+  } else if (type === 'dotmatrix_full') {
+    editedItem.value.name = 'Continuous Form 9.5 x 11 Inch (Dot Matrix)'
+    editedItem.value.width = '241mm'
+    editedItem.value.margin_top = 6
+    editedItem.value.margin_bottom = 6
+    editedItem.value.margin_left = 6
+    editedItem.value.margin_right = 6
+  } else if (type === '58mm') {
     editedItem.value.name = 'Thermal Mini 58mm'
     editedItem.value.width = '58mm'
     editedItem.value.margin_top = 0
@@ -366,14 +380,21 @@ const filteredItems = computed(() => {
               Template Cepat:
             </label>
             <div class="d-flex flex-wrap gap-2">
+              <VChip size="small" color="purple" variant="elevated" class="cursor-pointer font-weight-bold" @click="applyPreset('dotmatrix_half')">
+                <VIcon icon="ri-printer-line" size="14" class="me-1" />
+                Continuous Form 9.5x5.5" (Dot Matrix)
+              </VChip>
+              <VChip size="small" color="purple" variant="tonal" class="cursor-pointer font-weight-medium" @click="applyPreset('dotmatrix_full')">
+                Continuous Form 9.5x11"
+              </VChip>
               <VChip size="small" color="primary" variant="tonal" class="cursor-pointer font-weight-medium" @click="applyPreset('58mm')">
-                Thermal 58mm (Mini)
+                Thermal 58mm
               </VChip>
               <VChip size="small" color="success" variant="tonal" class="cursor-pointer font-weight-medium" @click="applyPreset('80mm')">
-                Thermal 80mm (Standar)
+                Thermal 80mm
               </VChip>
               <VChip size="small" color="info" variant="tonal" class="cursor-pointer font-weight-medium" @click="applyPreset('a5')">
-                Kertas A5 (Faktur)
+                Kuitansi A5
               </VChip>
             </div>
           </div>

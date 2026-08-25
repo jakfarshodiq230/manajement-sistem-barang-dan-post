@@ -17,10 +17,6 @@ const isPastClosing = ref(false)
 const requiredClosingDateFormatted = ref('')
 const closingStatus = ref('draft')
 const userData = JSON.parse(localStorage.getItem('userData') || '{}')
-const isSuperAdmin = computed(() => {
-  if (!userData || !userData.roles) return false
-  return userData.roles.some(r => r === 'Super Admin' || r.name === 'Super Admin')
-})
 const unclosedDates = ref([])
 const draftDates = ref([])
 const completedDates = ref([])
@@ -98,6 +94,7 @@ const tableHeaders = [
   { title: 'Tanggal', key: 'date' },
   { title: 'Kasir', key: 'user.name' },
   { title: 'Uang Sistem', key: 'expected_cash' },
+  { title: 'Cicilan/Setor Modal', key: 'capital_returns_amount', align: 'center' },
   { title: 'Uang Fisik', key: 'actual_cash' },
   { title: 'Selisih (Variance)', key: 'variance' },
   { title: 'Status Waktu', key: 'status_waktu' },
@@ -105,6 +102,37 @@ const tableHeaders = [
   { title: 'Catatan', key: 'notes' },
   { title: 'Aksi', key: 'actions', sortable: false, align: 'center' },
 ]
+
+const liveBreakdown = ref({
+  cash_sales_amount: 0,
+  dp_cash_amount: 0,
+  receivable_payments_amount: 0,
+  capital_injections_amount: 0,
+  capital_returns_amount: 0,
+  petty_cash_amount: 0,
+  expected_cash: 0,
+})
+const isBreakdownLoading = ref(false)
+
+const fetchLivePreview = async () => {
+  if (!selectedBranch.value || !requiredClosingDate.value) return
+  isBreakdownLoading.value = true
+  try {
+    const res = await $api('/apps/cash-reconciliations/preview', {
+      params: {
+        branch_id: selectedBranch.value,
+        date: requiredClosingDate.value,
+      },
+    })
+    if (res && res.breakdown) {
+      liveBreakdown.value = res.breakdown
+    }
+  } catch (error) {
+    console.error('Error fetching live preview:', error)
+  } finally {
+    isBreakdownLoading.value = false
+  }
+}
 
 const actualCashRaw = ref(0)
 
@@ -205,6 +233,7 @@ const submitClosing = async () => {
       })
       showSnackbar('Closing berhasil disimpan', 'success')
     }
+    window.dispatchEvent(new Event('refresh-notifications'))
     showForm.value = false
     activeEditId.value = null
     actualCashRaw.value = 0
@@ -272,6 +301,7 @@ const submitAjukan = async () => {
     })
     showSnackbar('Laporan berhasil diajukan menjadi Final', 'success')
     showAjukanDialog.value = false
+    window.dispatchEvent(new Event('refresh-notifications'))
     fetchHistory()
     fetchRequiredDate()
   } catch (e) {
@@ -292,6 +322,15 @@ const formatCurrency = value => {
 watch(selectedBranch, () => {
   fetchRequiredDate()
   fetchHistory()
+  if (showForm.value) fetchLivePreview()
+})
+
+watch(requiredClosingDate, () => {
+  if (showForm.value) fetchLivePreview()
+})
+
+watch(showForm, val => {
+  if (val) fetchLivePreview()
 })
 
 onMounted(async () => {
@@ -324,6 +363,14 @@ onMounted(async () => {
             label="Pilih Cabang"
           />
         </div>
+        <VBtn
+          color="success"
+          variant="tonal"
+          to="/apps/branch-capitals"
+          prepend-icon="ri-hand-coin-line"
+        >
+          + Setor Cicilan Modal
+        </VBtn>
         <VBtn
           v-if="!showForm"
           color="primary"
@@ -388,53 +435,115 @@ onMounted(async () => {
                 <strong>Keterlambatan!</strong> Anda sedang melakukan closing untuk hari kemarin karena melewati batas jam 12 malam. Pastikan alasan keterlambatan jelas pada catatan.
               </VAlert>
 
-              <p class="text-body-2 mb-4">
-              Hitung uang tunai yang ada di laci kasir saat ini dan masukkan totalnya. Sistem akan otomatis menghitung selisihnya.
-            </p>
-            <VRow>
-              <VCol
-                cols="12"
-                md="4"
-              >
-                <VTextField
-                  v-model="actualCashDisplay"
-                  label="Total Uang Fisik (Rp)"
-                  type="text"
-                  variant="outlined"
-                />
-              </VCol>
-              <VCol
-                cols="12"
-                md="8"
-              >
-                <VTextField
-                  v-model="notes"
-                  label="Catatan (Opsional)"
-                  variant="outlined"
-                />
-              </VCol>
-              
-            </VRow>
+              <p class="text-body-2 mb-3">
+                Hitung uang tunai yang ada di laci kasir saat ini dan masukkan totalnya. Sistem akan otomatis menghitung selisihnya.
+              </p>
 
-          </VCardText>
-          <VCardActions class="px-4 pb-4">
-            <VSpacer />
-            <VBtn
-              variant="outlined"
-              color="secondary"
-              @click="showForm = false; activeEditId = null"
-            >
-              Batal
-            </VBtn>
-            <VBtn
-              color="primary"
-              :loading="isLoading"
-              @click="submitClosing"
-            >
-              {{ activeEditId ? 'Simpan Perubahan' : 'Simpan Closing' }}
-            </VBtn>
-          </VCardActions>
-        </VCard>
+              <!-- Live Preview Calculation Breakdown -->
+              <VCard variant="tonal" color="primary" class="mb-4 pa-3 rounded-lg border bg-var-theme-surface" :loading="isBreakdownLoading">
+                <div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-2">
+                  <div class="d-flex align-center gap-1 font-weight-bold text-subtitle-2">
+                    <VIcon icon="ri-calculator-line" size="18" />
+                    <span>Estimasi Kas Sistem (Laci Kasir) Tanggal Terpilih:</span>
+                  </div>
+                  <VChip color="primary" size="small" variant="elevated" class="font-weight-bold">
+                    Total Kas Sistem: {{ formatCurrency(liveBreakdown.expected_cash) }}
+                  </VChip>
+                </div>
+
+                <VRow dense class="text-caption">
+                  <!-- Pemasukan -->
+                  <VCol cols="12" md="6">
+                    <div class="pa-2 rounded bg-var-theme-background border h-100">
+                      <div class="font-weight-bold text-success text-uppercase mb-1 d-flex align-center gap-1">
+                        <VIcon icon="ri-add-circle-line" size="14" /> Pemasukan Kas Tunai (+)
+                      </div>
+                      <div class="d-flex justify-space-between py-0-5">
+                        <span class="text-medium-emphasis">Penjualan Tunai:</span>
+                        <span class="font-weight-medium">{{ formatCurrency(liveBreakdown.cash_sales_amount) }}</span>
+                      </div>
+                      <div class="d-flex justify-space-between py-0-5">
+                        <span class="text-medium-emphasis">DP Tempo Tunai:</span>
+                        <span class="font-weight-medium">{{ formatCurrency(liveBreakdown.dp_cash_amount) }}</span>
+                      </div>
+                      <div class="d-flex justify-space-between py-0-5">
+                        <span class="text-medium-emphasis">Pelunasan Piutang:</span>
+                        <span class="font-weight-medium">{{ formatCurrency(liveBreakdown.receivable_payments_amount) }}</span>
+                      </div>
+                      <div class="d-flex justify-space-between py-0-5" v-if="liveBreakdown.capital_injections_amount > 0">
+                        <span class="text-medium-emphasis">Injeksi / Modal Masuk:</span>
+                        <span class="font-weight-bold text-success">+ {{ formatCurrency(liveBreakdown.capital_injections_amount) }}</span>
+                      </div>
+                    </div>
+                  </VCol>
+
+                  <!-- Pengeluaran -->
+                  <VCol cols="12" md="6">
+                    <div class="pa-2 rounded bg-var-theme-background border h-100">
+                      <div class="font-weight-bold text-error text-uppercase mb-1 d-flex align-center gap-1">
+                        <VIcon icon="ri-indeterminate-circle-line" size="14" /> Pengeluaran Kas Tunai (-)
+                      </div>
+                      <div class="d-flex align-center justify-space-between py-0-5 pa-1 rounded mb-1 bg-error-subtle">
+                        <div>
+                          <span class="text-error font-weight-bold d-block">Cicilan / Setoran Modal ke Owner:</span>
+                          <RouterLink to="/apps/branch-capitals" class="text-caption font-weight-bold text-primary text-decoration-none">
+                            + Catat Setoran Baru
+                          </RouterLink>
+                        </div>
+                        <span class="font-weight-bold text-error">- {{ formatCurrency(liveBreakdown.capital_returns_amount) }}</span>
+                      </div>
+                      <div class="d-flex justify-space-between py-0-5">
+                        <span class="text-medium-emphasis">Kas Kecil (Petty Cash):</span>
+                        <span class="font-weight-medium text-error">- {{ formatCurrency(liveBreakdown.petty_cash_amount) }}</span>
+                      </div>
+                    </div>
+                  </VCol>
+                </VRow>
+              </VCard>
+
+              <VRow>
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <VTextField
+                    v-model="actualCashDisplay"
+                    label="Total Uang Fisik Nyata (Rp) *"
+                    type="text"
+                    variant="outlined"
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  md="8"
+                >
+                  <VTextField
+                    v-model="notes"
+                    label="Catatan (Opsional)"
+                    placeholder="Keterangan kondisi kasir / selisih jika ada..."
+                    variant="outlined"
+                  />
+                </VCol>
+              </VRow>
+            </VCardText>
+            <VCardActions class="px-4 pb-4">
+              <VSpacer />
+              <VBtn
+                variant="outlined"
+                color="secondary"
+                @click="showForm = false; activeEditId = null"
+              >
+                Batal
+              </VBtn>
+              <VBtn
+                color="primary"
+                :loading="isLoading"
+                @click="submitClosing"
+              >
+                {{ activeEditId ? 'Simpan Perubahan' : 'Simpan Closing' }}
+              </VBtn>
+            </VCardActions>
+          </VCard>
 
         <!-- History Table -->
         <VCard title="Riwayat Closing Cabang">
@@ -451,20 +560,56 @@ onMounted(async () => {
             <template #expanded-row="{ columns, item }">
               <tr>
                 <td :colspan="columns.length" class="pa-4" style="background-color: rgba(var(--v-theme-on-surface), 0.04);">
-                  <div class="d-flex flex-column gap-1">
-                    <div class="text-subtitle-2 mb-1 text-primary">Rincian Uang Sistem ({{ formatCurrency(item.expected_cash) }})</div>
-                    <div class="d-flex justify-space-between" style="max-width: 400px;">
-                      <span class="text-body-2 text-medium-emphasis">Penjualan Tunai Murni:</span>
-                      <span class="text-body-2 font-weight-medium">{{ formatCurrency(item.cash_sales_amount || 0) }}</span>
+                  <div class="d-flex flex-column gap-2">
+                    <div class="text-subtitle-2 text-primary font-weight-bold">
+                      Rincian Kalkulasi Kas Sistem ({{ formatCurrency(item.expected_cash) }})
                     </div>
-                    <div class="d-flex justify-space-between" style="max-width: 400px;">
-                      <span class="text-body-2 text-medium-emphasis">Uang Muka (DP) Tunai:</span>
-                      <span class="text-body-2 font-weight-medium">{{ formatCurrency(item.dp_cash_amount || 0) }}</span>
-                    </div>
-                    <div class="d-flex justify-space-between" style="max-width: 400px;">
-                      <span class="text-body-2 text-medium-emphasis">Pelunasan Piutang Tunai:</span>
-                      <span class="text-body-2 font-weight-medium">{{ formatCurrency(item.receivable_payments_amount || 0) }}</span>
-                    </div>
+                    
+                    <VRow dense style="max-width: 700px;">
+                      <!-- Pemasukan -->
+                      <VCol cols="12" sm="6">
+                        <div class="pa-3 rounded border bg-var-theme-surface h-100">
+                          <div class="text-caption font-weight-bold text-success mb-2 text-uppercase d-flex align-center gap-1">
+                            <VIcon icon="ri-add-circle-line" size="14" />
+                            Pemasukan Kas Tunai (+)
+                          </div>
+                          <div class="d-flex justify-space-between mb-1">
+                            <span class="text-caption text-medium-emphasis">Penjualan Tunai Murni:</span>
+                            <span class="text-caption font-weight-medium">{{ formatCurrency(item.cash_sales_amount || 0) }}</span>
+                          </div>
+                          <div class="d-flex justify-space-between mb-1">
+                            <span class="text-caption text-medium-emphasis">Uang Muka (DP) Tunai:</span>
+                            <span class="text-caption font-weight-medium">{{ formatCurrency(item.dp_cash_amount || 0) }}</span>
+                          </div>
+                          <div class="d-flex justify-space-between mb-1">
+                            <span class="text-caption text-medium-emphasis">Pelunasan Piutang Tunai:</span>
+                            <span class="text-caption font-weight-medium">{{ formatCurrency(item.receivable_payments_amount || 0) }}</span>
+                          </div>
+                          <div class="d-flex justify-space-between" v-if="item.capital_injections_amount > 0">
+                            <span class="text-caption text-medium-emphasis">Injeksi Modal Masuk:</span>
+                            <span class="text-caption font-weight-bold text-success">+ {{ formatCurrency(item.capital_injections_amount || 0) }}</span>
+                          </div>
+                        </div>
+                      </VCol>
+
+                      <!-- Pengeluaran -->
+                      <VCol cols="12" sm="6">
+                        <div class="pa-3 rounded border bg-var-theme-surface h-100">
+                          <div class="text-caption font-weight-bold text-error mb-2 text-uppercase d-flex align-center gap-1">
+                            <VIcon icon="ri-indeterminate-circle-line" size="14" />
+                            Pengeluaran Kas Tunai (-)
+                          </div>
+                          <div class="d-flex justify-space-between mb-1 pa-1 rounded" style="background-color: rgba(var(--v-theme-error), 0.08);">
+                            <span class="text-caption text-error font-weight-bold">Cicilan / Setoran Modal ke Owner:</span>
+                            <span class="text-caption font-weight-bold text-error">- {{ formatCurrency(item.capital_returns_amount || 0) }}</span>
+                          </div>
+                          <div class="d-flex justify-space-between">
+                            <span class="text-caption text-medium-emphasis">Kas Kecil (Petty Cash):</span>
+                            <span class="text-caption font-weight-medium text-error">- {{ formatCurrency(item.petty_cash_amount || 0) }}</span>
+                          </div>
+                        </div>
+                      </VCol>
+                    </VRow>
                   </div>
                 </td>
               </tr>
@@ -475,6 +620,19 @@ onMounted(async () => {
         
             <template #item.expected_cash="{ item }">
               {{ formatCurrency(item.expected_cash) }}
+            </template>
+
+            <template #item.capital_returns_amount="{ item }">
+              <VChip
+                v-if="item.capital_returns_amount > 0"
+                color="error"
+                variant="tonal"
+                size="small"
+                class="font-weight-bold"
+              >
+                - {{ formatCurrency(item.capital_returns_amount) }}
+              </VChip>
+              <span v-else class="text-medium-emphasis text-caption">-</span>
             </template>
         
             <template #item.actual_cash="{ item }">
