@@ -20,6 +20,11 @@ export const useSnackbarStore = defineStore('snackbar', () => {
     isVisible.value = true
   }
 
+  const showSuccess = (msg, msgTimeout = 4000) => show(msg, 'success', msgTimeout)
+  const showError = (msg, msgTimeout = 4000) => show(msg, 'error', msgTimeout)
+  const showWarning = (msg, msgTimeout = 4000) => show(msg, 'warning', msgTimeout)
+  const showInfo = (msg, msgTimeout = 4000) => show(msg, 'info', msgTimeout)
+
   const hide = () => {
     isVisible.value = false
   }
@@ -30,6 +35,10 @@ export const useSnackbarStore = defineStore('snackbar', () => {
     color,
     timeout,
     show,
+    showSuccess,
+    showError,
+    showWarning,
+    showInfo,
     hide,
   }
 })

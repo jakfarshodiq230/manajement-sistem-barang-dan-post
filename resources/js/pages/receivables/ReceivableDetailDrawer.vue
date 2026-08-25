@@ -567,7 +567,8 @@ const printReceipt = () => {
           />
         </div>
 
-        <VCard class="border" variant="flat">
+        <VCard class="border" variant="flat" :loading="isLoadingEmailLogs">
+          <VProgressLinear v-if="isLoadingEmailLogs" indeterminate color="primary" height="2" />
           <VTable density="compact">
             <thead>
               <tr>
@@ -578,7 +579,13 @@ const printReceipt = () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-if="emailLogs.length === 0">
+              <tr v-if="isLoadingEmailLogs">
+                <td colspan="4" class="text-center text-medium-emphasis py-3 text-caption">
+                  <VProgressCircular indeterminate color="primary" size="18" class="me-2" />
+                  Memuat riwayat email...
+                </td>
+              </tr>
+              <tr v-else-if="emailLogs.length === 0">
                 <td colspan="4" class="text-center text-medium-emphasis py-3 text-caption">
                   Belum ada riwayat email untuk piutang ini
                 </td>

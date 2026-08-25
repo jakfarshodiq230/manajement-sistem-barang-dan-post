@@ -934,7 +934,7 @@ onMounted(async () => {
     </VCard>
 
     <!-- Main Table Card -->
-    <VCard elevation="2" class="rounded-xl border">
+    <VCard elevation="2" class="rounded-xl border" :loading="isLoading">
       <!-- Filter Bar -->
       <VCardText class="pa-4 border-b">
         <div class="d-flex flex-wrap align-center justify-space-between gap-3">
@@ -948,7 +948,6 @@ onMounted(async () => {
               density="compact"
               variant="outlined"
               label="Pilih Cabang"
-              prepend-inner-icon="ri-store-2-line"
               style="min-width: 220px; max-width: 280px;"
               hide-details
             />
@@ -958,13 +957,13 @@ onMounted(async () => {
               v-model="selectedType"
               :items="[
                 { value: 'all', title: 'Semua Jenis Mutasi' },
-                { value: 'injection', title: 'Injeksi / Permintaan Modal' },
-                { value: 'return', title: 'Pengembalian Modal' }
+                { value: 'injection', title: 'Penyertaan / Injeksi Modal' },
+                { value: 'withdrawal', title: 'Penarikan / Setoran Laba' },
               ]"
               density="compact"
               variant="outlined"
               label="Jenis Mutasi"
-              style="min-width: 210px; max-width: 260px;"
+              style="min-width: 200px; max-width: 250px;"
               hide-details
             />
 
@@ -973,20 +972,18 @@ onMounted(async () => {
               v-model="selectedStatus"
               :items="[
                 { value: 'all', title: 'Semua Status' },
-                { value: 'approved', title: 'Disetujui (Approved)' },
-                { value: 'pending', title: 'Menunggu Approval' },
-                { value: 'rejected', title: 'Ditolak / Dibatalkan' }
+                { value: 'approved', title: 'Disetujui / Selesai' },
+                { value: 'pending', title: 'Menunggu Persetujuan' },
+                { value: 'rejected', title: 'Ditolak' },
               ]"
               density="compact"
               variant="outlined"
               label="Status Transaksi"
-              style="min-width: 200px; max-width: 240px;"
+              style="min-width: 180px; max-width: 230px;"
               hide-details
             />
-          </div>
 
-          <!-- Search Box -->
-          <div style="min-width: 220px;">
+            <!-- Search -->
             <VTextField
               v-model="search"
               placeholder="Cari referensi, catatan, bank..."
@@ -999,6 +996,8 @@ onMounted(async () => {
           </div>
         </div>
       </VCardText>
+
+      <VProgressLinear v-if="isLoading" indeterminate color="primary" height="2" />
 
       <!-- Table Body -->
       <VTable class="text-no-wrap" hover>
@@ -1018,8 +1017,8 @@ onMounted(async () => {
 
         <tbody>
           <tr v-if="isLoading">
-            <td colspan="9" class="text-center pa-6">
-              <VProgressCircular indeterminate color="primary" size="32" class="me-2" />
+            <td colspan="9" class="text-center pa-6 text-medium-emphasis">
+              <VProgressCircular indeterminate color="primary" size="28" class="me-2" />
               <span>Memuat riwayat transaksi modal...</span>
             </td>
           </tr>

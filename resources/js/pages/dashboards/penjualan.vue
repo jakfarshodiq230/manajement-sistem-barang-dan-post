@@ -497,6 +497,7 @@ const formatPaymentLabel = method => {
             <VCardSubtitle>Item dengan kontribusi kuantitas & omzet tertinggi</VCardSubtitle>
           </VCardItem>
           <VDivider />
+          <VProgressLinear v-if="isLoading" indeterminate color="warning" height="2" />
 
           <VTable class="text-no-wrap" hover density="comfortable">
             <thead>
@@ -507,7 +508,13 @@ const formatPaymentLabel = method => {
               </tr>
             </thead>
             <tbody>
-              <tr v-if="analyticsData.top_products.length === 0">
+              <tr v-if="isLoading">
+                <td colspan="3" class="text-center text-medium-emphasis py-6">
+                  <VProgressCircular indeterminate color="warning" size="24" class="me-2" />
+                  <span>Memuat produk terlaris...</span>
+                </td>
+              </tr>
+              <tr v-else-if="analyticsData.top_products.length === 0">
                 <td colspan="3" class="text-center text-medium-emphasis py-6">
                   Belum ada data penjualan pada periode ini.
                 </td>
@@ -561,6 +568,7 @@ const formatPaymentLabel = method => {
             <VCardSubtitle>Aliran transaksi penjualan live dari kasir POS</VCardSubtitle>
           </VCardItem>
           <VDivider />
+          <VProgressLinear v-if="isLoading" indeterminate color="info" height="2" />
 
           <VTable class="text-no-wrap" hover density="comfortable">
             <thead>
@@ -572,7 +580,13 @@ const formatPaymentLabel = method => {
               </tr>
             </thead>
             <tbody>
-              <tr v-if="analyticsData.recent_transactions.length === 0">
+              <tr v-if="isLoading">
+                <td colspan="4" class="text-center text-medium-emphasis py-6">
+                  <VProgressCircular indeterminate color="info" size="24" class="me-2" />
+                  <span>Memuat transaksi terbaru...</span>
+                </td>
+              </tr>
+              <tr v-else-if="analyticsData.recent_transactions.length === 0">
                 <td colspan="4" class="text-center text-medium-emphasis py-6">
                   Belum ada transaksi struk kasir.
                 </td>

@@ -162,11 +162,23 @@ const fetchBlockedIps = async () => {
   }
 }
 
+const isManualBlock = ref(false)
+
 // Block IP
 const openBlockDialog = (ip, reason = '') => {
+  isManualBlock.value = false
   blockForm.value = {
     ip_address: ip,
     reason: reason || 'Terdeteksi aktivitas mencurigakan / percobaan serangan',
+  }
+  isBlockDialogVisible.value = true
+}
+
+const openManualBlockDialog = () => {
+  isManualBlock.value = true
+  blockForm.value = {
+    ip_address: '',
+    reason: 'Diblokir manual oleh Administrator',
   }
   isBlockDialogVisible.value = true
 }
@@ -313,6 +325,19 @@ onUnmounted(() => {
             @click="() => { fetchSummary(); fetchLogs(); }"
           >
             Segarkan
+          </VBtn>
+
+          <!-- Manual Block IP Button -->
+          <VBtn
+            v-if="$can('block', 'Log Keamanan') || $can('manage', 'all')"
+            variant="elevated"
+            color="error"
+            prepend-icon="ri-shield-user-line"
+            size="small"
+            class="text-none font-weight-bold shadow-sm"
+            @click="openManualBlockDialog"
+          >
+            + Tambah Blokir IP
           </VBtn>
 
           <!-- Blacklist IP Manager -->
@@ -462,7 +487,7 @@ onUnmounted(() => {
     </VCard>
 
     <!-- Main Log Table Card -->
-    <VCard elevation="2" class="rounded-xl border">
+    <VCard elevation="2" class="rounded-xl border" :loading="isLoading">
       <!-- Filter Bar -->
       <VCardText class="pa-4 border-b">
         <div class="d-flex flex-wrap align-center justify-space-between gap-3">
@@ -484,10 +509,10 @@ onUnmounted(() => {
               v-model="selectedRisk"
               :items="[
                 { value: 'all', title: 'Semua Tingkat Risiko' },
-                { value: 'critical', title: '🔴 Kritis / Serangan' },
-                { value: 'high', title: '🟠 Mencurigakan (High)' },
-                { value: 'medium', title: '🟡 Peringatan (Medium)' },
-                { value: 'low', title: '🟢 Aman / Normal (Low)' }
+                { value: 'critical', title: 'Kritis / Serangan' },
+                { value: 'high', title: 'Mencurigakan (High)' },
+                { value: 'medium', title: 'Peringatan (Medium)' },
+                { value: 'low', title: 'Aman / Normal (Low)' }
               ]"
               density="compact"
               variant="outlined"
@@ -520,6 +545,9 @@ onUnmounted(() => {
         </div>
       </VCardText>
 
+      <!-- Top Linear Loading Bar -->
+      <VProgressLinear v-if="isLoading" indeterminate color="primary" height="2" />
+
       <!-- Table Body -->
       <VTable class="text-no-wrap" hover>
         <thead>
@@ -536,14 +564,7 @@ onUnmounted(() => {
         </thead>
 
         <tbody>
-          <tr v-if="isLoading">
-            <td colspan="8" class="text-center pa-6">
-              <VProgressCircular indeterminate color="primary" size="32" class="me-2" />
-              <span>Memuat riwayat log keamanan & IP...</span>
-            </td>
-          </tr>
-
-          <tr v-else-if="logs.length === 0">
+          <tr v-if="!isLoading && logs.length === 0">
             <td colspan="8" class="text-center pa-6 text-medium-emphasis">
               <VIcon icon="ri-shield-check-line" size="36" color="success" class="d-block mx-auto mb-2 opacity-50" />
               <span>Tidak ada log keamanan yang sesuai filter saat ini.</span>
@@ -795,16 +816,18 @@ onUnmounted(() => {
         </div>
 
         <p class="text-body-2 mb-3">
-          Apakah Anda yakin ingin memblokir alamat IP <strong>{{ blockForm.ip_address }}</strong>? Semua permintaan selanjutnya dari IP ini akan langsung ditolak sistem (403 Forbidden).
+          {{ isManualBlock ? 'Masukkan alamat IP yang ingin Anda blokir secara manual dari sistem.' : 'Apakah Anda yakin ingin memblokir alamat IP ini? Semua permintaan selanjutnya dari IP ini akan langsung ditolak sistem (403 Forbidden).' }}
         </p>
 
         <VTextField
           v-model="blockForm.ip_address"
           label="Alamat IP yang Diblokir *"
+          placeholder="Contoh: 192.168.1.50 atau 103.45.67.89"
           density="compact"
           variant="outlined"
           class="mb-3"
-          readonly
+          :readonly="!isManualBlock"
+          :rules="[v => !!v || 'Alamat IP wajib diisi']"
         />
 
         <VTextarea
@@ -841,7 +864,19 @@ onUnmounted(() => {
               <span class="text-caption text-medium-emphasis">Daftar IP yang dicekal dan ditolak otomatis oleh firewall sistem</span>
             </div>
           </div>
-          <VBtn icon="ri-close-line" variant="text" density="compact" @click="isBlacklistModalVisible = false" />
+          <div class="d-flex align-center gap-2">
+            <VBtn
+              v-if="$can('block', 'Log Keamanan') || $can('manage', 'all')"
+              size="small"
+              color="error"
+              variant="tonal"
+              prepend-icon="ri-add-line"
+              @click="openManualBlockDialog"
+            >
+              + Blokir IP Baru
+            </VBtn>
+            <VBtn icon="ri-close-line" variant="text" density="compact" @click="isBlacklistModalVisible = false" />
+          </div>
         </div>
 
         <VTable class="text-no-wrap mb-4" hover>

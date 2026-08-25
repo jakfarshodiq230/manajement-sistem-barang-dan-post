@@ -189,7 +189,7 @@ const formatDate = dateString => {
     </div>
 
     <!-- Filter Card -->
-    <VCard elevation="2">
+    <VCard elevation="2" :loading="isLoading">
       <VCardText class="d-flex flex-wrap gap-4 align-center py-4">
         <VSelect
           v-model="selectedMonth"
@@ -253,6 +253,7 @@ const formatDate = dateString => {
       </VCardText>
 
       <VDivider />
+      <VProgressLinear v-if="isLoading" indeterminate color="primary" height="2" />
 
       <!-- Scrollable Matrix Table -->
       <div style="overflow-x: auto;">

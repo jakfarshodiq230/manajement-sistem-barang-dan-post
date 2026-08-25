@@ -94,7 +94,7 @@ const closeDialog = () => {
     max-width="800"
     @update:model-value="(val) => emit('update:isDialogVisible', val)"
   >
-    <VCard title="Kelola Harga Batch">
+    <VCard title="Kelola Harga Batch" :loading="isLoading">
       <VCardText>
         <p class="mb-4 text-body-1">
           Atur harga jual dan batas nego untuk masing-masing batch dari produk 
@@ -102,14 +102,25 @@ const closeDialog = () => {
           <strong>{{ props.selectedData?.branch?.name }}</strong>.
         </p>
 
+        <VProgressLinear
+          v-if="isLoading"
+          indeterminate
+          color="primary"
+          height="2"
+          class="mb-3"
+        />
+
         <div
           v-if="isLoading"
-          class="d-flex justify-center pa-4"
+          class="d-flex justify-center align-center pa-6 text-medium-emphasis"
         >
           <VProgressCircular
             indeterminate
             color="primary"
+            size="28"
+            class="me-2"
           />
+          <span>Memuat data batch produk...</span>
         </div>
         
         <VTable

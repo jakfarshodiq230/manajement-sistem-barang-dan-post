@@ -670,7 +670,7 @@ onMounted(async () => {
             </template>
             <template #item.actions="{ item }">
               <VBtn
-                v-if="item.status !== 'completed' || isSuperAdmin"
+                v-if="item.status !== 'completed' || $can('write', 'Audit & Laporan') || $can('manage', 'all')"
                 size="small"
                 color="success"
                 variant="tonal"
@@ -681,7 +681,7 @@ onMounted(async () => {
               </VBtn>
 
               <VBtn
-                v-if="item.status !== 'completed' || isSuperAdmin"
+                v-if="item.status !== 'completed' || $can('write', 'Audit & Laporan') || $can('manage', 'all')"
                 icon="ri-edit-line"
                 variant="text"
                 size="small"
@@ -689,7 +689,7 @@ onMounted(async () => {
                 @click="editItem(item)"
               />
               <VBtn
-                v-if="item.status !== 'completed' || isSuperAdmin"
+                v-if="item.status !== 'completed' || $can('delete', 'Audit & Laporan') || $can('manage', 'all')"
                 icon="ri-delete-bin-line"
                 variant="text"
                 size="small"

@@ -432,5 +432,5 @@ const exportExcel = async () => {
 <route lang="yaml">
 meta:
   action: read
-  subject: Analisis Usia Stok
+  subject: Analisis Stok
 </route>

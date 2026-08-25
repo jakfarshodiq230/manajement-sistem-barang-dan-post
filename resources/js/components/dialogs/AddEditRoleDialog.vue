@@ -358,7 +358,8 @@ const onReset = () => {
           </div>
 
           <!-- Permissions Matrix Table -->
-          <VCard class="border rounded-xl overflow-hidden mb-2">
+          <VCard class="border rounded-xl overflow-hidden mb-2" :loading="isLoading">
+            <VProgressLinear v-if="isLoading" indeterminate color="primary" height="2" />
             <VTable class="permissions-matrix-table text-no-wrap" density="comfortable">
               <thead>
                 <tr class="bg-var-theme-background">
@@ -382,6 +383,17 @@ const onReset = () => {
               </thead>
 
               <tbody>
+                <tr v-if="isLoading">
+                  <td :colspan="2 + availableActions.length" class="text-center py-6 text-medium-emphasis">
+                    <VProgressCircular indeterminate color="primary" size="24" class="me-2" />
+                    <span>Memuat daftar modul hak akses...</span>
+                  </td>
+                </tr>
+                <tr v-else-if="filteredPermissions.length === 0">
+                  <td :colspan="2 + availableActions.length" class="text-center py-6 text-medium-emphasis">
+                    Modul tidak ditemukan
+                  </td>
+                </tr>
                 <tr
                   v-for="p in filteredPermissions"
                   :key="p.name"

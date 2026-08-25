@@ -356,7 +356,7 @@ const chartSeries = computed(() => {
     <VRow class="mb-4">
       <!-- Low Stock Table -->
       <VCol cols="12" md="6">
-        <VCard elevation="2" class="h-100 d-flex flex-column">
+        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="warning" variant="tonal" size="36" class="me-2">
@@ -367,6 +367,7 @@ const chartSeries = computed(() => {
             <VCardSubtitle>Produk yang sisa stoknya kritis (&le; 10 unit)</VCardSubtitle>
           </VCardItem>
           <VDivider />
+          <VProgressLinear v-if="isLoading" indeterminate color="warning" height="2" />
 
           <VTable class="text-no-wrap" hover density="comfortable">
             <thead>
@@ -377,7 +378,13 @@ const chartSeries = computed(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-if="analyticsData.low_stock.length === 0">
+              <tr v-if="isLoading">
+                <td colspan="3" class="text-center text-medium-emphasis py-6">
+                  <VProgressCircular indeterminate color="warning" size="24" class="me-2" />
+                  <span>Memuat data stok menipis...</span>
+                </td>
+              </tr>
+              <tr v-else-if="analyticsData.low_stock.length === 0">
                 <td colspan="3" class="text-center text-medium-emphasis py-6">
                   <VIcon icon="ri-checkbox-circle-line" color="success" size="18" class="me-1" />
                   Semua stok produk aman.
@@ -412,7 +419,7 @@ const chartSeries = computed(() => {
 
       <!-- Expiring Batches (FEFO) Table -->
       <VCol cols="12" md="6">
-        <VCard elevation="2" class="h-100 d-flex flex-column">
+        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="error" variant="tonal" size="36" class="me-2">
@@ -423,6 +430,7 @@ const chartSeries = computed(() => {
             <VCardSubtitle>Batch produk yang akan expired dalam 30 hari</VCardSubtitle>
           </VCardItem>
           <VDivider />
+          <VProgressLinear v-if="isLoading" indeterminate color="error" height="2" />
 
           <VTable class="text-no-wrap" hover density="comfortable">
             <thead>
@@ -434,7 +442,13 @@ const chartSeries = computed(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-if="analyticsData.expiring_batches.length === 0">
+              <tr v-if="isLoading">
+                <td colspan="4" class="text-center text-medium-emphasis py-6">
+                  <VProgressCircular indeterminate color="error" size="24" class="me-2" />
+                  <span>Memuat data kedaluwarsa...</span>
+                </td>
+              </tr>
+              <tr v-else-if="analyticsData.expiring_batches.length === 0">
                 <td colspan="4" class="text-center text-medium-emphasis py-6">
                   <VIcon icon="ri-checkbox-circle-line" color="success" size="18" class="me-1" />
                   Tidak ada produk yang mendekati kedaluwarsa.
@@ -473,7 +487,7 @@ const chartSeries = computed(() => {
     <VRow>
       <!-- Dead Stock Table (FIFO) -->
       <VCol cols="12" md="6">
-        <VCard elevation="2" class="h-100 d-flex flex-column">
+        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="warning" variant="tonal" size="36" class="me-2">
@@ -484,6 +498,7 @@ const chartSeries = computed(() => {
             <VCardSubtitle>Stok lama mengendap di gudang &gt; 90 hari</VCardSubtitle>
           </VCardItem>
           <VDivider />
+          <VProgressLinear v-if="isLoading" indeterminate color="warning" height="2" />
 
           <VTable class="text-no-wrap" hover density="comfortable">
             <thead>
@@ -494,7 +509,13 @@ const chartSeries = computed(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-if="analyticsData.dead_stock && analyticsData.dead_stock.length === 0">
+              <tr v-if="isLoading">
+                <td colspan="3" class="text-center text-medium-emphasis py-6">
+                  <VProgressCircular indeterminate color="warning" size="24" class="me-2" />
+                  <span>Memuat data dead stock...</span>
+                </td>
+              </tr>
+              <tr v-else-if="analyticsData.dead_stock && analyticsData.dead_stock.length === 0">
                 <td colspan="3" class="text-center text-medium-emphasis py-6">
                   <VIcon icon="ri-checkbox-circle-line" color="success" size="18" class="me-1" />
                   Tidak ada stok usang yang terdeteksi.
@@ -529,7 +550,7 @@ const chartSeries = computed(() => {
 
       <!-- New Stock Table (LIFO) -->
       <VCol cols="12" md="6">
-        <VCard elevation="2" class="h-100 d-flex flex-column">
+        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="info" variant="tonal" size="36" class="me-2">
@@ -540,6 +561,7 @@ const chartSeries = computed(() => {
             <VCardSubtitle>Batch produk yang baru ditambahkan ke gudang</VCardSubtitle>
           </VCardItem>
           <VDivider />
+          <VProgressLinear v-if="isLoading" indeterminate color="info" height="2" />
 
           <VTable class="text-no-wrap" hover density="comfortable">
             <thead>
@@ -550,7 +572,13 @@ const chartSeries = computed(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-if="analyticsData.new_stock && analyticsData.new_stock.length === 0">
+              <tr v-if="isLoading">
+                <td colspan="3" class="text-center text-medium-emphasis py-6">
+                  <VProgressCircular indeterminate color="info" size="24" class="me-2" />
+                  <span>Memuat data stok baru...</span>
+                </td>
+              </tr>
+              <tr v-else-if="analyticsData.new_stock && analyticsData.new_stock.length === 0">
                 <td colspan="3" class="text-center text-medium-emphasis py-6">
                   Belum ada produk baru masuk.
                 </td>

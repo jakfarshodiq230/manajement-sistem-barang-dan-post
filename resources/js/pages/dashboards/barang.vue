@@ -148,7 +148,7 @@ const headers = [
     <VRow class="mb-4">
       <!-- Low Stock Column -->
       <VCol cols="12" md="6">
-        <VCard elevation="2" class="h-100 d-flex flex-column">
+        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="warning" variant="tonal" size="36" class="me-2">
@@ -159,6 +159,7 @@ const headers = [
             <VCardSubtitle>Produk yang sisa stoknya di bawah 10 unit</VCardSubtitle>
           </VCardItem>
           <VDivider />
+          <VProgressLinear v-if="isLoading" indeterminate color="warning" height="2" />
 
           <VTable class="text-no-wrap" hover density="comfortable">
             <thead>
@@ -169,7 +170,13 @@ const headers = [
               </tr>
             </thead>
             <tbody>
-              <tr v-if="analyticsData.low_stock.length === 0">
+              <tr v-if="isLoading">
+                <td colspan="3" class="text-center text-medium-emphasis py-6">
+                  <VProgressCircular indeterminate color="warning" size="24" class="me-2" />
+                  <span>Memuat peringatan stok...</span>
+                </td>
+              </tr>
+              <tr v-else-if="analyticsData.low_stock.length === 0">
                 <td colspan="3" class="text-center text-medium-emphasis py-6">
                   <VIcon icon="ri-checkbox-circle-line" color="success" size="20" class="me-1" />
                   Semua stok produk dalam kondisi aman.
@@ -204,7 +211,7 @@ const headers = [
 
       <!-- Out of Stock Column -->
       <VCol cols="12" md="6">
-        <VCard elevation="2" class="h-100 d-flex flex-column">
+        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="error" variant="tonal" size="36" class="me-2">
@@ -215,6 +222,7 @@ const headers = [
             <VCardSubtitle>Produk yang saat ini berjumlah 0 di rak</VCardSubtitle>
           </VCardItem>
           <VDivider />
+          <VProgressLinear v-if="isLoading" indeterminate color="error" height="2" />
 
           <VTable class="text-no-wrap" hover density="comfortable">
             <thead>
@@ -225,7 +233,13 @@ const headers = [
               </tr>
             </thead>
             <tbody>
-              <tr v-if="analyticsData.out_of_stock.length === 0">
+              <tr v-if="isLoading">
+                <td colspan="3" class="text-center text-medium-emphasis py-6">
+                  <VProgressCircular indeterminate color="error" size="24" class="me-2" />
+                  <span>Memuat produk habis...</span>
+                </td>
+              </tr>
+              <tr v-else-if="analyticsData.out_of_stock.length === 0">
                 <td colspan="3" class="text-center text-medium-emphasis py-6">
                   <VIcon icon="ri-checkbox-circle-line" color="success" size="20" class="me-1" />
                   Tidak ada produk yang kehabisan stok.
@@ -260,7 +274,7 @@ const headers = [
     </VRow>
 
     <!-- Recent Stock Movements Table -->
-    <VCard elevation="2">
+    <VCard elevation="2" :loading="isLoading">
       <VCardItem class="pb-2">
         <template #prepend>
           <VAvatar color="primary" variant="tonal" size="36" class="me-2">
@@ -271,6 +285,7 @@ const headers = [
         <VCardSubtitle>Log transaksi masuk, keluar, penjualan, retur, dan penyesuaian opname</VCardSubtitle>
       </VCardItem>
       <VDivider />
+      <VProgressLinear v-if="isLoading" indeterminate color="primary" height="2" />
 
       <VTable class="text-no-wrap" hover density="comfortable">
         <thead>
@@ -284,7 +299,13 @@ const headers = [
           </tr>
         </thead>
         <tbody>
-          <tr v-if="analyticsData.recent_movements.length === 0">
+          <tr v-if="isLoading">
+            <td colspan="6" class="text-center text-medium-emphasis py-6">
+              <VProgressCircular indeterminate color="primary" size="24" class="me-2" />
+              <span>Memuat riwayat mutasi stok...</span>
+            </td>
+          </tr>
+          <tr v-else-if="analyticsData.recent_movements.length === 0">
             <td colspan="6" class="text-center text-medium-emphasis py-6">
               Belum ada riwayat mutasi stok.
             </td>

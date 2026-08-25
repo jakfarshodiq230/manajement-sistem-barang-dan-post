@@ -7,12 +7,17 @@ const notifications = ref([])
 const pollingInterval = ref(null)
 
 const fetchNotifications = async () => {
+  const token = useCookie('accessToken').value
+  if (!token) return
+
   try {
     const response = await $api('/apps/notifications')
 
     notifications.value = response || []
   } catch (error) {
-    console.error('Failed to fetch notifications:', error)
+    if (error?.status !== 401) {
+      console.error('Failed to fetch notifications:', error)
+    }
   }
 }
 

@@ -370,5 +370,5 @@ const tableHeaders = [
 <route lang="yaml">
 meta:
   action: read
-  subject: Dashboard Analytics
+  subject: Stok Global
 </route>

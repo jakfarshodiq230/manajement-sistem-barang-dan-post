@@ -318,5 +318,5 @@ const headers = [
 <route lang="yaml">
 meta:
   action: read
-  subject: Stok Barang Saat Ini
+  subject: Stok Saat Ini
 </route>
