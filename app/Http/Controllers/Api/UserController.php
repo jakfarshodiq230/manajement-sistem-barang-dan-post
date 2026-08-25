@@ -13,15 +13,19 @@ class UserController extends Controller
     {
         $admin = $request->user();
         
-        $hasPermission = \Illuminate\Support\Facades\DB::table('model_has_roles')
-            ->join('role_has_permissions', 'model_has_roles.role_id', '=', 'role_has_permissions.role_id')
-            ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
-            ->where('model_has_roles.model_id', $admin->id)
-            ->where('permissions.name', 'Pengguna PIN')
-            ->exists();
+        $hasPermission = $admin && (
+            $admin->can('Pengguna PIN')
+            || $admin->can('Daftar Pengguna Pin')
+            || $admin->can('Penugasan & PIN Pin')
+            || $admin->can('Daftar Pengguna Write')
+            || $admin->can('Penugasan & PIN Write')
+            || $admin->can('Pengguna Write')
+            || $admin->can('manage users')
+            || $admin->can('manage all')
+        );
 
         if (!$hasPermission) {
-            return response()->json(['message' => 'Anda tidak memiliki izin (Pengguna PIN) untuk mengubah PIN pengguna.'], 403);
+            return response()->json(['message' => 'Anda tidak memiliki hak akses izin untuk mengubah PIN pengguna.'], 403);
         }
 
         $user = \App\Models\User::findOrFail($id);
@@ -411,5 +415,62 @@ class UserController extends Controller
             });
 
         return response()->json(['message' => 'User deleted successfully']);
+    }
+
+    /**
+     * Update branch & role assignments for a user.
+     */
+    public function updateAssignments(Request $request, $id)
+    {
+        $admin = $request->user();
+        $hasPermission = $admin && (
+            $admin->can('Pengguna Write')
+            || $admin->can('Daftar Pengguna Write')
+            || $admin->can('Penugasan & PIN Write')
+            || $admin->can('Penugasan & PIN Create')
+            || $admin->can('manage users')
+            || $admin->can('manage all')
+            || $admin->can('*')
+        );
+
+        if (!$hasPermission) {
+            return response()->json(['message' => 'Anda tidak memiliki hak akses izin untuk mengubah penugasan cabang/jabatan pengguna.'], 403);
+        }
+
+        $user = User::findOrFail($id);
+
+        $request->validate([
+            'assignments' => 'required|array',
+            'assignments.*.branch_id' => 'nullable|exists:branches,id',
+            'assignments.*.role_name' => 'nullable|string',
+            'assignments.*.role' => 'nullable|string',
+        ]);
+
+        // Re-sync all branch-role assignments
+        \DB::table('model_has_roles')
+            ->where('model_type', 'App\\Models\\User')
+            ->where('model_id', $user->id)
+            ->delete();
+
+        foreach ($request->assignments as $assignment) {
+            $branchId = $assignment['branch_id'] ?? null;
+            $roleName = $assignment['role_name'] ?? $assignment['role'] ?? null;
+            if ($branchId && $roleName) {
+                $role = \Spatie\Permission\Models\Role::where('name', $roleName)->first();
+                if ($role) {
+                    \DB::table('model_has_roles')->insertOrIgnore([
+                        'role_id'    => $role->id,
+                        'model_type' => 'App\\Models\\User',
+                        'model_id'   => $user->id,
+                        'branch_id'  => $branchId,
+                    ]);
+                }
+            }
+        }
+
+        return response()->json([
+            'message' => 'Penugasan cabang dan jabatan pengguna berhasil disimpan.',
+            'user' => $user->fresh(['roles']),
+        ]);
     }
 }

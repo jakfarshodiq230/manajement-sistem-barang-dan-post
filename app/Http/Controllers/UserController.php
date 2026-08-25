@@ -17,7 +17,7 @@ class UserController extends Controller
         // For Super Admin, they see all.
         $query = \App\Models\User::with(['branch', 'roles']);
         
-        if (auth()->user()->branch_id && !auth()->user()->hasRole('Super Admin')) {
+        if (auth()->user()->branch_id && !auth()->user()->can('manage all')) {
             $query->where('branch_id', auth()->user()->branch_id);
         }
 

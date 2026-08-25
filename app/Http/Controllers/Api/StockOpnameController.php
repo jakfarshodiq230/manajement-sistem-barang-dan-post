@@ -274,14 +274,14 @@ class StockOpnameController extends Controller
             return response()->json(['message' => 'PIN otorisasi Kepala Cabang dibutuhkan untuk mengirim laporan!'], 400);
         }
 
-        // Verifikasi PIN
-        $managers = \App\Models\User::whereHas('roles', function($q) {
-            $q->whereIn('name', ['Admin Cabang', 'Super Admin', 'Kepala Cabang']);
-        })->get();
+        // Verifikasi PIN via database RBAC permission
+        $managers = \App\Models\User::all()->filter(function($u) {
+            return $u->can('Stock Opname Approve') || $u->can('Stock Opname Validate') || $u->can('Stock Opname PIN') || $u->can('manage all');
+        });
 
         $authorized = false;
         foreach ($managers as $manager) {
-            if ($manager->pos_pin && \Illuminate\Support\Facades\Hash::check($pin, $manager->pos_pin)) {
+            if ($manager->pos_pin && ($manager->pos_pin === $pin || \Illuminate\Support\Facades\Hash::check($pin, $manager->pos_pin))) {
                 $authorized = true;
                 break;
             }
