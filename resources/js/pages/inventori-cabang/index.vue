@@ -20,6 +20,7 @@ const isPrintLabelDialogVisible = ref(false)
 const isManageBatchesDialogVisible = ref(false)
 const selectedProductBranch = ref(null)
 const fileInput = ref(null)
+const isPriceGuideVisible = ref(true)
 
 // Pagination
 const page = ref(1)
@@ -223,10 +224,10 @@ const handleFileUpload = async event => {
 const tableHeaders = [
   { title: 'PRODUK', key: 'product.name' },
   { title: 'CABANG', key: 'branch.name' },
-  { title: 'HARGA MODAL', key: 'cost_price' },
-  { title: 'HARGA JUAL', key: 'price' },
-  { title: 'HARGA NEGO', key: 'min_nego_price' },
-  { title: 'PAJAK & BIAYA', key: 'taxes' },
+  { title: 'HARGA MODAL (HPP)', key: 'cost_price' },
+  { title: 'HARGA JUAL NORMAL', key: 'price' },
+  { title: 'HARGA NEGO (MINIMAL)', key: 'min_nego_price' },
+  { title: 'PAJAK PENJUALAN POS', key: 'taxes' },
   { title: 'STOK', key: 'stock' },
   { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
 ]
@@ -336,6 +337,107 @@ const confirmDelete = async id => {
       </div>
     </div>
 
+    <!-- Price Structure & Tax Policy Guide Banner -->
+    <VCard class="mb-5 border border-primary border-opacity-25 bg-primary-lighten-5 rounded-xl">
+      <VCardItem class="pa-4">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+          <div class="d-flex align-center gap-3">
+            <VAvatar color="primary" variant="tonal" size="44" rounded="lg">
+              <VIcon icon="ri-price-tag-3-line" size="24" />
+            </VAvatar>
+            <div>
+              <h4 class="text-subtitle-1 font-weight-bold text-primary mb-0">
+                Panduan Struktur Harga Modal (HPP), Harga Jual, Harga Nego & Pajak Kasir POS
+              </h4>
+              <p class="text-caption text-medium-emphasis mb-0">
+                Ketentuan perhitungan 3 tingkatan harga dan perlakuan PPN Masukan Supplier vs PPN Keluaran Kasir POS.
+              </p>
+            </div>
+          </div>
+          <VBtn
+            size="small"
+            variant="tonal"
+            color="primary"
+            :prepend-icon="isPriceGuideVisible ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'"
+            @click="isPriceGuideVisible = !isPriceGuideVisible"
+          >
+            {{ isPriceGuideVisible ? 'Tutup Catatan Ketentuan' : 'Buka Catatan Ketentuan' }}
+          </VBtn>
+        </div>
+
+        <VExpandTransition>
+          <div v-show="isPriceGuideVisible" class="mt-4 pt-3 border-t">
+            <VRow dense class="g-3">
+              <!-- 1. Harga Modal Real (HPP) -->
+              <VCol cols="12" md="3">
+                <div class="pa-3 bg-white border rounded-lg h-100">
+                  <div class="d-flex align-center gap-2 mb-1">
+                    <VIcon icon="ri-archive-line" size="18" color="error" />
+                    <span class="text-caption font-weight-bold text-error">1. Harga Modal (HPP Real)</span>
+                  </div>
+                  <div class="text-caption text-medium-emphasis mb-2" style="font-size: 11px;">
+                    Harga bersih per unit dari PO yang <strong>sudah mencakup diskon bertingkat (D1 s/d D5) dan PPN Masukan 11%</strong> dari Supplier.
+                  </div>
+                  <div class="pa-1 bg-error-lighten-5 rounded text-caption text-error font-mono font-weight-medium" style="font-size: 10.5px;">
+                    Total Bayar Supplier / Total Pcs
+                  </div>
+                </div>
+              </VCol>
+
+              <!-- 2. Harga Jual Normal -->
+              <VCol cols="12" md="3">
+                <div class="pa-3 bg-white border rounded-lg h-100">
+                  <div class="d-flex align-center gap-2 mb-1">
+                    <VIcon icon="ri-shopping-bag-3-line" size="18" color="success" />
+                    <span class="text-caption font-weight-bold text-success">2. Harga Jual Normal (POS)</span>
+                  </div>
+                  <div class="text-caption text-medium-emphasis mb-2" style="font-size: 11px;">
+                    Harga pricelist standar eceran di kasir dengan target margin untung retail toko (contoh markup 35% - 40%).
+                  </div>
+                  <div class="pa-1 bg-success-lighten-5 rounded text-caption text-success font-mono font-weight-medium" style="font-size: 10.5px;">
+                    Modal HPP x (1 + Target Markup %)
+                  </div>
+                </div>
+              </VCol>
+
+              <!-- 3. Harga Nego Minimum -->
+              <VCol cols="12" md="3">
+                <div class="pa-3 bg-white border rounded-lg h-100">
+                  <div class="d-flex align-center gap-2 mb-1">
+                    <VIcon icon="ri-hand-coin-line" size="18" color="warning" />
+                    <span class="text-caption font-weight-bold text-warning">3. Harga Nego (Batas Kasir)</span>
+                  </div>
+                  <div class="text-caption text-medium-emphasis mb-2" style="font-size: 11px;">
+                    Batas terendah saat tawar-menawar / grosir. Jika pembeli menawar di bawah ini, POS terkunci & wajib <strong>PIN Supervisor/Owner</strong>.
+                  </div>
+                  <div class="pa-1 bg-warning-lighten-5 rounded text-caption text-warning font-mono font-weight-medium" style="font-size: 10.5px;">
+                    Modal HPP x (1 + Min. Margin 10-15%)
+                  </div>
+                </div>
+              </VCol>
+
+              <!-- 4. Pajak Penjualan Kasir POS -->
+              <VCol cols="12" md="3">
+                <div class="pa-3 bg-white border rounded-lg h-100">
+                  <div class="d-flex align-center gap-2 mb-1">
+                    <VIcon icon="ri-percent-line" size="18" color="primary" />
+                    <span class="text-caption font-weight-bold text-primary">4. Pajak Penjualan POS</span>
+                  </div>
+                  <div class="text-caption text-medium-emphasis mb-2" style="font-size: 11px;">
+                    <strong>Harga Final (Netto):</strong> Kasir menjual harga bersih tanpa tambahan pajak di struk. <br>
+                    <strong>+ PPN 11%:</strong> PPN ditambahkan di struk POS ke pembeli.
+                  </div>
+                  <div class="pa-1 bg-primary-lighten-5 rounded text-caption text-primary font-mono font-weight-medium" style="font-size: 10.5px;">
+                    Pengaturan Struk Kasir POS
+                  </div>
+                </div>
+              </VCol>
+            </VRow>
+          </div>
+        </VExpandTransition>
+      </VCardItem>
+    </VCard>
+
     <VCard>
       <VCardItem class="pa-4 pb-0">
         <div class="d-flex align-center justify-space-between w-100">
@@ -417,34 +519,49 @@ const confirmDelete = async id => {
         </template>
 
         <template #item.cost_price="{ item }">
-          <div class="d-flex align-center">
-            <span class="text-error font-weight-medium">{{ formatRupiah(item.active_batch?.cost_price || item.cost_price) }}</span>
-            <VIcon
-              v-if="item.active_batch"
-              icon="ri-information-line"
-              size="14"
-              class="ms-1 text-disabled"
-              title="Harga modal batch aktif (FEFO/FIFO)"
-            />
+          <div>
+            <div class="d-flex align-center">
+              <span class="text-error font-weight-medium">{{ formatRupiah(item.active_batch?.cost_price || item.cost_price) }}</span>
+              <VIcon
+                v-if="item.active_batch"
+                icon="ri-information-line"
+                size="14"
+                class="ms-1 text-disabled"
+                title="Harga modal batch aktif (FEFO/FIFO)"
+              />
+            </div>
+            <div class="text-caption text-medium-emphasis" style="font-size: 10px;">
+              (Inc. PPN Masukan)
+            </div>
           </div>
         </template>
 
         <template #item.price="{ item }">
-          <div class="d-flex align-center">
-            <span class="font-weight-bold text-success">{{ formatRupiah(item.active_batch?.price || item.price) }}</span>
-            <VIcon
-              v-if="item.active_batch"
-              icon="ri-information-line"
-              size="14"
-              class="ms-1 text-disabled"
-              title="Harga jual batch aktif (FEFO/FIFO)"
-            />
+          <div>
+            <div class="d-flex align-center">
+              <span class="font-weight-bold text-success">{{ formatRupiah(item.active_batch?.price || item.price) }}</span>
+              <VIcon
+                v-if="item.active_batch"
+                icon="ri-information-line"
+                size="14"
+                class="ms-1 text-disabled"
+                title="Harga jual batch aktif (FEFO/FIFO)"
+              />
+            </div>
+            <div v-if="(item.active_batch?.price || item.price) > (item.active_batch?.cost_price || item.cost_price)" class="text-caption text-success font-weight-medium" style="font-size: 10px;">
+              Laba: +{{ formatRupiah((item.active_batch?.price || item.price) - (item.active_batch?.cost_price || item.cost_price)) }}
+            </div>
           </div>
         </template>
 
         <template #item.min_nego_price="{ item }">
-          <div class="d-flex align-center">
-            <span class="text-warning font-weight-medium">{{ (item.active_batch?.min_nego_price || item.min_nego_price) > 0 ? formatRupiah(item.active_batch?.min_nego_price || item.min_nego_price) : '-' }}</span>
+          <div>
+            <div class="d-flex align-center">
+              <span class="text-warning font-weight-medium">{{ (item.active_batch?.min_nego_price || item.min_nego_price) > 0 ? formatRupiah(item.active_batch?.min_nego_price || item.min_nego_price) : '-' }}</span>
+            </div>
+            <div v-if="(item.active_batch?.min_nego_price || item.min_nego_price) > (item.active_batch?.cost_price || item.cost_price)" class="text-caption text-warning" style="font-size: 10px;">
+              Min. Laba: +{{ formatRupiah((item.active_batch?.min_nego_price || item.min_nego_price) - (item.active_batch?.cost_price || item.cost_price)) }}
+            </div>
           </div>
         </template>
 
@@ -452,15 +569,15 @@ const confirmDelete = async id => {
           <div class="d-flex flex-column">
             <span
               v-if="item.tax_percentage > 0"
-              class="text-caption text-error font-weight-medium"
+              class="text-caption text-primary font-weight-medium"
             >
-              + PPN {{ Number(item.tax_percentage) }}%
+              + PPN Kasir {{ Number(item.tax_percentage) }}%
             </span>
             <span
               v-else
-              class="text-caption text-error font-weight-medium"
+              class="text-caption text-medium-emphasis"
             >
-              Tanpa PPN
+              Harga Final (Netto)
             </span>
             
             <span

@@ -17,13 +17,23 @@ class DocumentVerificationController extends Controller
             'goods_receipt' => \App\Models\GoodsReceipt::class,
             'return_transaction' => \App\Models\ReturnTransaction::class,
             'sale' => \App\Models\Sale::class,
+            'stock_transfer' => \App\Models\StockTransfer::class,
         ];
 
         $document = null;
         $type = null;
 
         foreach ($models as $docType => $modelClass) {
-            $doc = $modelClass::with(['validator', 'approver'])->where('uuid', $uuid)->first();
+            if ($docType === 'stock_transfer') {
+                $doc = $modelClass::withoutGlobalScopes()
+                    ->with(['sourceBranch', 'destinationBranch', 'createdBy', 'preparedBy', 'approvedBy', 'receivedBy', 'items.product'])
+                    ->where('uuid', $uuid)
+                    ->first();
+            } else {
+                $doc = $modelClass::withoutGlobalScopes()
+                    ->where('uuid', $uuid)
+                    ->first();
+            }
             if ($doc) {
                 $document = $doc;
                 $type = $docType;
@@ -32,7 +42,52 @@ class DocumentVerificationController extends Controller
         }
 
         if (!$document) {
-            return response()->json(['valid' => false, 'message' => 'Document not found'], 404);
+            return response()->json(['valid' => false, 'message' => 'Dokumen tidak ditemukan atau QR Code tidak valid'], 404);
+        }
+
+        if ($type === 'stock_transfer') {
+            return response()->json([
+                'valid' => true,
+                'type' => 'stock_transfer',
+                'status' => $document->status,
+                'reference_number' => $document->reference_no,
+                'created_at' => $document->created_at,
+                'notes' => $document->notes,
+                'source_branch' => $document->sourceBranch ? $document->sourceBranch->name : '-',
+                'destination_branch' => $document->destinationBranch ? $document->destinationBranch->name : '-',
+                
+                // 1. Pengirim / Penyiapan Asal
+                'created_by' => $document->createdBy ? $document->createdBy->name : null,
+                'prepared_by' => $document->preparedBy ? $document->preparedBy->name : null,
+                'prepared_at' => $document->prepared_at,
+                
+                // 2. Kurir / Penjemput
+                'picked_up_by_name' => $document->picked_up_by_name,
+                'picked_up_at' => $document->picked_up_at,
+                'pickup_courier_type' => $document->pickup_courier_type,
+                'pickup_notes' => $document->pickup_notes,
+                'pickup_photo' => $document->pickup_photo,
+                
+                // 3. Penerima Toko Tujuan
+                'received_by' => $document->receivedBy ? $document->receivedBy->name : null,
+                'received_at' => $document->received_at,
+                'receive_notes' => $document->receive_notes,
+                'received_photo' => $document->received_photo,
+
+                // Items list
+                'items' => $document->items->map(function ($it) {
+                    return [
+                        'sku' => $it->product ? $it->product->sku : '-',
+                        'name' => $it->product ? $it->product->name : '-',
+                        'qty_requested' => $it->qty,
+                        'qty_prepared' => $it->qty_prepared ?? $it->qty,
+                        'qty_picked' => $it->qty_picked ?? $it->qty_prepared ?? $it->qty,
+                        'qty_received' => $it->qty_received,
+                        'receive_condition' => $it->receive_condition ?? 'good',
+                        'item_notes' => $it->item_notes,
+                    ];
+                }),
+            ]);
         }
 
         // Determine if fully approved
@@ -148,6 +203,7 @@ class DocumentVerificationController extends Controller
                         $item->update(['product_branch_id' => $productBranch->id]);
                         
                         $poItem = \App\Models\PurchaseOrderItem::find($item->purchase_order_item_id);
+                        $actualCostPerPiece = $item->final_cost_per_piece > 0 ? (float) $item->final_cost_per_piece : ($poItem ? (float) ($poItem->final_cost_per_piece > 0 ? $poItem->final_cost_per_piece : $poItem->unit_cost) : 0);
                         
                         // Create Stock Movement
                         \App\Models\StockMovement::create([
@@ -155,7 +211,7 @@ class DocumentVerificationController extends Controller
                             'user_id' => $request->user()->id,
                             'type' => 'in',
                             'quantity' => $item->qty_received,
-                            'unit_cost' => $poItem ? $poItem->unit_cost : 0,
+                            'unit_cost' => $actualCostPerPiece,
                             'reference_type' => 'goods_receipt',
                             'reference_id' => $document->id,
                             'notes' => 'Penerimaan Barang dari PO: ' . $po->po_number,
@@ -163,15 +219,15 @@ class DocumentVerificationController extends Controller
                         
                         // Update Stock
                         $productBranch->increment('stock', $item->qty_received);
-                        if ($poItem) {
-                            $productBranch->update(['cost_price' => $poItem->unit_cost]);
+                        if ($actualCostPerPiece > 0) {
+                            $productBranch->update(['cost_price' => $actualCostPerPiece]);
                         }
 
                         // Create Product Batch for FIFO/LIFO/FEFO
                         \App\Models\ProductBatch::create([
                             'product_branch_id' => $productBranch->id,
                             'qty' => $item->qty_received,
-                            'cost_price' => $poItem ? $poItem->unit_cost : 0,
+                            'cost_price' => $actualCostPerPiece,
                             'price' => $item->price ?? 0,
                             'min_nego_price' => $item->min_nego_price ?? 0,
                             'entry_date' => $document->date,

@@ -100,22 +100,61 @@ class GoodsReceiptController extends Controller
                 }
             }
 
+            $taxType = $request->tax_type ?: ($po->tax_type ?: 'include');
+            $taxPercentage = $request->tax_percentage !== null ? (float) $request->tax_percentage : (float) ($po->tax_percentage ?? 11.00);
+            $extraDiscount = (float) ($request->extra_discount ?? ($po->extra_discount ?? 0));
+
             $gr = \App\Models\GoodsReceipt::create([
                 'receipt_number' => $receipt_number,
+                'invoice_number_supplier' => $request->invoice_number_supplier ?: $po->invoice_number_supplier,
                 'purchase_order_id' => $po->id,
                 'user_id' => $request->user()->id,
                 'date' => $request->date,
+                'tax_type' => $taxType,
+                'tax_percentage' => $taxPercentage,
+                'extra_discount' => $extraDiscount,
                 'notes' => $request->notes,
                 'photos' => $photoPaths,
                 'approval_status' => 'draft',
+                'subtotal_bruto' => 0,
+                'dpp_amount' => 0,
+                'tax_amount' => 0,
+                'total_amount' => 0,
             ]);
+
+            $subtotalBruto = 0;
+            $subtotalNetto = 0;
 
             foreach ($itemsData as $item) {
                 if ($item['qty_received'] > 0) {
+                    $qtyReceived = (int) $item['qty_received'];
+                    $convQty = max(1, (int) ($item['conversion_qty'] ?? 1));
+                    $unitName = $item['unit_name'] ?? 'pcs';
+
+                    $poItem = \App\Models\PurchaseOrderItem::find($item['purchase_order_item_id']);
+                    $grossPrice = isset($item['gross_price']) ? (float) $item['gross_price'] : ($poItem ? (float) $poItem->gross_price : 0);
+                    $disc1 = isset($item['discount_percent_1']) ? (float) $item['discount_percent_1'] : ($poItem ? (float) $poItem->discount_percent_1 : 0);
+                    $disc2 = isset($item['discount_percent_2']) ? (float) $item['discount_percent_2'] : ($poItem ? (float) $poItem->discount_percent_2 : 0);
+                    $discNominal = isset($item['discount_amount']) ? (float) $item['discount_amount'] : ($poItem ? (float) $poItem->discount_amount : 0);
+
+                    $priceAfterD1 = $grossPrice * (1 - ($disc1 / 100));
+                    $priceAfterD2 = $priceAfterD1 * (1 - ($disc2 / 100));
+                    $netUnitPrice = max(0, $priceAfterD2 - ($discNominal > 0 && $qtyReceived > 0 ? ($discNominal / $qtyReceived) : 0));
+
+                    if ($netUnitPrice == 0 && $poItem) {
+                        $netUnitPrice = (float) $poItem->unit_cost;
+                    }
+
+                    $totalLinePrice = $qtyReceived * $netUnitPrice;
+                    $finalCostPerPiece = ($qtyReceived * $convQty) > 0 ? ($totalLinePrice / ($qtyReceived * $convQty)) : $netUnitPrice;
+
+                    $subtotalBruto += ($qtyReceived * $grossPrice);
+                    $subtotalNetto += $totalLinePrice;
+
                     // Find or create product_branch for this branch and product
                     $productBranch = \App\Models\ProductBranch::firstOrCreate(
                         ['branch_id' => $po->branch_id, 'product_id' => $item['product_id']],
-                        ['stock' => 0, 'cost_price' => 0, 'price' => 0, 'tax_percentage' => 0]
+                        ['stock' => 0, 'cost_price' => $finalCostPerPiece, 'price' => 0, 'tax_percentage' => 0]
                     );
 
                     // Create GR Item without adding stock
@@ -123,13 +162,42 @@ class GoodsReceiptController extends Controller
                         'goods_receipt_id' => $gr->id,
                         'purchase_order_item_id' => $item['purchase_order_item_id'],
                         'product_branch_id' => $productBranch->id,
-                        'qty_received' => $item['qty_received'],
+                        'unit_name' => $unitName,
+                        'conversion_qty' => $convQty,
+                        'qty_received' => $qtyReceived,
+                        'gross_price' => $grossPrice,
+                        'discount_percent_1' => $disc1,
+                        'discount_percent_2' => $disc2,
+                        'discount_amount' => $discNominal,
+                        'net_unit_price' => $netUnitPrice,
                         'price' => !empty($item['price']) ? $item['price'] : $productBranch->price,
                         'min_nego_price' => !empty($item['min_nego_price']) ? $item['min_nego_price'] : $productBranch->min_nego_price,
+                        'final_cost_per_piece' => $finalCostPerPiece,
                         'expiration_date' => !empty($item['expiration_date']) ? $item['expiration_date'] : null,
                     ]);
                 }
             }
+
+            if ($taxType === 'include') {
+                $totalAmount = max(0, $subtotalNetto - $extraDiscount);
+                $dppAmount = $request->dpp_amount ? (float) $request->dpp_amount : round($totalAmount / (1 + ($taxPercentage / 100)), 2);
+                $taxAmount = $request->tax_amount ? (float) $request->tax_amount : round($totalAmount - $dppAmount, 2);
+            } elseif ($taxType === 'exclude') {
+                $dppAmount = max(0, $subtotalNetto - $extraDiscount);
+                $taxAmount = $request->tax_amount ? (float) $request->tax_amount : round($dppAmount * ($taxPercentage / 100), 2);
+                $totalAmount = $dppAmount + $taxAmount;
+            } else {
+                $totalAmount = max(0, $subtotalNetto - $extraDiscount);
+                $dppAmount = $totalAmount;
+                $taxAmount = 0;
+            }
+
+            $gr->update([
+                'subtotal_bruto' => $subtotalBruto,
+                'dpp_amount' => $dppAmount,
+                'tax_amount' => $taxAmount,
+                'total_amount' => $totalAmount,
+            ]);
 
             \Illuminate\Support\Facades\DB::commit();
 

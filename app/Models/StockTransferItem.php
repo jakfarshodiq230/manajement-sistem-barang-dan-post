@@ -15,8 +15,12 @@ class StockTransferItem extends Model
         'product_id',
         'qty',
         'qty_prepared',
+        'qty_picked',
+        'qty_received',
+        'receive_condition',
         'status',
         'cancel_reason',
+        'item_notes',
         'batches_data',
     ];
 

@@ -82,6 +82,20 @@ const parseInputRupiah = value => {
   return Number(digits) || 0
 }
 
+const applyMarkup = percent => {
+  const c = Number(cost_price.value) || 0
+  if (c > 0) {
+    price.value = Math.round(c * (1 + percent / 100))
+  }
+}
+
+const applyNegoMargin = percent => {
+  const c = Number(cost_price.value) || 0
+  if (c > 0) {
+    min_nego_price.value = Math.round(c * (1 + percent / 100))
+  }
+}
+
 const onSubmit = () => {
   refForm.value?.validate().then(({ valid }) => {
     if (valid) {
@@ -108,7 +122,7 @@ const handleDrawerModelValueUpdate = val => {
 <template>
   <VNavigationDrawer
     temporary
-    :width="400"
+    :width="460"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
@@ -160,9 +174,11 @@ const handleDrawerModelValueUpdate = val => {
                 <VTextField
                   :model-value="formatInputRupiah(cost_price)"
                   :rules="[v => !!v || 'Harga modal wajib diisi']"
-                  label="Harga Modal (Rp)"
+                  label="Harga Modal (HPP Real) (Rp)"
                   type="text"
                   placeholder="0"
+                  hint="Modal bersih unit (Inc. PPN Supplier & Diskon)"
+                  persistent-hint
                   @update:model-value="val => cost_price = parseInputRupiah(val)"
                 />
               </VCol>
@@ -171,11 +187,20 @@ const handleDrawerModelValueUpdate = val => {
                 <VTextField
                   :model-value="formatInputRupiah(price)"
                   :rules="[v => !!v || 'Harga jual wajib diisi']"
-                  label="Harga Jual (Rp)"
+                  label="Harga Jual Normal (Pricelist POS) (Rp)"
                   type="text"
                   placeholder="0"
                   @update:model-value="val => price = parseInputRupiah(val)"
                 />
+                <!-- Quick Markup Buttons -->
+                <div class="d-flex align-center gap-1 mt-1 flex-wrap">
+                  <span class="text-caption text-medium-emphasis me-1" style="font-size: 11px;">Kalkulasi Cepat:</span>
+                  <VChip size="x-small" color="primary" variant="tonal" class="cursor-pointer" @click="applyMarkup(20)">+20%</VChip>
+                  <VChip size="x-small" color="primary" variant="tonal" class="cursor-pointer" @click="applyMarkup(25)">+25%</VChip>
+                  <VChip size="x-small" color="primary" variant="tonal" class="cursor-pointer" @click="applyMarkup(30)">+30%</VChip>
+                  <VChip size="x-small" color="primary" variant="tonal" class="cursor-pointer" @click="applyMarkup(35)">+35%</VChip>
+                  <VChip size="x-small" color="primary" variant="tonal" class="cursor-pointer" @click="applyMarkup(40)">+40%</VChip>
+                </div>
               </VCol>
 
               <VCol cols="12">
@@ -185,9 +210,16 @@ const handleDrawerModelValueUpdate = val => {
                   type="text"
                   placeholder="0"
                   persistent-hint
-                  hint="Kasir tidak dapat menjual di bawah harga ini. Jika 0, maka disamakan dengan harga jual."
+                  hint="Batas terendah saat tawar-menawar / grosir. Di bawah ini wajib PIN Supervisor."
                   @update:model-value="val => min_nego_price = parseInputRupiah(val)"
                 />
+                <!-- Quick Nego Buttons -->
+                <div class="d-flex align-center gap-1 mt-1 flex-wrap">
+                  <span class="text-caption text-medium-emphasis me-1" style="font-size: 11px;">Min. Margin:</span>
+                  <VChip size="x-small" color="warning" variant="tonal" class="cursor-pointer" @click="applyNegoMargin(10)">+10% Modal</VChip>
+                  <VChip size="x-small" color="warning" variant="tonal" class="cursor-pointer" @click="applyNegoMargin(15)">+15% Modal</VChip>
+                  <VChip size="x-small" color="warning" variant="tonal" class="cursor-pointer" @click="applyNegoMargin(20)">+20% Modal</VChip>
+                </div>
               </VCol>
 
               <VCol cols="6">

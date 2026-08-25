@@ -16,6 +16,7 @@ class StockTransfer extends Model
     }
 
     protected $fillable = [
+        'uuid',
         'reference_no',
         'source_branch_id',
         'destination_branch_id',
@@ -28,13 +29,28 @@ class StockTransfer extends Model
         'received_by',
         'received_at',
         'picked_up_by_name',
+        'picked_up_at',
+        'pickup_courier_type',
+        'pickup_photo',
+        'received_photo',
+        'receive_notes',
         'pickup_notes',
     ];
 
     protected $casts = [
         'prepared_at' => 'datetime',
+        'picked_up_at' => 'datetime',
         'received_at' => 'datetime',
     ];
+
+    protected static function booted()
+    {
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) Str::uuid();
+            }
+        });
+    }
 
     public function getActivitylogOptions(): \Spatie\Activitylog\LogOptions
     {

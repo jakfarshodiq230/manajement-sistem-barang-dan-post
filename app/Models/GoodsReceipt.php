@@ -16,9 +16,17 @@ class GoodsReceipt extends Model
 
     protected $fillable = ['uuid', 'validated_by', 'validated_at', 'approved_by', 'approved_at', 'approval_status', 
         'receipt_number',
+        'invoice_number_supplier',
         'purchase_order_id',
         'user_id',
         'date',
+        'tax_type',
+        'tax_percentage',
+        'dpp_amount',
+        'tax_amount',
+        'subtotal_bruto',
+        'extra_discount',
+        'total_amount',
         'notes',
         'photos',
     ];

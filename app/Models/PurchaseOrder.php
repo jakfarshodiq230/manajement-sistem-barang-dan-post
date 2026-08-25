@@ -11,12 +11,20 @@ class PurchaseOrder extends Model
 
     protected $fillable = ['uuid', 'validated_by', 'validated_at', 'approved_by', 'approved_at', 'approval_status', 
         'po_number',
+        'invoice_number_supplier',
         'branch_id',
         'supplier_id',
         'user_id',
         'date',
+        'due_date',
         'status',
         'total_amount',
+        'tax_type',
+        'tax_percentage',
+        'dpp_amount',
+        'tax_amount',
+        'subtotal_bruto',
+        'extra_discount',
         'notes',
     ];
 

@@ -27,6 +27,7 @@ let searchTimeout = null
 
 const countNeedValidation = ref(0)
 const countNeedApproval = ref(0)
+const isFormulaInfoVisible = ref(true)
 
 const snackbar = useSnackbarStore()
 
@@ -44,6 +45,25 @@ const formatRupiah = value => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+const formatDiscountTiers = i => {
+  if (i.discount_string) return i.discount_string
+  const tiers = [i.discount_percent_1, i.discount_percent_2, i.discount_percent_3, i.discount_percent_4, i.discount_percent_5]
+    .map(Number)
+    .filter(d => d > 0)
+  
+  if (tiers.length > 0) {
+    let res = tiers.map(d => `${d}%`).join(' + ')
+    if (Number(i.discount_amount) > 0) {
+      res += ` + Rp ${Number(i.discount_amount).toLocaleString('id-ID')}`
+    }
+    return res
+  }
+  if (Number(i.discount_amount) > 0) {
+    return `Rp ${Number(i.discount_amount).toLocaleString('id-ID')}`
+  }
+  return '-'
 }
 
 const fetchData = async () => {
@@ -134,11 +154,12 @@ const savePurchaseOrder = async data => {
 }
 
 const tableHeaders = [
-  { title: 'NO. PO', key: 'po_number' },
-  { title: 'TANGGAL', key: 'date' },
+  { title: 'NO. PO / INVOICE SUPPLIER', key: 'po_number' },
+  { title: 'TANGGAL & JATUH TEMPO', key: 'date' },
   { title: 'CABANG', key: 'branch.name' },
   { title: 'SUPPLIER', key: 'supplier.name' },
-  { title: 'TOTAL', key: 'total_amount' },
+  { title: 'DPP & PPN', key: 'dpp_amount' },
+  { title: 'TOTAL BAYAR', key: 'total_amount' },
   { title: 'PERSETUJUAN', key: 'approval_status' },
   { title: 'STATUS PO', key: 'status' },
   { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
@@ -262,6 +283,92 @@ const confirmDeletePO = async id => {
       </div>
     </div>
 
+    <!-- Formula & Guide Banner Card -->
+    <VCard class="mb-5 border border-primary border-opacity-25 bg-primary-lighten-5 rounded-xl">
+      <VCardItem class="pa-4">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+          <div class="d-flex align-center gap-3">
+            <VAvatar color="primary" variant="tonal" size="44" rounded="lg">
+              <VIcon icon="ri-calculator-line" size="24" />
+            </VAvatar>
+            <div>
+              <h4 class="text-subtitle-1 font-weight-bold text-primary mb-0">
+                Panduan Rumus Kalkulasi Supplier & Harga Modal (HPP Real)
+              </h4>
+              <p class="text-caption text-medium-emphasis mb-0">
+                Sistem otomatis mengkonversi pembelian Dus/Karton dari supplier, diskon bertingkat (d1 + d2), dan PPN menjadi Modal HPP per Pcs Eceran.
+              </p>
+            </div>
+          </div>
+          <VBtn
+            size="small"
+            variant="tonal"
+            color="primary"
+            :prepend-icon="isFormulaInfoVisible ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'"
+            @click="isFormulaInfoVisible = !isFormulaInfoVisible"
+          >
+            {{ isFormulaInfoVisible ? 'Tutup Catatan Rumus' : 'Buka Catatan Rumus' }}
+          </VBtn>
+        </div>
+
+        <VExpandTransition>
+          <div v-show="isFormulaInfoVisible" class="mt-4 pt-3 border-t">
+            <VRow dense class="g-3">
+              <VCol cols="12" md="4">
+                <div class="pa-3 bg-white border rounded-lg h-100">
+                  <div class="text-caption font-weight-bold text-primary mb-1">
+                    1. Diskon Bertingkat Supplier (d1 + d2)
+                  </div>
+                  <div class="text-caption text-medium-emphasis mb-2">
+                    Jika supplier memberikan diskon 5% + 2%:
+                  </div>
+                  <div class="pa-2 bg-grey-50 rounded font-mono text-caption mb-2">
+                    Harga Dus x (1 - d1%) x (1 - d2%) = <strong>DPP</strong>
+                  </div>
+                  <div class="text-caption text-disabled" style="font-size: 11px;">
+                    * Diskon dihitung bertingkat dari sisa harga setelah diskon pertama.
+                  </div>
+                </div>
+              </VCol>
+
+              <VCol cols="12" md="4">
+                <div class="pa-3 bg-white border rounded-lg h-100">
+                  <div class="text-caption font-weight-bold text-purple mb-1">
+                    2. Pajak PPN 11% (Faktur Pajak)
+                  </div>
+                  <div class="text-caption text-medium-emphasis mb-2">
+                    3 Opsi Sesuai Kuitansi Supplier:
+                  </div>
+                  <ul class="text-caption text-medium-emphasis ps-4 mb-0" style="font-size: 11px;">
+                    <li><strong>Exclude (+11%):</strong> DPP + PPN 11% ditambahkan ke tagihan.</li>
+                    <li><strong>Include (11%):</strong> Harga kuitansi sudah termasuk PPN.</li>
+                    <li><strong>Non-PPN (0%):</strong> Supplier non-PKP / barang bebas pajak.</li>
+                  </ul>
+                </div>
+              </VCol>
+
+              <VCol cols="12" md="4">
+                <div class="pa-3 bg-white border rounded-lg h-100">
+                  <div class="text-caption font-weight-bold text-success mb-1">
+                    3. Harga Modal Final per Pcs (HPP)
+                  </div>
+                  <div class="text-caption text-medium-emphasis mb-2">
+                    Konversi Dus/Pack ke Pcs Eceran:
+                  </div>
+                  <div class="pa-2 bg-success-lighten-5 rounded font-mono text-caption text-success font-weight-bold mb-2">
+                    HPP = Total Bayar Real / (Qty Dus x Isi per Dus)
+                  </div>
+                  <div class="text-caption text-disabled" style="font-size: 11px;">
+                    * Menjadi dasar batas modal toko untuk jual eceran & harga grosir di POS.
+                  </div>
+                </div>
+              </VCol>
+            </VRow>
+          </div>
+        </VExpandTransition>
+      </VCardItem>
+    </VCard>
+
     <!-- Card -->
     <VCard>
       <VTabs
@@ -340,17 +447,43 @@ const confirmDeletePO = async id => {
         @update:options="fetchData"
       >
         <template #item.po_number="{ item }">
-          <a
-            href="#"
-            class="font-weight-bold text-primary text-decoration-none"
-            @click.prevent="openTrackingDialog(item)"
-          >
-            {{ item.po_number }}
-          </a>
+          <div>
+            <a
+              href="#"
+              class="font-weight-bold text-primary text-decoration-none"
+              @click.prevent="openTrackingDialog(item)"
+            >
+              {{ item.po_number }}
+            </a>
+            <div v-if="item.invoice_number_supplier" class="text-caption text-medium-emphasis">
+              Faktur: <strong>{{ item.invoice_number_supplier }}</strong>
+            </div>
+          </div>
+        </template>
+
+        <template #item.date="{ item }">
+          <div>
+            <div>{{ item.date || item.created_at?.substr(0, 10) }}</div>
+            <div v-if="item.due_date && item.due_date !== item.date" class="text-caption text-medium-emphasis">
+              Tempo: {{ item.due_date }}
+            </div>
+          </div>
+        </template>
+
+        <template #item.dpp_amount="{ item }">
+          <div class="text-caption">
+            <div>DPP: {{ formatRupiah(item.dpp_amount || item.total_amount) }}</div>
+            <div v-if="item.tax_amount > 0" class="text-purple font-weight-medium">
+              PPN: +{{ formatRupiah(item.tax_amount) }}
+            </div>
+            <div v-else class="text-disabled">
+              PPN: 0% (Non-PPN)
+            </div>
+          </div>
         </template>
         
         <template #item.total_amount="{ item }">
-          <span class="font-weight-medium">{{ formatRupiah(item.total_amount) }}</span>
+          <span class="font-weight-bold text-primary">{{ formatRupiah(item.total_amount) }}</span>
         </template>
 
         <template #item.approval_status="{ item }">
@@ -374,6 +507,15 @@ const confirmDeletePO = async id => {
 
         <template #item.actions="{ item }">
           <IconBtn
+            size="small"
+            color="info"
+            title="Lihat Rincian HPP & Validasi"
+            class="me-1"
+            @click="openTrackingDialog(item)"
+          >
+            <VIcon icon="ri-eye-line" />
+          </IconBtn>
+          <IconBtn
             v-if="$can('write', 'Purchase Order')"
             size="small"
             color="primary"
@@ -392,8 +534,6 @@ const confirmDeletePO = async id => {
             <VIcon icon="ri-delete-bin-line" />
           </IconBtn>
         </template>
-
-        <!-- Expanded Row for Items -->
       </VDataTableServer>
     </VCard>
 
@@ -409,11 +549,21 @@ const confirmDeletePO = async id => {
     <!-- Tracking & Validation Dialog -->
     <VDialog
       v-model="isTrackingDialogVisible"
-      max-width="800"
+      max-width="880"
     >
       <VCard v-if="trackingPO">
         <VCardTitle class="d-flex justify-space-between align-center px-6 pt-6 pb-4">
-          <span class="text-h5">Detail & Validasi: {{ trackingPO.po_number }}</span>
+          <div class="d-flex align-center gap-2">
+            <VAvatar color="primary" variant="tonal" size="36">
+              <VIcon icon="ri-file-list-3-line" size="20" />
+            </VAvatar>
+            <div>
+              <span class="text-h6 font-weight-bold">Rincian PO: {{ trackingPO.po_number }}</span>
+              <div v-if="trackingPO.invoice_number_supplier" class="text-caption text-medium-emphasis">
+                No. Faktur Supplier: <strong>{{ trackingPO.invoice_number_supplier }}</strong>
+              </div>
+            </div>
+          </div>
           <VBtn
             icon
             variant="text"
@@ -426,32 +576,57 @@ const confirmDeletePO = async id => {
         <VDivider />
         <VCardText
           class="px-6 py-6"
-          style="max-height: 70vh; overflow-y: auto;"
+          style="max-height: 75vh; overflow-y: auto;"
         >
-          <!-- Item List -->
+          <!-- Supplier & Tax Summary Card -->
+          <div class="pa-4 bg-grey-50 rounded-lg border mb-5">
+            <VRow dense>
+              <VCol cols="6" md="3">
+                <div class="text-caption text-medium-emphasis">Supplier:</div>
+                <div class="font-weight-bold">{{ trackingPO.supplier?.name || '-' }}</div>
+              </VCol>
+              <VCol cols="6" md="3">
+                <div class="text-caption text-medium-emphasis">Cabang Tujuan:</div>
+                <div class="font-weight-bold text-primary">{{ trackingPO.branch?.name || '-' }}</div>
+              </VCol>
+              <VCol cols="6" md="3">
+                <div class="text-caption text-medium-emphasis">Skema PPN:</div>
+                <div class="font-weight-bold">
+                  {{ trackingPO.tax_type === 'include' ? 'Include (11%)' : (trackingPO.tax_type === 'exclude' ? 'Exclude (+11%)' : 'Non-PPN (0%)') }}
+                </div>
+              </VCol>
+              <VCol cols="6" md="3">
+                <div class="text-caption text-medium-emphasis">Total Bayar Real:</div>
+                <div class="font-weight-bold text-success text-body-1">{{ formatRupiah(trackingPO.total_amount) }}</div>
+              </VCol>
+            </VRow>
+          </div>
+
+          <!-- Item List with HPP Breakdown -->
           <div class="mb-6">
-            <h6 class="text-h6 mb-3">
-              Daftar Barang
-            </h6>
-            <div v-if="trackingPO.items && trackingPO.items.length">
+            <div class="d-flex justify-space-between align-center mb-3">
+              <h6 class="text-subtitle-1 font-weight-bold mb-0">
+                Daftar Barang & Rincian Modal Real (HPP)
+              </h6>
+              <span class="text-caption text-medium-emphasis">
+                * HPP per Pcs sudah termasuk diskon bertingkat & PPN
+              </span>
+            </div>
+
+            <div v-if="trackingPO.items && trackingPO.items.length" class="border rounded overflow-hidden">
               <table
                 class="w-100"
-                style="border-collapse: collapse;"
+                style="border-collapse: collapse; width: 100%; font-size: 12px;"
               >
                 <thead>
-                  <tr class="text-left border-b">
-                    <th class="pb-2">
-                      Barang
-                    </th>
-                    <th class="pb-2">
-                      Qty
-                    </th>
-                    <th class="pb-2">
-                      Harga Beli
-                    </th>
-                    <th class="pb-2 text-right">
-                      Subtotal
-                    </th>
+                  <tr class="text-left bg-grey-100 border-b">
+                    <th class="pa-2">Barang & SKU</th>
+                    <th class="pa-2 text-center" style="width: 120px;">Kemasan Beli</th>
+                    <th class="pa-2 text-center" style="width: 90px;">Total Pcs</th>
+                    <th class="pa-2 text-right">Harga Beli</th>
+                    <th class="pa-2 text-right">Diskon (d1+d2+d3+d4+5)</th>
+                    <th class="pa-2 text-right text-success font-weight-bold">HPP / Pcs</th>
+                    <th class="pa-2 text-right font-weight-bold">Subtotal</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -460,23 +635,34 @@ const confirmDeletePO = async id => {
                     :key="i.id"
                     class="border-b"
                   >
-                    <td class="py-2">
-                      {{ i.product?.name || i.product_branch?.product?.name || 'Item' }}
+                    <td class="pa-2">
+                      <div class="font-weight-bold">{{ i.product?.name || i.product_branch?.product?.name || 'Item' }}</div>
+                      <div class="text-caption text-medium-emphasis font-mono"><code>{{ i.product?.sku || '-' }}</code></div>
                     </td>
-                    <td class="py-2">
-                      {{ i.qty }}
+                    <td class="pa-2 text-center">
+                      {{ i.qty }} {{ i.unit_name || 'Dus' }}
+                      <div class="text-caption text-medium-emphasis">(@ {{ i.conversion_qty || 1 }} pcs)</div>
                     </td>
-                    <td class="py-2">
-                      {{ formatRupiah(i.unit_cost) }}
+                    <td class="pa-2 text-center font-weight-medium">
+                      {{ (i.qty || 1) * (i.conversion_qty || 1) }} pcs
                     </td>
-                    <td class="py-2 text-right font-weight-medium">
+                    <td class="pa-2 text-right">
+                      {{ formatRupiah(i.gross_price || i.unit_cost) }}
+                    </td>
+                    <td class="pa-2 text-right font-medium">
+                      {{ formatDiscountTiers(i) }}
+                    </td>
+                    <td class="pa-2 text-right text-success font-weight-bold bg-success-lighten-5">
+                      {{ formatRupiah(i.final_cost_per_piece || (i.unit_cost / (i.conversion_qty || 1))) }}
+                    </td>
+                    <td class="pa-2 text-right font-weight-bold">
                       {{ formatRupiah(i.total_price || i.subtotal) }}
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <div v-else>
+            <div v-else class="pa-4 text-center text-disabled">
               Tidak ada data barang.
             </div>
           </div>

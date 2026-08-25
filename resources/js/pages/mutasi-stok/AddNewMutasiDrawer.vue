@@ -189,6 +189,7 @@ const onSubmit = async () => {
         },
       })
       snackbar.show(res.message || 'Pengajuan mutasi berhasil dibuat', 'success')
+      window.dispatchEvent(new Event('refresh-notifications'))
       emit('saveData')
       closeNavigationDrawer()
     } catch (error) {

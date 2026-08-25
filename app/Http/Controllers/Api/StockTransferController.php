@@ -8,6 +8,8 @@ use App\Models\StockTransferItem;
 use App\Models\ProductBranch;
 use App\Models\ProductBatch;
 use App\Models\StockMovement;
+use App\Models\Branch;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -31,6 +33,7 @@ class StockTransferController extends Controller
             COUNT(*) as total,
             SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
             SUM(CASE WHEN status IN ('ready_for_pickup', 'approved') THEN 1 ELSE 0 END) as ready_for_pickup,
+            SUM(CASE WHEN status = 'in_transit' THEN 1 ELSE 0 END) as in_transit,
             SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
             SUM(CASE WHEN status IN ('rejected', 'cancelled') THEN 1 ELSE 0 END) as rejected_cancelled
         ")->first();
@@ -39,6 +42,7 @@ class StockTransferController extends Controller
             'total' => (int) ($counts->total ?? 0),
             'pending' => (int) ($counts->pending ?? 0),
             'ready_for_pickup' => (int) ($counts->ready_for_pickup ?? 0),
+            'in_transit' => (int) ($counts->in_transit ?? 0),
             'completed' => (int) ($counts->completed ?? 0),
             'rejected_cancelled' => (int) ($counts->rejected_cancelled ?? 0),
         ]);
@@ -53,7 +57,14 @@ class StockTransferController extends Controller
             'destination_branch_id',
             'status',
             'picked_up_by_name',
+            'picked_up_at',
+            'pickup_courier_type',
+            'pickup_photo',
+            'received_photo',
             'pickup_notes',
+            'receive_notes',
+            'prepared_at',
+            'received_at',
             'created_at',
             'updated_at',
         ])->with([
@@ -167,6 +178,41 @@ class StockTransferController extends Controller
             }
 
             DB::commit();
+
+            $sourceBranch = Branch::find($request->source_branch_id);
+            $destBranch = Branch::find($request->destination_branch_id);
+            $sourceName = $sourceBranch ? $sourceBranch->name : 'Cabang Asal';
+            $destName = $destBranch ? $destBranch->name : 'Cabang Tujuan';
+
+            NotificationService::notifyBranch(
+                $request->source_branch_id,
+                'Permintaan Mutasi Stok Masuk',
+                "Permintaan barang dari cabang {$destName} (Ref: {$referenceNo}) menunggu disiapkan.",
+                '/mutasi-stok',
+                'info',
+                'ri-truck-line'
+            );
+
+            if ($request->user()) {
+                NotificationService::notifyUser(
+                    $request->user()->id,
+                    'Pengajuan Mutasi Berhasil',
+                    "Permintaan mutasi barang {$referenceNo} ke {$sourceName} berhasil diajukan.",
+                    '/mutasi-stok',
+                    'success',
+                    'ri-truck-line',
+                    $request->destination_branch_id
+                );
+            }
+
+            NotificationService::notifyOwnerAndAdmins(
+                'Permintaan Mutasi Stok Baru',
+                "Pengajuan mutasi {$referenceNo} dari {$sourceName} ke {$destName}.",
+                '/mutasi-stok',
+                'info',
+                'ri-truck-line',
+                $request->destination_branch_id
+            );
 
             return response()->json([
                 'message' => 'Permintaan mutasi stok berhasil dibuat dan menunggu konfirmasi cabang asal.',
@@ -357,6 +403,30 @@ class StockTransferController extends Controller
 
             DB::commit();
 
+            $sourceName = $transfer->sourceBranch ? $transfer->sourceBranch->name : 'Cabang Asal';
+            $destName = $transfer->destinationBranch ? $transfer->destinationBranch->name : 'Cabang Tujuan';
+
+            NotificationService::notifyBranch(
+                $transfer->destination_branch_id,
+                'Mutasi Stok Siap Dijemput',
+                "Barang mutasi ({$transfer->reference_no}) telah disiapkan oleh {$sourceName} dan siap dijemput kurir.",
+                '/mutasi-stok',
+                'info',
+                'ri-box-3-line'
+            );
+
+            if ($transfer->created_by) {
+                NotificationService::notifyUser(
+                    $transfer->created_by,
+                    'Mutasi Stok Disiapkan',
+                    "Permintaan mutasi {$transfer->reference_no} telah disiapkan oleh {$sourceName}.",
+                    '/mutasi-stok',
+                    'info',
+                    'ri-box-3-line',
+                    $transfer->destination_branch_id
+                );
+            }
+
             return response()->json([
                 'message' => 'Barang berhasil disiapkan. Status sekarang: Siap Dijemput.',
                 'data' => $transfer->fresh(['sourceBranch', 'destinationBranch', 'preparedBy', 'items.product'])
@@ -376,15 +446,21 @@ class StockTransferController extends Controller
     }
 
     /**
-     * Tahap 3: Cabang Pemohon menjemput barang di unit asal dan konfirmasi penerimaan.
-     * Stok masuk ke Cabang Pemohon (Destination Branch) dan status berubah menjadi 'completed'.
+     * Tahap 3: Validasi Penjemputan per Item oleh Kurir / Petugas Jemput.
+     * Status berubah menjadi 'in_transit' (Dibawa Kurir / Dalam Perjalanan).
      */
-    public function receive(Request $request, $id)
+    public function pickup(Request $request, $id)
     {
         $user = $request->user();
         if ($user && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
-            return response()->json(['message' => 'Anda tidak memiliki hak akses (permission) untuk mengonfirmasi penerimaan mutasi stok.'], 403);
+            return response()->json(['message' => 'Anda tidak memiliki hak akses untuk memvalidasi penjemputan barang.'], 403);
         }
+
+        $request->validate([
+            'picked_up_by_name' => 'required|string|max:255',
+            'pickup_courier_type' => 'nullable|string|max:100',
+            'pickup_notes' => 'nullable|string',
+        ]);
 
         try {
             DB::beginTransaction();
@@ -392,20 +468,129 @@ class StockTransferController extends Controller
             $transfer = StockTransfer::with(['items.product', 'sourceBranch', 'destinationBranch'])->findOrFail($id);
 
             if (!in_array($transfer->status, ['ready_for_pickup', 'approved'])) {
-                return response()->json(['message' => 'Hanya mutasi yang sudah disiapkan / siap dijemput yang dapat dikonfirmasi penerimaannya.'], 400);
+                return response()->json(['message' => 'Hanya mutasi berstatus siap dijemput yang dapat divalidasi penjemputannya.'], 400);
             }
+
+            $inputItems = $request->input('items', []);
+            if (is_string($inputItems)) {
+                $inputItems = json_decode($inputItems, true) ?: [];
+            }
+            $inputItemsById = collect($inputItems)->keyBy('id');
+
+            foreach ($transfer->items as $item) {
+                if ($item->status === 'cancelled') continue;
+
+                $payload = $inputItemsById->get($item->id);
+                $qtyPicked = $payload !== null && isset($payload['qty_picked']) ? (int) $payload['qty_picked'] : ($item->qty_prepared ?? $item->qty);
+                $itemNotes = $payload ? ($payload['item_notes'] ?? null) : null;
+
+                $item->qty_picked = max(0, $qtyPicked);
+                if ($itemNotes) {
+                    $item->item_notes = $itemNotes;
+                }
+                $item->save();
+            }
+
+            // Handle pickup photo upload
+            $photoPath = $transfer->pickup_photo;
+            if ($request->hasFile('pickup_photo')) {
+                $photoPath = $request->file('pickup_photo')->store('transfers/pickup', 'public');
+            }
+
+            $transfer->update([
+                'status' => 'in_transit',
+                'picked_up_by_name' => trim($request->picked_up_by_name),
+                'picked_up_at' => now(),
+                'pickup_courier_type' => $request->pickup_courier_type ?: 'internal_courier',
+                'pickup_photo' => $photoPath,
+                'pickup_notes' => $request->pickup_notes ? trim($request->pickup_notes) : null,
+            ]);
+
+            DB::commit();
+
+            $sourceName = $transfer->sourceBranch ? $transfer->sourceBranch->name : 'Cabang Asal';
+            $destName = $transfer->destinationBranch ? $transfer->destinationBranch->name : 'Cabang Tujuan';
+
+            NotificationService::notifyBranch(
+                $transfer->destination_branch_id,
+                'Barang Mutasi Sedang Dikirim',
+                "Barang mutasi ({$transfer->reference_no}) dari {$sourceName} sedang dalam perjalanan ke cabang Anda.",
+                '/mutasi-stok',
+                'info',
+                'ri-truck-line'
+            );
+
+            if ($transfer->created_by) {
+                NotificationService::notifyUser(
+                    $transfer->created_by,
+                    'Mutasi Dalam Perjalanan',
+                    "Barang mutasi ({$transfer->reference_no}) sedang dibawa kurir menuju {$destName}.",
+                    '/mutasi-stok',
+                    'info',
+                    'ri-truck-line',
+                    $transfer->destination_branch_id
+                );
+            }
+
+            return response()->json([
+                'message' => 'Barang telah berhasil diverifikasi dan dibawa kurir. Status: Dalam Perjalanan (In-Transit).',
+                'data' => $transfer->fresh(['sourceBranch', 'destinationBranch', 'items.product'])
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Mutasi Stok Pickup Error: ' . $e->getMessage());
+            return response()->json(['message' => 'Gagal memvalidasi penjemputan mutasi', 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Tahap 4: Cabang Tujuan memvalidasi penerimaan fisik per item saat barang tiba.
+     * Stok masuk ke Cabang Tujuan dan status berubah menjadi 'completed'.
+     */
+    public function receive(Request $request, $id)
+    {
+        $user = $request->user();
+        if ($user && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
+            return response()->json(['message' => 'Anda tidak memiliki hak akses untuk mengonfirmasi penerimaan mutasi stok.'], 403);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $transfer = StockTransfer::with(['items.product', 'sourceBranch', 'destinationBranch'])->findOrFail($id);
+
+            if (!in_array($transfer->status, ['in_transit', 'ready_for_pickup', 'approved'])) {
+                return response()->json(['message' => 'Hanya mutasi yang sedang dalam perjalanan atau siap dijemput yang dapat dikonfirmasi penerimaannya.'], 400);
+            }
+
+            $inputItems = $request->input('items', []);
+            if (is_string($inputItems)) {
+                $inputItems = json_decode($inputItems, true) ?: [];
+            }
+            $inputItemsById = collect($inputItems)->keyBy('id');
 
             $sourceName = $transfer->sourceBranch ? $transfer->sourceBranch->name : 'Cabang Asal';
             $destName = $transfer->destinationBranch ? $transfer->destinationBranch->name : 'Cabang Tujuan';
 
             foreach ($transfer->items as $item) {
-                // Skip cancelled / empty items
-                if ($item->status === 'cancelled' || ($item->qty_prepared !== null && $item->qty_prepared <= 0)) {
-                    continue;
-                }
+                if ($item->status === 'cancelled') continue;
 
-                $qtyToReceive = $item->qty_prepared ?? $item->qty;
-                if ($qtyToReceive <= 0) continue;
+                $payload = $inputItemsById->get($item->id);
+                $qtyReceived = $payload !== null && isset($payload['qty_received']) 
+                    ? (int) $payload['qty_received'] 
+                    : ($item->qty_picked ?? $item->qty_prepared ?? $item->qty);
+                $receiveCondition = $payload ? ($payload['receive_condition'] ?? 'good') : 'good';
+                $itemNotes = $payload ? ($payload['item_notes'] ?? null) : null;
+
+                $item->qty_received = max(0, $qtyReceived);
+                $item->receive_condition = $receiveCondition;
+                if ($itemNotes) {
+                    $item->item_notes = $itemNotes;
+                }
+                $item->save();
+
+                if ($qtyReceived <= 0) continue;
 
                 $sourceProductBranch = ProductBranch::withoutGlobalScopes()
                     ->where('branch_id', $transfer->source_branch_id)
@@ -431,7 +616,7 @@ class StockTransferController extends Controller
                     ]
                 );
 
-                $destinationProductBranch->stock += $qtyToReceive;
+                $destinationProductBranch->stock += $qtyReceived;
                 if ($destinationProductBranch->cost_price == 0 && $sourceCostPrice > 0) {
                     $destinationProductBranch->cost_price = $sourceCostPrice;
                 }
@@ -444,11 +629,15 @@ class StockTransferController extends Controller
                         'entry_date' => date('Y-m-d'),
                         'expiration_date' => null,
                         'cost_price' => $sourceCostPrice,
-                        'qty' => $qtyToReceive,
+                        'qty' => $qtyReceived,
                     ]];
                 }
 
+                $remainingToAllocate = $qtyReceived;
                 foreach ($batches as $tBatch) {
+                    if ($remainingToAllocate <= 0) break;
+                    $batchQty = min($tBatch['qty'] ?? $remainingToAllocate, $remainingToAllocate);
+
                     $destBatchQuery = ProductBatch::where('product_branch_id', $destinationProductBranch->id)
                         ->where('entry_date', $tBatch['entry_date'] ?? date('Y-m-d'))
                         ->where('cost_price', $tBatch['cost_price'] ?? 0);
@@ -471,39 +660,88 @@ class StockTransferController extends Controller
                         ]);
                     }
                     
-                    $destBatch->qty += $tBatch['qty'];
+                    $destBatch->qty += $batchQty;
                     $destBatch->save();
+                    $remainingToAllocate -= $batchQty;
                 }
 
                 // Record stock movement IN at destination
                 StockMovement::create([
                     'product_branch_id' => $destinationProductBranch->id,
                     'type' => 'in',
-                    'quantity' => $qtyToReceive,
+                    'quantity' => $qtyReceived,
                     'unit_cost' => $sourceCostPrice,
-                    'notes' => "Diterima dari penjemputan di {$sourceName} (Ref: {$transfer->reference_no})",
+                    'notes' => "Diterima dari mutasi asal {$sourceName} (Ref: {$transfer->reference_no})",
                 ]);
+            }
+
+            // Handle received photo upload
+            $receivedPhotoPath = $transfer->received_photo;
+            if ($request->hasFile('received_photo')) {
+                $receivedPhotoPath = $request->file('received_photo')->store('transfers/received', 'public');
             }
 
             $transfer->update([
                 'status' => 'completed',
                 'received_by' => $request->user()->id ?? null,
                 'received_at' => now(),
-                'picked_up_by_name' => $request->picked_up_by_name ? trim($request->picked_up_by_name) : null,
-                'pickup_notes' => $request->pickup_notes ? trim($request->pickup_notes) : null,
+                'received_photo' => $receivedPhotoPath,
+                'receive_notes' => $request->receive_notes ? trim($request->receive_notes) : null,
             ]);
 
             DB::commit();
 
+            $sourceName = $transfer->sourceBranch ? $transfer->sourceBranch->name : 'Cabang Asal';
+            $destName = $transfer->destinationBranch ? $transfer->destinationBranch->name : 'Cabang Tujuan';
+
+            NotificationService::notifyBranch(
+                $transfer->source_branch_id,
+                'Mutasi Selesai Diterima',
+                "Barang mutasi ({$transfer->reference_no}) telah selesai diverifikasi dan diterima di cabang {$destName}.",
+                '/mutasi-stok',
+                'success',
+                'ri-checkbox-circle-line'
+            );
+
+            NotificationService::notifyBranch(
+                $transfer->destination_branch_id,
+                'Penerimaan Mutasi Selesai',
+                "Barang mutasi ({$transfer->reference_no}) berhasil diterima dan stok telah masuk ke sistem.",
+                '/mutasi-stok',
+                'success',
+                'ri-checkbox-circle-line'
+            );
+
+            if ($transfer->created_by) {
+                NotificationService::notifyUser(
+                    $transfer->created_by,
+                    'Penerimaan Mutasi Selesai',
+                    "Barang mutasi ({$transfer->reference_no}) telah selesai diterima di {$destName}.",
+                    '/mutasi-stok',
+                    'success',
+                    'ri-checkbox-circle-line',
+                    $transfer->destination_branch_id
+                );
+            }
+
+            NotificationService::notifyOwnerAndAdmins(
+                'Mutasi Stok Selesai',
+                "Mutasi {$transfer->reference_no} dari {$sourceName} ke {$destName} telah selesai diterima.",
+                '/mutasi-stok',
+                'success',
+                'ri-checkbox-circle-line',
+                $transfer->destination_branch_id
+            );
+
             return response()->json([
-                'message' => 'Barang telah berhasil dijemput dan stok telah masuk ke unit tujuan.',
+                'message' => 'Barang telah berhasil diverifikasi dan diterima oleh unit tujuan.',
                 'data' => $transfer->fresh(['sourceBranch', 'destinationBranch', 'receivedBy', 'items.product'])
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Mutasi Stok Receive Error: ' . $e->getMessage());
-            return response()->json(['message' => 'Gagal menerima/menjemput barang mutasi', 'error' => $e->getMessage()], 400);
+            return response()->json(['message' => 'Gagal mengonfirmasi penerimaan barang mutasi', 'error' => $e->getMessage()], 400);
         }
     }
 
@@ -526,6 +764,18 @@ class StockTransferController extends Controller
             'notes' => ($transfer->notes ? $transfer->notes . ' | ' : '') . ($request->reason ? "Alasan Penolakan: {$request->reason}" : 'Permintaan Ditolak.'),
         ]);
 
+        if ($transfer->created_by) {
+            NotificationService::notifyUser(
+                $transfer->created_by,
+                'Permintaan Mutasi Ditolak',
+                "Permintaan mutasi {$transfer->reference_no} ditolak." . ($request->reason ? " Alasan: {$request->reason}" : ""),
+                '/mutasi-stok',
+                'error',
+                'ri-close-circle-line',
+                $transfer->destination_branch_id
+            );
+        }
+
         return response()->json(['message' => 'Permintaan mutasi stok berhasil ditolak.']);
     }
 
@@ -545,12 +795,12 @@ class StockTransferController extends Controller
 
             $transfer = StockTransfer::with(['items', 'sourceBranch', 'destinationBranch'])->findOrFail($id);
 
-            if (!in_array($transfer->status, ['pending', 'ready_for_pickup', 'approved'])) {
+            if (!in_array($transfer->status, ['pending', 'ready_for_pickup', 'in_transit', 'approved'])) {
                 return response()->json(['message' => 'Mutasi yang sudah selesai atau ditolak tidak dapat dibatalkan.'], 400);
             }
 
-            // If stock was already deducted (ready_for_pickup / approved), restore it to source
-            if (in_array($transfer->status, ['ready_for_pickup', 'approved'])) {
+            // If stock was already deducted (ready_for_pickup / in_transit / approved), restore it to source
+            if (in_array($transfer->status, ['ready_for_pickup', 'in_transit', 'approved'])) {
                 $destName = $transfer->destinationBranch ? $transfer->destinationBranch->name : 'Cabang Tujuan';
 
                 foreach ($transfer->items as $item) {
