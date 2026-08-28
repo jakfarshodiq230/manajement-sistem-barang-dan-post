@@ -10,13 +10,18 @@ const suppliers = ref([])
 const masterProducts = ref([])
 const search = ref('')
 const selectedBranch = ref(null)
-const selectedStatus = ref(null)
 const isLoading = ref(false)
 const isAddNewDrawerVisible = ref(false)
 const isTrackingDialogVisible = ref(false)
+const isRejectDialogVisible = ref(false)
+const isPhotoPreviewVisible = ref(false)
+const previewPhotoUrl = ref('')
 const selectedPO = ref(null)
 const trackingPO = ref(null)
-const activeTab = ref('all')
+const grToReject = ref(null)
+const rejectReason = ref('')
+const isApproving = ref(false)
+const activeTab = ref('all') // all, stage_gudang, stage_approval, stage_approved, stage_rejected
 const dateRange = ref('')
 
 // Pagination
@@ -25,9 +30,10 @@ const itemsPerPage = ref(10)
 const totalItems = ref(0)
 let searchTimeout = null
 
-const countNeedValidation = ref(0)
-const countNeedApproval = ref(0)
-const isFormulaInfoVisible = ref(true)
+const countStageGudang = ref(0)
+const countStageApproval = ref(0)
+const countStageApproved = ref(0)
+const countStageRejected = ref(0)
 
 const snackbar = useSnackbarStore()
 
@@ -44,7 +50,12 @@ const formatRupiah = value => {
     currency: 'IDR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(value)
+  }).format(value || 0)
+}
+
+const formatDate = dateString => {
+  if (!dateString) return '-'
+  return new Date(dateString).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 const formatDiscountTiers = i => {
@@ -76,10 +87,6 @@ const fetchData = async () => {
     
     if (search.value) params.search = search.value
     
-    if (activeTab.value !== 'all') {
-      params.approval_status_filter = activeTab.value
-    }
-    
     if (dateRange.value) {
       const dates = dateRange.value.split(' to ')
       if (dates.length > 0) {
@@ -102,10 +109,12 @@ const fetchData = async () => {
     suppliers.value = extractArray(supplierData)
     masterProducts.value = extractArray(productData)
     
-    // Update badge counts
+    // Update badge counts for 4-stage pipeline
     const allPOs = extractArray(countsData)
-    countNeedValidation.value = allPOs.filter(item => !item.approval_status || item.approval_status === 'draft' || item.approval_status === 'pending').length
-    countNeedApproval.value = allPOs.filter(item => item.approval_status === 'validated').length
+    countStageGudang.value = allPOs.filter(item => item.status === 'pending' && (!item.goods_receipt || item.goods_receipt.approval_status === 'rejected')).length
+    countStageApproval.value = allPOs.filter(item => item.goods_receipt && item.goods_receipt.approval_status === 'pending_approval').length
+    countStageApproved.value = allPOs.filter(item => item.status === 'completed' || (item.goods_receipt && item.goods_receipt.approval_status === 'approved')).length
+    countStageRejected.value = allPOs.filter(item => item.goods_receipt && item.goods_receipt.approval_status === 'rejected').length
 
   } catch (error) {
     console.error(error)
@@ -144,7 +153,7 @@ const savePurchaseOrder = async data => {
         method: 'POST',
         body: data,
       })
-      snackbar.show('PO berhasil dibuat', 'success')
+      snackbar.show('PO berhasil dibuat dan diteruskan ke Petugas Gudang', 'success')
     }
     fetchData()
   } catch (error) {
@@ -154,46 +163,52 @@ const savePurchaseOrder = async data => {
 }
 
 const tableHeaders = [
-  { title: 'NO. PO / INVOICE SUPPLIER', key: 'po_number' },
-  { title: 'TANGGAL & JATUH TEMPO', key: 'date' },
-  { title: 'CABANG', key: 'branch.name' },
+  { title: 'NO. PO & FAKTUR', key: 'po_number' },
+  { title: 'TANGGAL PESAN & TEMPO', key: 'date' },
+  { title: 'CABANG TUJUAN', key: 'branch.name' },
   { title: 'SUPPLIER', key: 'supplier.name' },
-  { title: 'DPP & PPN', key: 'dpp_amount' },
-  { title: 'TOTAL BAYAR', key: 'total_amount' },
-  { title: 'PERSETUJUAN', key: 'approval_status' },
-  { title: 'STATUS PO', key: 'status' },
+  { title: 'TOTAL BIAYA', key: 'total_amount' },
+  { title: 'STATUS ALUR SOP', key: 'status_sop', align: 'center' },
   { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
 ]
 
 const filteredPOs = computed(() => {
-  return purchaseOrders.value
+  let list = purchaseOrders.value
+  if (activeTab.value === 'stage_gudang') {
+    list = list.filter(item => item.status === 'pending' && (!item.goods_receipt || item.goods_receipt.approval_status === 'rejected'))
+  } else if (activeTab.value === 'stage_approval') {
+    list = list.filter(item => item.goods_receipt && item.goods_receipt.approval_status === 'pending_approval')
+  } else if (activeTab.value === 'stage_approved') {
+    list = list.filter(item => item.status === 'completed' || (item.goods_receipt && item.goods_receipt.approval_status === 'approved'))
+  } else if (activeTab.value === 'stage_rejected') {
+    list = list.filter(item => item.goods_receipt && item.goods_receipt.approval_status === 'rejected')
+  }
+  return list
 })
 
 const exportExcel = () => {
   if (!dateRange.value) {
     snackbar.show('Silakan pilih rentang tanggal periode terlebih dahulu!', 'warning')
-    
     return
   }
   
   if (!filteredPOs.value.length) {
     snackbar.show('Tidak ada data untuk diekspor pada periode ini', 'warning')
-    
     return
   }
   
-  const headers = ['NO. PO', 'TANGGAL', 'CABANG', 'SUPPLIER', 'TOTAL (Rp)', 'STATUS PERSETUJUAN', 'STATUS PO']
+  const headers = ['NO. PO', 'FAKTUR SUPPLIER', 'TANGGAL PESAN', 'CABANG', 'SUPPLIER', 'TOTAL (Rp)', 'STATUS SOP']
   const csvRows = [headers.join(',')]
   
   filteredPOs.value.forEach(po => {
     const row = [
       `"${po.po_number || ''}"`,
+      `"${po.goods_receipt?.invoice_number_supplier || po.invoice_number_supplier || ''}"`,
       `"${po.date || ''}"`,
       `"${po.branch?.name || ''}"`,
       `"${po.supplier?.name || ''}"`,
-      `"${po.total_amount || 0}"`,
-      `"${po.approval_status || ''}"`,
-      `"${po.status || ''}"`,
+      `"${po.goods_receipt?.total_amount || po.total_amount || 0}"`,
+      `"${po.goods_receipt?.approval_status || po.status || ''}"`,
     ]
 
     csvRows.push(row.join(','))
@@ -211,42 +226,100 @@ const exportExcel = () => {
 }
 
 const viewPO = po => {
-  // For now, edit view acts as read-only if it's completed, or editable if not implemented yet
   selectedPO.value = po
   isAddNewDrawerVisible.value = true
 }
 
-const openTrackingDialog = po => {
-  trackingPO.value = po
+const openTrackingDialog = async po => {
+  try {
+    const res = await $api(`/apps/purchase-orders/${po.id}`)
+    trackingPO.value = res.data || res
+  } catch (e) {
+    trackingPO.value = po
+  }
   isTrackingDialogVisible.value = true
 }
 
-const updateStatus = async (id, status) => {
-  if (confirm(`Apakah Anda yakin ingin mengubah status PO menjadi ${status}?`)) {
-    try {
-      await $api(`/apps/purchase-orders/${id}`, { 
-        method: 'PUT',
-        body: { status },
-      })
-      snackbar.show('Status PO berhasil diperbarui', 'success')
-      fetchData()
-    } catch (error) {
-      console.error(error)
-      snackbar.show('Gagal memperbarui status', 'error')
-    }
+const openPhotoZoom = url => {
+  previewPhotoUrl.value = url
+  isPhotoPreviewVisible.value = true
+}
+
+const isApproveDialogVisible = ref(false)
+const grToApprove = ref(null)
+
+const isDeletePoDialogVisible = ref(false)
+const poToDelete = ref(null)
+
+const openApproveDialog = gr => {
+  grToApprove.value = gr
+  isApproveDialogVisible.value = true
+}
+
+const executeApproveGR = async () => {
+  if (!grToApprove.value) return
+
+  isApproving.value = true
+  try {
+    const res = await $api(`/apps/goods-receipts/${grToApprove.value.id}/approve`, {
+      method: 'POST',
+    })
+    snackbar.show(res.message || 'Penerimaan barang berhasil disetujui & stok fisik telah bertambah!', 'success')
+    isApproveDialogVisible.value = false
+    isTrackingDialogVisible.value = false
+    fetchData()
+  } catch (error) {
+    console.error(error)
+    const errorMsg = error.response?._data?.message || error.message || 'Gagal menyetujui penerimaan barang'
+    snackbar.show(errorMsg, 'error')
+  } finally {
+    isApproving.value = false
   }
 }
 
-const confirmDeletePO = async id => {
-  if (confirm('Apakah Anda yakin ingin menghapus PO ini?')) {
-    try {
-      await $api(`/apps/purchase-orders/${id}`, { method: 'DELETE' })
-      snackbar.show('PO berhasil dihapus', 'success')
-      fetchData()
-    } catch (error) {
-      console.error(error)
-      snackbar.show('Gagal menghapus PO', 'error')
-    }
+const openRejectDialog = gr => {
+  grToReject.value = gr
+  rejectReason.value = ''
+  isRejectDialogVisible.value = true
+}
+
+const executeRejectGR = async () => {
+  if (!grToReject.value) return
+  isApproving.value = true
+  try {
+    const res = await $api(`/apps/goods-receipts/${grToReject.value.id}/reject`, {
+      method: 'POST',
+      body: { reason: rejectReason.value }
+    })
+    snackbar.show(res.message || 'Penerimaan barang ditolak dan dikembalikan ke petugas gudang untuk revisi.', 'info')
+    isRejectDialogVisible.value = false
+    isTrackingDialogVisible.value = false
+    fetchData()
+  } catch (error) {
+    console.error(error)
+    const errorMsg = error.response?._data?.message || error.message || 'Gagal menolak penerimaan barang'
+    snackbar.show(errorMsg, 'error')
+  } finally {
+    isApproving.value = false
+  }
+}
+
+const openDeletePoDialog = po => {
+  poToDelete.value = po
+  isDeletePoDialogVisible.value = true
+}
+
+const executeDeletePO = async () => {
+  if (!poToDelete.value) return
+  try {
+    await $api(`/apps/purchase-orders/${poToDelete.value.id}`, { method: 'DELETE' })
+    snackbar.show('PO berhasil dihapus', 'success')
+    isDeletePoDialogVisible.value = false
+    poToDelete.value = null
+    fetchData()
+  } catch (error) {
+    console.error(error)
+    snackbar.show('Gagal menghapus PO', 'error')
   }
 }
 </script>
@@ -254,14 +327,18 @@ const confirmDeletePO = async id => {
 <template>
   <section>
     <!-- Page Header -->
-    <div class="d-flex align-center justify-space-between mb-4">
+    <div class="d-flex flex-wrap align-center justify-space-between gap-4 mb-4">
       <div>
-        <h2 class="text-h4 mb-0">
-          Purchase Orders (PO)
+        <h2 class="text-h4 font-weight-bold mb-1 d-flex align-center gap-2">
+          <VIcon icon="ri-shopping-cart-2-line" color="primary" />
+          Purchase Orders & Alur Penerimaan Gudang
         </h2>
+        <p class="text-caption text-medium-emphasis mb-0">
+          SOP 4 Tahap: Input PO (Ka. Divisi) &rarr; Validasi Fisik & Faktur (Gudang) &rarr; Validasi Harga & Diskon (Ka. Divisi) &rarr; Stok Masuk
+        </p>
       </div>
       
-      <div class="d-flex gap-4">
+      <div class="d-flex gap-2">
         <VBtn
           v-if="$can('read', 'Purchase Order')"
           color="success"
@@ -283,132 +360,53 @@ const confirmDeletePO = async id => {
       </div>
     </div>
 
-    <!-- Formula & Guide Banner Card -->
-    <VCard class="mb-5 border border-primary border-opacity-25 bg-primary-lighten-5 rounded-xl">
-      <VCardItem class="pa-4">
-        <div class="d-flex align-center justify-space-between flex-wrap gap-2">
-          <div class="d-flex align-center gap-3">
-            <VAvatar color="primary" variant="tonal" size="44" rounded="lg">
-              <VIcon icon="ri-calculator-line" size="24" />
-            </VAvatar>
-            <div>
-              <h4 class="text-subtitle-1 font-weight-bold text-primary mb-0">
-                Panduan Rumus Kalkulasi Supplier & Harga Modal (HPP Real)
-              </h4>
-              <p class="text-caption text-medium-emphasis mb-0">
-                Sistem otomatis mengkonversi pembelian Dus/Karton dari supplier, diskon bertingkat (d1 + d2), dan PPN menjadi Modal HPP per Pcs Eceran.
-              </p>
-            </div>
-          </div>
-          <VBtn
-            size="small"
-            variant="tonal"
-            color="primary"
-            :prepend-icon="isFormulaInfoVisible ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'"
-            @click="isFormulaInfoVisible = !isFormulaInfoVisible"
-          >
-            {{ isFormulaInfoVisible ? 'Tutup Catatan Rumus' : 'Buka Catatan Rumus' }}
-          </VBtn>
-        </div>
-
-        <VExpandTransition>
-          <div v-show="isFormulaInfoVisible" class="mt-4 pt-3 border-t">
-            <VRow dense class="g-3">
-              <VCol cols="12" md="4">
-                <div class="pa-3 bg-white border rounded-lg h-100">
-                  <div class="text-caption font-weight-bold text-primary mb-1">
-                    1. Diskon Bertingkat Supplier (d1 + d2)
-                  </div>
-                  <div class="text-caption text-medium-emphasis mb-2">
-                    Jika supplier memberikan diskon 5% + 2%:
-                  </div>
-                  <div class="pa-2 bg-grey-50 rounded font-mono text-caption mb-2">
-                    Harga Dus x (1 - d1%) x (1 - d2%) = <strong>DPP</strong>
-                  </div>
-                  <div class="text-caption text-disabled" style="font-size: 11px;">
-                    * Diskon dihitung bertingkat dari sisa harga setelah diskon pertama.
-                  </div>
-                </div>
-              </VCol>
-
-              <VCol cols="12" md="4">
-                <div class="pa-3 bg-white border rounded-lg h-100">
-                  <div class="text-caption font-weight-bold text-purple mb-1">
-                    2. Pajak PPN 11% (Faktur Pajak)
-                  </div>
-                  <div class="text-caption text-medium-emphasis mb-2">
-                    3 Opsi Sesuai Kuitansi Supplier:
-                  </div>
-                  <ul class="text-caption text-medium-emphasis ps-4 mb-0" style="font-size: 11px;">
-                    <li><strong>Exclude (+11%):</strong> DPP + PPN 11% ditambahkan ke tagihan.</li>
-                    <li><strong>Include (11%):</strong> Harga kuitansi sudah termasuk PPN.</li>
-                    <li><strong>Non-PPN (0%):</strong> Supplier non-PKP / barang bebas pajak.</li>
-                  </ul>
-                </div>
-              </VCol>
-
-              <VCol cols="12" md="4">
-                <div class="pa-3 bg-white border rounded-lg h-100">
-                  <div class="text-caption font-weight-bold text-success mb-1">
-                    3. Harga Modal Final per Pcs (HPP)
-                  </div>
-                  <div class="text-caption text-medium-emphasis mb-2">
-                    Konversi Dus/Pack ke Pcs Eceran:
-                  </div>
-                  <div class="pa-2 bg-success-lighten-5 rounded font-mono text-caption text-success font-weight-bold mb-2">
-                    HPP = Total Bayar Real / (Qty Dus x Isi per Dus)
-                  </div>
-                  <div class="text-caption text-disabled" style="font-size: 11px;">
-                    * Menjadi dasar batas modal toko untuk jual eceran & harga grosir di POS.
-                  </div>
-                </div>
-              </VCol>
-            </VRow>
-          </div>
-        </VExpandTransition>
-      </VCardItem>
-    </VCard>
-
-    <!-- Card -->
-    <VCard>
+    <!-- 4-Stage Pipeline Filter Tabs -->
+    <VCard class="mb-4">
       <VTabs
         v-model="activeTab"
-        class="px-4 border-b"
-        @update:model-value="() => { page = 1; fetchData(); }"
+        grow
+        class="border-b"
       >
         <VTab value="all">
-          Semua
+          <VIcon icon="ri-apps-line" class="me-1" size="18" />
+          Semua PO
+          <VChip size="x-small" class="ms-2" color="secondary">{{ purchaseOrders.length }}</VChip>
         </VTab>
-        <VTab value="need_validation">
-          <span class="mr-2">Butuh Validasi</span>
-          <VBadge
-            v-if="countNeedValidation > 0"
-            color="error"
-            :content="countNeedValidation"
-            inline
-          />
+
+        <VTab value="stage_gudang">
+          <VIcon icon="ri-truck-line" class="me-1" size="18" color="info" />
+          1. Menunggu Cek Fisik Gudang
+          <VChip v-if="countStageGudang > 0" size="x-small" class="ms-2" color="info">{{ countStageGudang }}</VChip>
         </VTab>
-        <VTab value="need_approval">
-          <span class="mr-2">Butuh Persetujuan</span>
-          <VBadge
-            v-if="countNeedApproval > 0"
-            color="warning"
-            :content="countNeedApproval"
-            inline
-          />
+
+        <VTab value="stage_approval">
+          <VIcon icon="ri-shield-user-line" class="me-1" size="18" color="warning" />
+          2. Menunggu Validasi Ka. Divisi
+          <VChip v-if="countStageApproval > 0" size="x-small" class="ms-2 font-weight-bold" color="warning" variant="flat">{{ countStageApproval }}</VChip>
         </VTab>
-        <VTab value="approved">
-          Selesai / Disetujui
+
+        <VTab value="stage_approved">
+          <VIcon icon="ri-checkbox-circle-line" class="me-1" size="18" color="success" />
+          3. Disetujui & Masuk Stok
+          <VChip v-if="countStageApproved > 0" size="x-small" class="ms-2" color="success">{{ countStageApproved }}</VChip>
+        </VTab>
+
+        <VTab value="stage_rejected">
+          <VIcon icon="ri-close-circle-line" class="me-1" size="18" color="error" />
+          4. Ditolak / Revisi
+          <VChip v-if="countStageRejected > 0" size="x-small" class="ms-2" color="error">{{ countStageRejected }}</VChip>
         </VTab>
       </VTabs>
 
-      <!-- Card Header -->
+      <!-- Card Filter Header -->
       <VCardItem class="pa-4 pb-0">
         <div class="d-flex flex-wrap align-center justify-space-between w-100 gap-4">
-          <VCardTitle class="px-0">
-            Daftar PO
-          </VCardTitle>
-          <div class="d-flex align-center gap-4">
+          <div>
+            <span class="text-caption text-medium-emphasis">
+              Menampilkan {{ filteredPOs.length }} data purchase order berdasarkan filter tahap SOP.
+            </span>
+          </div>
+          <div class="d-flex align-center gap-4 flex-wrap">
             <AppDateTimePicker
               v-model="dateRange"
               placeholder="Filter Rentang Tanggal"
@@ -420,10 +418,10 @@ const confirmDeletePO = async id => {
               clearable
               @update:model-value="handleSearchAndFilter"
             />
-            <div style="width: 250px;">
+            <div style="width: 260px;">
               <VTextField
                 v-model="search"
-                placeholder="Cari No PO atau Supplier..."
+                placeholder="Cari No. PO, Faktur, Sales..."
                 density="compact"
                 prepend-inner-icon="ri-search-line"
                 hide-details
@@ -446,6 +444,7 @@ const confirmDeletePO = async id => {
         class="text-no-wrap"
         @update:options="fetchData"
       >
+        <!-- PO Number & Supplier Invoice -->
         <template #item.po_number="{ item }">
           <div>
             <a
@@ -455,84 +454,159 @@ const confirmDeletePO = async id => {
             >
               {{ item.po_number }}
             </a>
-            <div v-if="item.invoice_number_supplier" class="text-caption text-medium-emphasis">
-              Faktur: <strong>{{ item.invoice_number_supplier }}</strong>
+            <div v-if="item.goods_receipt?.invoice_number_supplier" class="text-caption text-success font-weight-medium">
+              <VIcon icon="ri-bill-line" size="13" class="me-1" />
+              Faktur: {{ item.goods_receipt.invoice_number_supplier }}
+            </div>
+            <div v-if="item.goods_receipt?.sales_name" class="text-caption text-medium-emphasis">
+              Sales: {{ item.goods_receipt.sales_name }}
             </div>
           </div>
         </template>
 
+        <!-- Date & Due Date -->
         <template #item.date="{ item }">
           <div>
-            <div>{{ item.date || item.created_at?.substr(0, 10) }}</div>
-            <div v-if="item.due_date && item.due_date !== item.date" class="text-caption text-medium-emphasis">
-              Tempo: {{ item.due_date }}
+            <div class="font-weight-medium">{{ item.date || item.created_at?.substr(0, 10) }}</div>
+            <div v-if="item.goods_receipt?.due_date" class="text-caption text-error font-weight-medium">
+              Jatuh Tempo: {{ String(item.goods_receipt.due_date).substring(0, 10) }}
+            </div>
+            <div v-else-if="item.due_date && String(item.due_date).substring(0, 10) !== String(item.date || item.created_at).substring(0, 10)" class="text-caption text-medium-emphasis">
+              Tempo: {{ String(item.due_date).substring(0, 10) }}
             </div>
           </div>
         </template>
 
-        <template #item.dpp_amount="{ item }">
-          <div class="text-caption">
-            <div>DPP: {{ formatRupiah(item.dpp_amount || item.total_amount) }}</div>
-            <div v-if="item.tax_amount > 0" class="text-purple font-weight-medium">
-              PPN: +{{ formatRupiah(item.tax_amount) }}
-            </div>
-            <div v-else class="text-disabled">
-              PPN: 0% (Non-PPN)
-            </div>
+        <!-- Branch -->
+        <template #item.branch.name="{ item }">
+          <span class="font-weight-medium">{{ item.branch?.name || '-' }}</span>
+        </template>
+
+        <!-- Supplier -->
+        <template #item.supplier.name="{ item }">
+          <div>
+            <span class="font-weight-bold">{{ item.supplier?.name || '-' }}</span>
+            <div class="text-caption text-disabled">{{ item.items ? item.items.length : 0 }} Item Produk</div>
           </div>
         </template>
-        
+
+        <!-- Total Amount -->
         <template #item.total_amount="{ item }">
-          <span class="font-weight-bold text-primary">{{ formatRupiah(item.total_amount) }}</span>
+          <div>
+            <span class="font-weight-bold text-primary font-mono">
+              {{ formatRupiah(item.goods_receipt?.total_amount || item.total_amount) }}
+            </span>
+            <div v-if="item.goods_receipt?.extra_discount > 0" class="text-caption text-success">
+              Diskon Faktur: -{{ formatRupiah(item.goods_receipt.extra_discount) }}
+            </div>
+          </div>
         </template>
 
-        <template #item.approval_status="{ item }">
+        <!-- Status SOP Alur 4 Tahap -->
+        <template #item.status_sop="{ item }">
+          <!-- Stage 3: Approved & Restocked -->
           <VChip
-            :color="item.approval_status === 'draft' ? 'secondary' : ((!item.approval_status || item.approval_status === 'pending') ? 'warning' : (item.approval_status === 'validated' ? 'info' : (item.approval_status === 'approved' ? 'success' : 'error')))"
+            v-if="item.status === 'completed' || item.goods_receipt?.approval_status === 'approved'"
+            color="success"
+            size="small"
+            variant="flat"
+            class="font-weight-bold"
+          >
+            <VIcon icon="ri-checkbox-circle-line" size="14" class="me-1" />
+            Disetujui & Masuk Stok
+          </VChip>
+
+          <!-- Stage 2: Pending Approval from Ka. Divisi -->
+          <VChip
+            v-else-if="item.goods_receipt?.approval_status === 'pending_approval'"
+            color="warning"
+            size="small"
+            variant="flat"
+            class="font-weight-bold"
+          >
+            <VIcon icon="ri-shield-user-line" size="14" class="me-1" />
+            Menunggu Validasi Ka. Divisi
+          </VChip>
+
+          <!-- Stage 4: Rejected / Revision needed -->
+          <VChip
+            v-else-if="item.goods_receipt?.approval_status === 'rejected'"
+            color="error"
             size="small"
             variant="tonal"
+            class="font-weight-bold"
           >
-            {{ item.approval_status === 'draft' ? 'Draf' : ((!item.approval_status || item.approval_status === 'pending') ? 'Menunggu Validasi' : (item.approval_status === 'validated' ? 'Menunggu Persetujuan' : (item.approval_status === 'approved' ? 'Disetujui' : 'Ditolak'))) }}
+            <VIcon icon="ri-close-circle-line" size="14" class="me-1" />
+            Ditolak / Perlu Revisi
           </VChip>
-        </template>
 
-        <template #item.status="{ item }">
+          <!-- Stage 1: Waiting for physical delivery & warehouse receipt -->
           <VChip
-            :color="item.status === 'completed' ? 'success' : (item.status === 'pending' ? 'secondary' : 'error')"
+            v-else
+            color="info"
             size="small"
+            variant="tonal"
+            class="font-weight-medium"
           >
-            {{ item.status.toUpperCase() }}
+            <VIcon icon="ri-truck-line" size="14" class="me-1" />
+            Menunggu Cek Fisik Gudang
           </VChip>
         </template>
 
+        <!-- Actions -->
         <template #item.actions="{ item }">
-          <IconBtn
-            size="small"
-            color="info"
-            title="Lihat Rincian HPP & Validasi"
-            class="me-1"
-            @click="openTrackingDialog(item)"
-          >
-            <VIcon icon="ri-eye-line" />
-          </IconBtn>
-          <IconBtn
-            v-if="$can('write', 'Purchase Order')"
-            size="small"
-            color="primary"
-            :disabled="item.approval_status !== 'draft' && item.approval_status !== 'rejected'"
-            @click="viewPO(item)"
-          >
-            <VIcon icon="ri-edit-line" />
-          </IconBtn>
-          <IconBtn
-            v-if="$can('delete', 'Purchase Order')"
-            size="small"
-            color="error"
-            :disabled="item.status === 'completed' || item.status === 'cancelled'"
-            @click="confirmDeletePO(item.id)"
-          >
-            <VIcon icon="ri-delete-bin-line" />
-          </IconBtn>
+          <div class="d-flex align-center justify-center gap-1">
+            <!-- Validasi & Setujui Button for Ka. Divisi -->
+            <VBtn
+              v-if="item.goods_receipt?.approval_status === 'pending_approval' && ($can('approve', 'Purchase Order') || $can('approve', 'Penerimaan Gudang') || $can('write', 'Purchase Order') || $can('manage all', 'all'))"
+              size="small"
+              color="primary"
+              variant="elevated"
+              prepend-icon="ri-check-double-line"
+              class="me-1 font-weight-bold"
+              @click="openTrackingDialog(item)"
+            >
+              Validasi & Setujui
+            </VBtn>
+
+            <IconBtn
+              size="small"
+              color="info"
+              title="Lihat Rincian Pesanan & Faktur"
+              @click="openTrackingDialog(item)"
+            >
+              <VIcon icon="ri-eye-line" />
+            </IconBtn>
+
+            <IconBtn
+              v-if="$can('write', 'Purchase Order')"
+              size="small"
+              color="secondary"
+              title="Edit PO"
+              :disabled="item.status === 'completed' || (item.goods_receipt && item.goods_receipt.approval_status === 'approved')"
+              @click="viewPO(item)"
+            >
+              <VIcon icon="ri-edit-line" />
+            </IconBtn>
+
+            <IconBtn
+              v-if="$can('delete', 'Purchase Order')"
+              size="small"
+              color="error"
+              title="Hapus PO"
+              :disabled="item.status === 'completed' || (item.goods_receipt && item.goods_receipt.approval_status === 'approved')"
+              @click="openDeletePoDialog(item)"
+            >
+              <VIcon icon="ri-delete-bin-line" />
+            </IconBtn>
+          </div>
+        </template>
+
+        <template #no-data>
+          <div class="pa-6 text-center text-medium-emphasis">
+            <VIcon icon="ri-inbox-line" size="36" class="mb-2 text-disabled" />
+            <div>Tidak ada data purchase order pada filter ini.</div>
+          </div>
         </template>
       </VDataTableServer>
     </VCard>
@@ -546,22 +620,40 @@ const confirmDeletePO = async id => {
       @save-data="savePurchaseOrder"
     />
 
-    <!-- Tracking & Validation Dialog -->
+    <!-- Tracking & Approval Dialog (Kepala Divisi Review) -->
     <VDialog
       v-model="isTrackingDialogVisible"
-      max-width="880"
+      max-width="960"
     >
       <VCard v-if="trackingPO">
-        <VCardTitle class="d-flex justify-space-between align-center px-6 pt-6 pb-4">
-          <div class="d-flex align-center gap-2">
-            <VAvatar color="primary" variant="tonal" size="36">
-              <VIcon icon="ri-file-list-3-line" size="20" />
+        <VCardTitle class="d-flex justify-space-between align-center px-6 pt-6 pb-4 bg-light">
+          <div class="d-flex align-center gap-3">
+            <VAvatar color="primary" variant="tonal" size="42" class="rounded-lg">
+              <VIcon icon="ri-file-shield-2-line" size="24" />
             </VAvatar>
             <div>
-              <span class="text-h6 font-weight-bold">Rincian PO: {{ trackingPO.po_number }}</span>
-              <div v-if="trackingPO.invoice_number_supplier" class="text-caption text-medium-emphasis">
-                No. Faktur Supplier: <strong>{{ trackingPO.invoice_number_supplier }}</strong>
+              <div class="d-flex align-center gap-2">
+                <span class="text-h6 font-weight-bold">PO: {{ trackingPO.po_number }}</span>
+                <VChip
+                  v-if="trackingPO.goods_receipt?.approval_status === 'pending_approval'"
+                  color="warning"
+                  size="small"
+                  variant="flat"
+                >
+                  Menunggu Validasi Ka. Divisi
+                </VChip>
+                <VChip
+                  v-else-if="trackingPO.status === 'completed' || trackingPO.goods_receipt?.approval_status === 'approved'"
+                  color="success"
+                  size="small"
+                  variant="flat"
+                >
+                  Disetujui & Masuk Stok
+                </VChip>
               </div>
+              <span class="text-caption text-medium-emphasis">
+                Dibuat oleh: {{ trackingPO.user?.name || '-' }} pada {{ formatDate(trackingPO.created_at) }}
+              </span>
             </div>
           </div>
           <VBtn
@@ -573,220 +665,368 @@ const confirmDeletePO = async id => {
             <VIcon icon="ri-close-line" />
           </VBtn>
         </VCardTitle>
+
         <VDivider />
+
         <VCardText
           class="px-6 py-6"
           style="max-height: 75vh; overflow-y: auto;"
         >
-          <!-- Supplier & Tax Summary Card -->
-          <div class="pa-4 bg-grey-50 rounded-lg border mb-5">
+          <!-- Rejection Alert if any -->
+          <VAlert
+            v-if="trackingPO.goods_receipt?.approval_status === 'rejected'"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+            icon="ri-error-warning-line"
+          >
+            <strong>Penerimaan Ditolak / Perlu Revisi Gudang:</strong> {{ trackingPO.goods_receipt.rejection_reason || 'Periksa kembali kesesuaian fisik atau data faktur supplier.' }}
+          </VAlert>
+
+          <!-- Section 1: Data Faktur dari Petugas Gudang (Jika Barang Sudah Divalidasi Gudang) -->
+          <div v-if="trackingPO.goods_receipt" class="pa-4 bg-var-theme-surface rounded-xl border mb-5 shadow-xs">
+            <div class="d-flex align-center justify-space-between mb-3">
+              <h6 class="text-subtitle-2 font-weight-bold text-uppercase letter-spacing-1 text-primary d-flex align-center gap-2 mb-0">
+                <VIcon icon="ri-file-paper-2-line" size="18" />
+                Data Faktur Masuk (Diinput oleh Petugas Gudang)
+              </h6>
+              <VChip size="small" variant="tonal" color="info">
+                No. GR: {{ trackingPO.goods_receipt.receipt_number }}
+              </VChip>
+            </div>
+
             <VRow dense>
-              <VCol cols="6" md="3">
-                <div class="text-caption text-medium-emphasis">Supplier:</div>
-                <div class="font-weight-bold">{{ trackingPO.supplier?.name || '-' }}</div>
+              <VCol cols="12" sm="4">
+                <div class="text-caption text-medium-emphasis">No. Faktur Supplier:</div>
+                <div class="font-weight-bold text-success">{{ trackingPO.goods_receipt.invoice_number_supplier || '-' }}</div>
               </VCol>
-              <VCol cols="6" md="3">
-                <div class="text-caption text-medium-emphasis">Cabang Tujuan:</div>
-                <div class="font-weight-bold text-primary">{{ trackingPO.branch?.name || '-' }}</div>
+              <VCol cols="12" sm="4">
+                <div class="text-caption text-medium-emphasis">Nama Sales Supplier:</div>
+                <div class="font-weight-bold">{{ trackingPO.goods_receipt.sales_name || '-' }}</div>
               </VCol>
-              <VCol cols="6" md="3">
-                <div class="text-caption text-medium-emphasis">Skema PPN:</div>
-                <div class="font-weight-bold">
-                  {{ trackingPO.tax_type === 'include' ? 'Include (11%)' : (trackingPO.tax_type === 'exclude' ? 'Exclude (+11%)' : 'Non-PPN (0%)') }}
+              <VCol cols="12" sm="4">
+                <div class="text-caption text-medium-emphasis">Petugas Gudang (Cek Fisik):</div>
+                <div class="font-weight-bold">{{ trackingPO.goods_receipt.validator?.name || '-' }} ({{ formatDate(trackingPO.goods_receipt.validated_at || trackingPO.goods_receipt.created_at) }})</div>
+              </VCol>
+              <VCol cols="12" sm="4" class="mt-2">
+                <div class="text-caption text-medium-emphasis">Tanggal Barang Sampai:</div>
+                <div class="font-weight-bold">{{ trackingPO.goods_receipt.received_date || '-' }}</div>
+              </VCol>
+              <VCol cols="12" sm="4" class="mt-2">
+                <div class="text-caption text-medium-emphasis">Tanggal Jatuh Tempo Faktur:</div>
+                <div class="font-weight-bold text-error">{{ trackingPO.goods_receipt.due_date ? String(trackingPO.goods_receipt.due_date).substring(0, 10) : '-' }}</div>
+              </VCol>
+              <VCol cols="12" sm="4" class="mt-2">
+                <div class="text-caption text-medium-emphasis">Kepala Divisi (Validasi Harga):</div>
+                <div class="font-weight-bold text-primary">{{ trackingPO.goods_receipt.approver?.name || (trackingPO.goods_receipt.approval_status === 'pending_approval' ? 'Menunggu Validasi Anda' : '-') }}</div>
+              </VCol>
+
+              <!-- Photo of invoice / surat jalan -->
+              <VCol v-if="trackingPO.goods_receipt.photos && trackingPO.goods_receipt.photos.length" cols="12" class="mt-3">
+                <div class="text-caption text-medium-emphasis mb-1">Bukti Foto Faktur / Surat Jalan Supplier:</div>
+                <div class="d-flex gap-2 flex-wrap">
+                  <VImg
+                    v-for="(photo, idx) in trackingPO.goods_receipt.photos"
+                    :key="idx"
+                    :src="photo"
+                    width="100"
+                    height="80"
+                    cover
+                    class="rounded-lg border cursor-pointer hover-elevation"
+                    @click="openPhotoZoom(photo)"
+                  />
                 </div>
-              </VCol>
-              <VCol cols="6" md="3">
-                <div class="text-caption text-medium-emphasis">Total Bayar Real:</div>
-                <div class="font-weight-bold text-success text-body-1">{{ formatRupiah(trackingPO.total_amount) }}</div>
               </VCol>
             </VRow>
           </div>
 
-          <!-- Item List with HPP Breakdown -->
-          <div class="mb-6">
+          <!-- Section 2: Informasi Dasar PO -->
+          <div class="pa-4 bg-grey-50 rounded-lg border mb-5">
+            <VRow dense>
+              <VCol cols="12" sm="4">
+                <div class="text-caption text-medium-emphasis">Supplier Tujuan:</div>
+                <div class="font-weight-bold text-primary">{{ trackingPO.supplier?.name || '-' }}</div>
+              </VCol>
+              <VCol cols="12" sm="4">
+                <div class="text-caption text-medium-emphasis">Cabang Penerima:</div>
+                <div class="font-weight-bold">{{ trackingPO.branch?.name || '-' }}</div>
+              </VCol>
+              <VCol cols="12" sm="4">
+                <div class="text-caption text-medium-emphasis">Tanggal Pemesanan:</div>
+                <div class="font-weight-bold">{{ trackingPO.date || trackingPO.created_at?.substr(0, 10) }}</div>
+              </VCol>
+              <VCol v-if="trackingPO.notes" cols="12" class="mt-2">
+                <div class="text-caption text-medium-emphasis">Catatan Pesanan:</div>
+                <div class="text-body-2">{{ trackingPO.notes }}</div>
+              </VCol>
+            </VRow>
+          </div>
+
+          <!-- Section 3: Item List with Capella Pricing & Tier Discounts -->
+          <div class="mb-5">
             <div class="d-flex justify-space-between align-center mb-3">
-              <h6 class="text-subtitle-1 font-weight-bold mb-0">
-                Daftar Barang & Rincian Modal Real (HPP)
+              <h6 class="text-subtitle-1 font-weight-bold mb-0 d-flex align-center gap-2">
+                <VIcon icon="ri-box-3-line" color="primary" size="18" />
+                Rincian Barang & Kalkulasi Harga Modal Capella
               </h6>
               <span class="text-caption text-medium-emphasis">
-                * HPP per Pcs sudah termasuk diskon bertingkat & PPN
+                Total: {{ (trackingPO.goods_receipt?.items || trackingPO.items)?.length || 0 }} Item Produk
               </span>
             </div>
 
-            <div v-if="trackingPO.items && trackingPO.items.length" class="border rounded overflow-hidden">
-              <table
-                class="w-100"
-                style="border-collapse: collapse; width: 100%; font-size: 12px;"
-              >
+            <div class="border rounded overflow-hidden">
+              <table class="w-100 text-left" style="border-collapse: collapse; font-size: 13px;">
                 <thead>
-                  <tr class="text-left bg-grey-100 border-b">
-                    <th class="pa-2">Barang & SKU</th>
-                    <th class="pa-2 text-center" style="width: 120px;">Kemasan Beli</th>
-                    <th class="pa-2 text-center" style="width: 90px;">Total Pcs</th>
-                    <th class="pa-2 text-right">Harga Beli</th>
-                    <th class="pa-2 text-right">Diskon (d1+d2+d3+d4+5)</th>
-                    <th class="pa-2 text-right text-success font-weight-bold">HPP / Pcs</th>
-                    <th class="pa-2 text-right font-weight-bold">Subtotal</th>
+                  <tr class="bg-grey-100 border-b text-medium-emphasis font-weight-bold">
+                    <th class="pa-3">Barang & SKU</th>
+                    <th class="pa-3 text-center" style="width: 100px;">Qty Diterima</th>
+                    <th class="pa-3 text-right" style="width: 130px;">Harga Gross (Rp)</th>
+                    <th class="pa-3 text-center" style="width: 150px;">Diskon Bertingkat</th>
+                    <th class="pa-3 text-right" style="width: 130px;">Harga Netto Satuan</th>
+                    <th class="pa-3 text-right" style="width: 140px;">Subtotal Netto</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr
-                    v-for="i in trackingPO.items"
+                    v-for="i in (trackingPO.goods_receipt?.items || trackingPO.items || [])"
                     :key="i.id"
                     class="border-b"
                   >
-                    <td class="pa-2">
+                    <td class="pa-3">
                       <div class="font-weight-bold">{{ i.product?.name || i.product_branch?.product?.name || 'Item' }}</div>
                       <div class="text-caption text-medium-emphasis font-mono"><code>{{ i.product?.sku || '-' }}</code></div>
                     </td>
-                    <td class="pa-2 text-center">
-                      {{ i.qty }} {{ i.unit_name || 'Dus' }}
-                      <div class="text-caption text-medium-emphasis">(@ {{ i.conversion_qty || 1 }} pcs)</div>
+                    <td class="pa-3 text-center font-weight-bold text-primary">
+                      {{ i.qty }} {{ i.unit_name || 'pcs' }}
                     </td>
-                    <td class="pa-2 text-center font-weight-medium">
-                      {{ (i.qty || 1) * (i.conversion_qty || 1) }} pcs
-                    </td>
-                    <td class="pa-2 text-right">
+                    <td class="pa-3 text-right font-mono">
                       {{ formatRupiah(i.gross_price || i.unit_cost) }}
                     </td>
-                    <td class="pa-2 text-right font-medium">
-                      {{ formatDiscountTiers(i) }}
+                    <td class="pa-3 text-center">
+                      <VChip size="x-small" variant="tonal" color="warning" class="font-mono">
+                        {{ formatDiscountTiers(i) }}
+                      </VChip>
                     </td>
-                    <td class="pa-2 text-right text-success font-weight-bold bg-success-lighten-5">
-                      {{ formatRupiah(i.final_cost_per_piece || (i.unit_cost / (i.conversion_qty || 1))) }}
+                    <td class="pa-3 text-right font-mono font-weight-medium">
+                      {{ formatRupiah(i.unit_cost || (i.total_price && i.qty ? i.total_price / i.qty : i.gross_price)) }}
                     </td>
-                    <td class="pa-2 text-right font-weight-bold">
-                      {{ formatRupiah(i.total_price || i.subtotal) }}
+                    <td class="pa-3 text-right font-bold font-mono text-primary">
+                      {{ formatRupiah(i.total_price || (i.qty * (i.unit_cost || i.gross_price || 0))) }}
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <div v-else class="pa-4 text-center text-disabled">
-              Tidak ada data barang.
-            </div>
           </div>
 
-          <!-- Timeline -->
-          <div class="mt-8">
-            <h6 class="text-h6 mb-6">
-              Lacak Status Dokumen
-            </h6>
-            
-            <div class="d-flex align-start justify-space-between position-relative mt-2">
-              <!-- Line behind -->
-              <div
-                class="position-absolute bg-grey-300"
-                style="height: 2px; top: 12px; left: 15%; right: 15%; z-index: 0;"
-              />
-              
-              <!-- Created -->
-              <div
-                class="d-flex flex-column align-center position-relative text-center"
-                style="z-index: 1; flex: 1;"
-              >
-                <VAvatar
-                  size="26"
-                  color="primary"
-                  class="mb-2 ring-2 ring-white"
-                >
-                  <VIcon
-                    icon="ri-file-add-line"
-                    size="14"
-                    color="white"
-                  />
-                </VAvatar>
-                <div class="text-caption font-weight-bold mt-1">
-                  Dibuat
-                </div>
-                <div class="text-caption text-grey-600">
-                  {{ new Date(trackingPO.created_at || trackingPO.date).toLocaleString('id-ID') }}
-                </div>
+          <!-- Section 4: Ringkasan Pajak & Total Faktur -->
+          <div class="pa-4 bg-grey-50 rounded-lg border d-flex flex-wrap justify-space-between align-center gap-4">
+            <div>
+              <div class="text-caption text-medium-emphasis">Perlakuan Pajak:</div>
+              <div class="font-weight-bold text-uppercase">
+                PPN {{ (trackingPO.goods_receipt?.tax_type || trackingPO.tax_type || 'include') }} ({{ trackingPO.goods_receipt?.tax_percentage || trackingPO.tax_percentage || 11 }}%)
               </div>
+            </div>
 
-              <!-- Validated -->
-              <div
-                class="d-flex flex-column align-center position-relative text-center"
-                style="z-index: 1; flex: 1;"
-              >
-                <VAvatar
-                  size="26"
-                  :color="trackingPO.validated_by ? 'info' : 'grey-300'"
-                  class="mb-2 ring-2 ring-white"
-                >
-                  <VIcon
-                    icon="ri-check-double-line"
-                    size="14"
-                    color="white"
-                  />
-                </VAvatar>
-                <div class="text-caption font-weight-bold mt-1">
-                  Divalidasi
-                </div>
-                <div
-                  v-if="trackingPO.validated_by"
-                  class="text-caption text-grey-600"
-                >
-                  {{ trackingPO.validated_at ? new Date(trackingPO.validated_at).toLocaleString('id-ID') : '-' }}
-                </div>
-                <div
-                  v-else
-                  class="text-caption text-grey-400"
-                >
-                  Menunggu
-                </div>
+            <div class="text-right font-mono">
+              <div v-if="(trackingPO.goods_receipt?.extra_discount || trackingPO.extra_discount) > 0" class="text-caption text-success mb-1">
+                Diskon Tambahan Faktur: -{{ formatRupiah(trackingPO.goods_receipt?.extra_discount || trackingPO.extra_discount) }}
               </div>
-
-              <!-- Approved or Rejected -->
-              <div
-                class="d-flex flex-column align-center position-relative text-center"
-                style="z-index: 1; flex: 1;"
-              >
-                <VAvatar
-                  size="26"
-                  :color="trackingPO.approval_status === 'rejected' ? 'error' : (trackingPO.approved_by ? 'success' : 'grey-300')"
-                  class="mb-2 ring-2 ring-white"
-                >
-                  <VIcon
-                    :icon="trackingPO.approval_status === 'rejected' ? 'ri-close-circle-line' : 'ri-checkbox-circle-line'"
-                    size="16"
-                    color="white"
-                  />
-                </VAvatar>
-                <div
-                  class="text-caption font-weight-bold mt-1"
-                  :class="trackingPO.approval_status === 'rejected' ? 'text-error' : ''"
-                >
-                  {{ trackingPO.approval_status === 'rejected' ? 'Ditolak' : 'Disetujui' }}
-                </div>
-                <div
-                  v-if="trackingPO.approval_status === 'rejected' || trackingPO.approved_by"
-                  class="text-caption text-grey-600"
-                  :class="trackingPO.approval_status === 'rejected' ? 'text-error' : ''"
-                >
-                  <span v-if="trackingPO.approval_status === 'rejected'">{{ trackingPO.rejection_reason || 'Tanpa alasan' }}</span>
-                  <span v-else>{{ trackingPO.approved_at ? new Date(trackingPO.approved_at).toLocaleString('id-ID') : '-' }}</span>
-                </div>
-                <div
-                  v-else
-                  class="text-caption text-grey-400"
-                >
-                  Menunggu
-                </div>
-              </div>
+              <span class="text-subtitle-2 text-medium-emphasis me-3">Total Biaya Faktur:</span>
+              <span class="text-h5 font-weight-bold text-primary">
+                {{ formatRupiah(trackingPO.goods_receipt?.total_amount || trackingPO.total_amount) }}
+              </span>
             </div>
           </div>
         </VCardText>
+
         <VDivider />
-        <VCardActions class="px-6 py-4 justify-end bg-grey-50">
-          <DocumentActions 
-            document-type="purchase_order"
-            :document-id="trackingPO.id"
-            :document-status="trackingPO.status"
-            :approval-status="trackingPO.approval_status || 'pending'"
-            @status-updated="fetchData"
-          />
+
+        <VCardActions class="px-6 py-4 justify-space-between bg-grey-50 flex-wrap gap-2">
+          <VBtn
+            color="secondary"
+            variant="outlined"
+            @click="isTrackingDialogVisible = false"
+          >
+            Tutup
+          </VBtn>
+
+          <!-- Kepala Divisi Action Approval Buttons -->
+          <div v-if="trackingPO.goods_receipt?.approval_status === 'pending_approval' && ($can('approve', 'Purchase Order') || $can('approve', 'Penerimaan Gudang') || $can('write', 'Purchase Order') || $can('manage all', 'all'))" class="d-flex gap-2">
+            <VBtn
+              color="error"
+              variant="outlined"
+              prepend-icon="ri-close-circle-line"
+              :loading="isApproving"
+              @click="openRejectDialog(trackingPO.goods_receipt)"
+            >
+              Tolak / Minta Revisi Gudang
+            </VBtn>
+
+            <VBtn
+              color="success"
+              variant="flat"
+              prepend-icon="ri-check-double-line"
+              class="font-weight-bold"
+              :loading="isApproving"
+              @click="openApproveDialog(trackingPO.goods_receipt)"
+            >
+              Setujui & Tambahkan ke Stok Fisik
+            </VBtn>
+          </div>
         </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Dialog Konfirmasi Approval Ka. Divisi -->
+    <VDialog
+      v-model="isApproveDialogVisible"
+      max-width="520"
+    >
+      <VCard class="rounded-xl overflow-hidden shadow-lg">
+        <VCardTitle class="pa-5 pb-3 font-weight-bold text-h6 text-success d-flex align-center gap-2 bg-success-subtle border-b">
+          <VIcon icon="ri-checkbox-circle-fill" color="success" size="24" />
+          Konfirmasi Persetujuan Penerimaan Barang
+        </VCardTitle>
+        <VCardText class="pa-5 pt-4">
+          <p class="text-body-1 mb-2">
+            Apakah Anda yakin ingin menyetujui Dokumen Penerimaan <strong>#{{ grToApprove?.receipt_number }}</strong>?
+          </p>
+          <VAlert
+            type="success"
+            variant="tonal"
+            class="text-caption mt-3 mb-0 rounded-lg"
+            icon="ri-information-line"
+          >
+            Setelah disetujui, <strong>stok fisik barang</strong> akan otomatis bertambah ke gudang cabang dan nomor batch/SCC baru akan dicatat dalam sistem.
+          </VAlert>
+        </VCardText>
+        <VCardActions class="pa-5 pt-0 justify-end gap-2 border-t bg-grey-50">
+          <VBtn
+            variant="outlined"
+            color="secondary"
+            @click="isApproveDialogVisible = false"
+          >
+            Batal
+          </VBtn>
+          <VBtn
+            color="success"
+            variant="flat"
+            prepend-icon="ri-checkbox-circle-fill"
+            class="font-weight-bold"
+            :loading="isApproving"
+            @click="executeApproveGR"
+          >
+            Ya, Setujui & Tambahkan ke Stok
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Dialog Konfirmasi Hapus PO -->
+    <VDialog
+      v-model="isDeletePoDialogVisible"
+      max-width="480"
+    >
+      <VCard class="rounded-xl overflow-hidden shadow-lg">
+        <VCardTitle class="pa-5 pb-3 font-weight-bold text-h6 text-error d-flex align-center gap-2 bg-error-subtle border-b">
+          <VIcon icon="ri-delete-bin-line" color="error" size="24" />
+          Konfirmasi Hapus Purchase Order
+        </VCardTitle>
+        <VCardText class="pa-5 pt-4">
+          <p class="text-body-1 mb-2">
+            Apakah Anda yakin ingin menghapus PO <strong>#{{ poToDelete?.po_number }}</strong>?
+          </p>
+          <VAlert
+            type="warning"
+            variant="tonal"
+            class="text-caption mt-3 mb-0 rounded-lg"
+          >
+            Tindakan ini tidak dapat dibatalkan. Data PO yang dihapus akan hilang dari sistem.
+          </VAlert>
+        </VCardText>
+        <VCardActions class="pa-5 pt-0 justify-end gap-2 border-t bg-grey-50">
+          <VBtn
+            variant="outlined"
+            color="secondary"
+            @click="isDeletePoDialogVisible = false"
+          >
+            Batal
+          </VBtn>
+          <VBtn
+            color="error"
+            variant="flat"
+            prepend-icon="ri-delete-bin-line"
+            class="font-weight-bold"
+            @click="executeDeletePO"
+          >
+            Ya, Hapus PO
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Dialog Tolak GR -->
+    <VDialog
+      v-model="isRejectDialogVisible"
+      max-width="500"
+    >
+      <VCard>
+        <VCardTitle class="px-6 pt-6 pb-2 text-error d-flex align-center gap-2">
+          <VIcon icon="ri-error-warning-line" />
+          Alasan Penolakan Penerimaan Barang
+        </VCardTitle>
+        <VCardText class="px-6 py-4">
+          <p class="text-caption text-medium-emphasis mb-3">
+            Tuliskan instruksi revisi untuk orang gudang (misal: "Diskon Capella tidak sesuai faktur", "Foto faktur buram", dll).
+          </p>
+          <VTextarea
+            v-model="rejectReason"
+            label="Catatan / Alasan Penolakan"
+            placeholder="Masukkan alasan penolakan..."
+            rows="3"
+            variant="outlined"
+            auto-grow
+          />
+        </VCardText>
+        <VDivider />
+        <VCardActions class="px-6 py-4 justify-end gap-2">
+          <VBtn
+            variant="outlined"
+            color="secondary"
+            @click="isRejectDialogVisible = false"
+          >
+            Batal
+          </VBtn>
+          <VBtn
+            color="error"
+            variant="flat"
+            :loading="isApproving"
+            @click="executeRejectGR"
+          >
+            Konfirmasi Tolak
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Dialog Photo Zoom -->
+    <VDialog
+      v-model="isPhotoPreviewVisible"
+      max-width="800"
+    >
+      <VCard>
+        <VCardTitle class="d-flex justify-space-between align-center pa-4">
+          <span class="font-weight-bold">Pratinjau Foto Faktur / Surat Jalan</span>
+          <VBtn icon variant="text" size="small" @click="isPhotoPreviewVisible = false">
+            <VIcon icon="ri-close-line" />
+          </VBtn>
+        </VCardTitle>
+        <VDivider />
+        <VCardText class="pa-4 text-center">
+          <VImg :src="previewPhotoUrl" class="rounded-lg" max-height="600" contain />
+        </VCardText>
       </VCard>
     </VDialog>
   </section>
