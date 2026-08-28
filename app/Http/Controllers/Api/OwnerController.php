@@ -65,20 +65,27 @@ class OwnerController extends Controller
             'email' => 'required|email|max:255',
             'phone' => 'nullable|string|max:255',
             'address' => 'nullable|string',
-            'parent_id' => 'nullable|exists:owners,id',
-            'status' => 'nullable|string|in:Aktif,Nonaktif',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-            'qris_image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'parent_id' => 'nullable',
+            'status' => 'nullable|string',
         ]);
 
-        $data = $request->only(['name', 'email', 'phone', 'address', 'parent_id']);
-        $data['status'] = $request->status ?? 'Aktif';
+        $data = $request->only(['name', 'email', 'phone', 'address']);
+        $parentId = $request->parent_id;
+        if ($parentId && $parentId !== 'null' && $parentId !== 'undefined' && $parentId !== '') {
+            $data['parent_id'] = $parentId;
+        } else {
+            $data['parent_id'] = null;
+        }
+        $rawStatus = $request->status ?? 'Aktif';
+        $data['status'] = in_array(strtolower($rawStatus), ['aktif', 'active']) ? 'Aktif' : 'Nonaktif';
 
         if ($request->hasFile('logo')) {
+            $request->validate(['logo' => 'image|mimes:jpeg,png,jpg|max:2048']);
             $data['logo'] = $request->file('logo')->store('logos', 'public');
         }
 
         if ($request->hasFile('qris_image')) {
+            $request->validate(['qris_image' => 'image|mimes:jpeg,png,jpg|max:2048']);
             $data['qris_image'] = $request->file('qris_image')->store('qris', 'public');
         }
 
@@ -105,38 +112,50 @@ class OwnerController extends Controller
             'email' => 'required|email|max:255',
             'phone' => 'nullable|string|max:255',
             'address' => 'nullable|string',
-            'parent_id' => 'nullable|exists:owners,id',
-            'status' => 'nullable|string|in:Aktif,Nonaktif',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-            'qris_image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'parent_id' => 'nullable',
+            'status' => 'nullable|string',
         ]);
 
-        $data = $request->only(['name', 'email', 'phone', 'address', 'parent_id', 'status']);
+        $data = $request->only(['name', 'email', 'phone', 'address']);
+        $rawStatus = $request->status ?? $owner->status ?? 'Aktif';
+        $data['status'] = in_array(strtolower($rawStatus), ['aktif', 'active']) ? 'Aktif' : 'Nonaktif';
+
+        $parentId = $request->parent_id;
+        if ($parentId && $parentId !== 'null' && $parentId !== 'undefined' && $parentId !== '' && (int)$parentId !== (int)$owner->id) {
+            $data['parent_id'] = $parentId;
+        } else {
+            $data['parent_id'] = null;
+        }
 
         if ($request->hasFile('logo')) {
+            $request->validate(['logo' => 'image|mimes:jpeg,png,jpg|max:2048']);
             // Delete old logo
             if ($owner->logo && Storage::disk('public')->exists($owner->logo)) {
                 Storage::disk('public')->delete($owner->logo);
             }
             $data['logo'] = $request->file('logo')->store('logos', 'public');
-        } elseif ($request->logo === null && $request->has('logo')) {
-             // Handle clear logo if explicitly passed as null
-             if ($owner->logo && Storage::disk('public')->exists($owner->logo)) {
-                Storage::disk('public')->delete($owner->logo);
+        } elseif ($request->logo === 'null' || $request->logo === null) {
+             if ($request->has('logo')) {
+                 if ($owner->logo && Storage::disk('public')->exists($owner->logo)) {
+                    Storage::disk('public')->delete($owner->logo);
+                 }
+                 $data['logo'] = null;
              }
-             $data['logo'] = null;
         }
 
         if ($request->hasFile('qris_image')) {
+            $request->validate(['qris_image' => 'image|mimes:jpeg,png,jpg|max:2048']);
             if ($owner->qris_image && Storage::disk('public')->exists($owner->qris_image)) {
                 Storage::disk('public')->delete($owner->qris_image);
             }
             $data['qris_image'] = $request->file('qris_image')->store('qris', 'public');
-        } elseif ($request->qris_image === null && $request->has('qris_image')) {
-             if ($owner->qris_image && Storage::disk('public')->exists($owner->qris_image)) {
-                Storage::disk('public')->delete($owner->qris_image);
+        } elseif ($request->qris_image === 'null' || $request->qris_image === null) {
+             if ($request->has('qris_image')) {
+                 if ($owner->qris_image && Storage::disk('public')->exists($owner->qris_image)) {
+                    Storage::disk('public')->delete($owner->qris_image);
+                 }
+                 $data['qris_image'] = null;
              }
-             $data['qris_image'] = null;
         }
 
         $owner->update($data);

@@ -49,10 +49,10 @@ const years = Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - 2 
 
 const speedOptions = [
   { title: 'Semua Klasifikasi', value: null },
-  { title: '🚀 Fast Moving (Laris)', value: 'fast' },
-  { title: '📦 Medium Moving (Sedang)', value: 'medium' },
-  { title: '🐢 Slow Moving (Lambat)', value: 'slow' },
-  { title: '⚠️ Dead Stock (Macet / 0 Terjual)', value: 'dead' },
+  { title: 'Fast Moving (Laris)', value: 'fast' },
+  { title: 'Medium Moving (Sedang)', value: 'medium' },
+  { title: 'Slow Moving (Lambat)', value: 'slow' },
+  { title: 'Dead Stock (Macet / 0 Terjual)', value: 'dead' },
 ]
 
 const formatRupiah = val => {

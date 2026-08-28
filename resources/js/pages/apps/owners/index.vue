@@ -108,7 +108,15 @@ const saveOwner = async ownerData => {
   try {
     const formData = new FormData()
     for (const key in ownerData) {
-      if (ownerData[key] !== null && ownerData[key] !== undefined) {
+      if (key === 'logo' || key === 'qris_image') {
+        if (ownerData[key] instanceof File) {
+          formData.append(key, ownerData[key])
+        }
+      } else if (key === 'parent_id') {
+        if (ownerData[key] && ownerData[key] !== 'null' && ownerData[key] !== '') {
+          formData.append(key, ownerData[key])
+        }
+      } else if (ownerData[key] !== null && ownerData[key] !== undefined && ownerData[key] !== '') {
         formData.append(key, ownerData[key])
       }
     }
@@ -130,7 +138,8 @@ const saveOwner = async ownerData => {
     fetchOwners()
   } catch (error) {
     console.error(error)
-    snackbar.show('Terjadi kesalahan saat menyimpan data owner', 'error')
+    const errMsg = error?.response?._data?.message || error?.data?.message || 'Terjadi kesalahan saat menyimpan data owner'
+    snackbar.show(errMsg, 'error')
   }
 }
 

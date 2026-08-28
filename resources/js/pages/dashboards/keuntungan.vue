@@ -176,7 +176,7 @@ const chartSeries = computed(() => [
       <div class="d-flex align-center gap-3">
         <VSelect
           v-model="selectedBranch"
-          :items="[{ id: 'all', name: '🏢 Semua Cabang' }, ...branches]"
+          :items="[{ id: 'all', name: 'Semua Cabang' }, ...branches]"
           item-title="name"
           item-value="id"
           density="compact"

@@ -1,7 +1,7 @@
 <script setup>
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import { VForm } from 'vuetify/components/VForm'
-import { nextTick, ref, watch } from 'vue'
+import { nextTick, ref, watch, computed } from 'vue'
 
 const props = defineProps({
   isDrawerOpen: {
@@ -54,7 +54,13 @@ watch(() => props.selectedOwner, newVal => {
     phone.value = newVal.phone || ''
     address.value = newVal.address || ''
     parent_id.value = newVal.parent_id
-    status.value = newVal.status || 'Aktif'
+    let st = newVal.status || 'Aktif'
+    if (typeof st === 'string') {
+      const lower = st.toLowerCase()
+      if (lower === 'aktif' || lower === 'active') st = 'Aktif'
+      else if (lower === 'nonaktif' || lower === 'inactive') st = 'Nonaktif'
+    }
+    status.value = st
     logo.value = null // reset logo input when editing
     previewLogo.value = newVal.logo ? `/storage/${newVal.logo}` : null
     qrisImage.value = null

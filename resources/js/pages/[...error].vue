@@ -20,7 +20,7 @@ definePage({
   <div class="misc-wrapper">
     <ErrorHeader
       status-code="404"
-      title="Page Not Found ⚠️"
+      title="Page Not Found"
       description="We couldn't find the page you are looking for."
       class="mb-10"
     />

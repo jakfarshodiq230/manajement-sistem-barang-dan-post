@@ -65,7 +65,7 @@ definePage({
       >
         <VCardText>
           <h4 class="text-h4 mb-1">
-            Verify your email ✉️
+            Verify your email
           </h4>
           <p class="mb-5">
             Account activation link sent to your email address: <span class="text-high-emphasis font-weight-medium">hello@example.com</span> Please follow the link inside to continue.

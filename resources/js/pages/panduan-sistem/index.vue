@@ -96,8 +96,8 @@ const guides = [
     category: 'master',
     icon: 'ri-database-2-line',
     color: 'primary',
-    title: '1. Master Data & Inventori Cabang (Struktur 3 Tingkat Harga, Markup & Pajak POS)',
-    subtitle: 'Fondasi utama katalog inventaris, penetapan harga jual, batas nego kasir, dan perlakuan PPN',
+    title: '1. Master Data & Inventori Cabang (Struktur 3 Tingkat Harga, Multi-Batch & Pajak POS)',
+    subtitle: 'Fondasi utama katalog inventaris, penetapan harga per batch, batas nego kasir, dan perlakuan PPN',
     steps: [
       {
         title: 'Kategori Barang & Satuan Produk',
@@ -112,8 +112,8 @@ const guides = [
         linkText: 'Buka Master Produk',
       },
       {
-        title: 'Penetapan Struktur 3 Tingkat Harga & Markup Otomatis',
-        desc: 'Buka menu Inventori & Harga Cabang. Setiap produk memiliki 3 lapis harga:\n• 1. Harga Modal (HPP Real): Modal bersih per unit yang otomatis mencakup diskon supplier dan PPN Masukan 11%.\n• 2. Harga Jual Normal: Harga pricelist kasir. Gunakan tombol pintas kalkulasi cepat Markup (+20%, +25%, +30%, +35%, +40%) dari modal.\n• 3. Harga Nego Minimum: Batas harga terendah tawar-menawar kasir. Gunakan tombol pintas margin minimal (+10%, +15%, +20% Modal).',
+        title: 'Penetapan Struktur 3 Tingkat Harga & Kelola Multi-Batch',
+        desc: 'Buka menu Inventori Cabang. Setiap produk dan batch fisik memiliki 3 lapis harga:\n• 1. Harga Modal (HPP Real): Modal bersih per unit yang otomatis mencakup diskon supplier dan PPN Masukan 11%.\n• 2. Harga Jual Normal: Harga pricelist kasir. Gunakan tombol pintas kalkulasi cepat Markup (+15%, +20%, +25%, +30%) dari modal.\n• 3. Harga Nego Minimum: Batas harga terendah tawar-menawar kasir.\n• Multi-Batch FIFO: Jika barang memiliki banyak batch dengan modal berbeda, POS otomatis memakai harga Batch Aktif (FIFO/FEFO). Owner dapat menyesuaikan harga setiap batch atau menyamakan seluruh batch melalui tombol "Kelola Batch".',
         link: '/inventori-cabang',
         linkText: 'Buka Inventori Cabang',
       },
@@ -124,37 +124,41 @@ const guides = [
         linkText: 'Atur Pajak POS Cabang',
       },
       {
-        title: 'Data Supplier & Pelanggan (Credit Limit)',
+        title: 'Data Supplier & Pelanggan (Credit Limit & Tempo)',
         desc: 'Catat vendor pemasok (untuk Purchase Order) dan data pelanggan tetap. Pada pelanggan, tentukan batas limit kredit (Plafon Piutang) dan termin jatuh tempo.',
         link: '/suppliers',
         linkText: 'Buka Data Supplier',
       },
     ],
-    tips: 'Gunakan tombol kalkulasi markup cepat di Inventori Cabang agar harga jual dan batas nego langsung terhitung otomatis sesuai target laba toko.',
+    tips: 'Gunakan tombol "Kelola Batch" di Inventori Cabang untuk mengatur HPP Real, Harga Jual POS, dan Batas Nego untuk masing-masing batch pengiriman supplier.',
   },
   {
     id: 'pengadaan-gudang',
     category: 'gudang',
     icon: 'ri-truck-line',
     color: 'info',
-    title: '2. Pengadaan Barang, Multi-Column Diskon PO & Penerimaan Gudang',
-    subtitle: 'Alur pesanan pembelian (PO) dengan diskon bertingkat hingga 5 tingkat, kalkulasi HPP real, dan mutasi stok',
+    title: '2. Pengadaan Barang (PO), Penerimaan Gudang & Kalkulasi HPP Real',
+    subtitle: 'Alur pesanan pembelian (PO) fisik, verifikasi faktur gudang, diskon bertingkat D1..D5, kode SCC aki, dan mutasi stok',
     steps: [
       {
-        title: 'Pembuatan Purchase Order (PO) & Multi-Column Diskon (D1 s/d D5)',
-        desc: 'Buka menu Purchase Order. Masukkan No. Faktur Supplier, pilih Supplier dan Cabang Tujuan. Masukkan barang pesanan:\n• Mendukung multi-kolom Diskon Bertingkat: D1 (%), D2 (%), D3 (%), D4 (%), D5 (%), dan Diskon Rp.\n• Smart Quick Input: Cukup ketik format string seperti 10+5+2+2+1 pada kolom Format Cepat, sistem akan otomatis mengisi D1 s/d D5.\n• Rumus Netto: Harga Bruto x (1 - D1%) x (1 - D2%) x (1 - D3%) x (1 - D4%) x (1 - D5%) - Diskon Rp.',
+        title: 'Pembuatan Purchase Order (PO) ke Supplier',
+        desc: 'Buka menu Purchase Order. Pilih Supplier, Cabang Tujuan, Metode Pembayaran (Tunai / Lunas atau Kredit / Tempo), dan Tanggal Jatuh Tempo. Masukkan daftar barang yang dipesan beserta kuantitas fisik (Qty & Satuan). Form PO difokuskan pada jumlah kuantitas pesanan, sedangkan harga faktur aktual diverifikasi di Gudang.',
         link: '/purchase-orders',
         linkText: 'Buka Purchase Order',
       },
       {
-        title: 'Perlakuan PPN Faktur Supplier & HPP Real per Pcs',
-        desc: 'Pilih perlakuan PPN faktur supplier:\n• Include PPN (Harga sudah termasuk PPN 11%)\n• Exclude PPN (+11% PPN ditambahkan ke total tagihan)\n• Non-PPN (Bebas pajak).\nSistem secara real-time menghitung Live HPP Modal per Pcs = Total DPP Netto / (Qty Beli x Isi Satuan).',
-      },
-      {
-        title: 'Penerimaan Barang & Pencatatan Batch (Goods Receipt)',
-        desc: 'Saat barang fisik tiba di gudang/toko, buka menu Penerimaan Barang. Cocokkan kuantitas fisik dengan surat jalan. Masukkan Nomor Batch dan Tanggal Kadaluarsa (Expired Date). Stok fisik cabang otomatis bertambah (+).',
+        title: 'Penerimaan Barang (Goods Receipt), Diskon D1..D5 & HPP Real',
+        desc: 'Saat barang fisik dan faktur tiba di gudang/toko, buka menu Penerimaan Barang. Cocokkan fisik barang, masukkan harga faktur aktual, diskon bertingkat (D1 s/d D5), dan perlakuan PPN (Include/Exclude/Non-PPN). Sistem otomatis menghitung Live HPP Modal per Pcs dan mencatat batch baru.',
         link: '/penerimaan-barang',
         linkText: 'Buka Penerimaan Barang',
+      },
+      {
+        title: 'Pencatatan Nomor Batch, Expired Date & Kode SCC Aki',
+        desc: 'Untuk produk aki/baterai, masukkan nomor serial SCC unik per unit. Untuk produk makanan/obat, tentukan tanggal kadaluarsa (Expired Date) agar sistem FEFO bekerja otomatis.',
+      },
+      {
+        title: 'Penanganan Kenaikan Harga Supplier & Retur Barang Masuk',
+        desc: 'Jika harga faktur supplier naik dari kesepakatan awal, sistem otomatis menampilkan notifikasi kenaikan harga. Jika barang rusak/ditolak, pilih kompensasi: Tukar Barang, Potong Hutang Berjalan, atau Pengembalian Uang.',
       },
       {
         title: 'Mutasi / Transfer Stok Antar Cabang (Surat Jalan Digital & QR Code)',
@@ -163,7 +167,7 @@ const guides = [
         linkText: 'Buka Mutasi Stok',
       },
     ],
-    tips: 'Setiap barang yang diterima dari PO otomatis memperbarui modal HPP di Master Produk & Inventori Cabang secara akurat.',
+    tips: 'Setiap penerimaan barang otomatis membentuk batch fisik baru lengkap dengan HPP Real di Inventori Cabang.',
   },
   {
     id: 'kasir-pos',
@@ -181,7 +185,7 @@ const guides = [
       },
       {
         title: 'Pindai Barcode / Cari Produk & Pelanggan',
-        desc: 'Kasir cukup men-scan barcode barang menggunakan scanner barcode USB/Bluetooth, atau mengetik nama/SKU (tekan F2). Pilih pelanggan umum (*Walk-in*) atau pelanggan terdaftar (tekan F4).',
+        desc: 'Kasir cukup men-scan barcode barang menggunakan scanner barcode USB/Bluetooth, atau mengetik nama/SKU (tekan F2). Sistem otomatis menarik harga dari Batch Aktif (FIFO/FEFO). Pilih pelanggan umum (*Walk-in*) atau pelanggan terdaftar (tekan F4).',
         link: '/pos',
         linkText: 'Ke Halaman Kasir',
       },
@@ -217,8 +221,8 @@ const guides = [
         linkText: 'Buka Menu Retur',
       },
       {
-        title: 'Retur Pembelian (Supplier Return): Stok Berkurang (-)',
-        desc: 'Digunakan saat toko/gudang mengembalikan barang rusak/cacat ke Supplier. Sistem otomatis memotong stok fisik keluar (-) dan menyesuaikan tagihan utang ke supplier.',
+        title: 'Retur Pembelian (Supplier Return): Penyesuaian Hutang / Uang',
+        desc: 'Digunakan saat toko/gudang mengembalikan barang rusak/cacat ke Supplier. Sistem menyediakan pilihan kompensasi: Tukar Barang, Potong Hutang Berjalan Bulan Selanjutnya, atau Pengembalian Uang Tunai/Transfer.',
       },
       {
         title: 'Otorisasi & Approval Supervisor',

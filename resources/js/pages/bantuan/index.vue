@@ -31,8 +31,8 @@ const systemWorkflows = [
     category: 'master',
     icon: 'ri-database-2-line',
     color: 'primary',
-    title: 'Tahap 1: Inisialisasi Master Data & Inventori Cabang (3 Tingkat Harga & Pajak)',
-    subtitle: 'Langkah awal mempersiapkan kategori, master produk SKU, struktur harga jual/nego, supplier, dan pelanggan.',
+    title: 'Tahap 1: Inisialisasi Master Data & Inventori Cabang (3 Tingkat Harga & Multi-Batch)',
+    subtitle: 'Langkah awal mempersiapkan kategori, master produk SKU, struktur harga per batch, supplier, dan pelanggan.',
     steps: [
       {
         no: 1,
@@ -50,8 +50,8 @@ const systemWorkflows = [
       },
       {
         no: 3,
-        title: 'Atur 3 Tingkat Harga & Kalkulator Markup di Inventori Cabang',
-        desc: 'Buka menu Inventori & Harga Cabang. Setiap produk memiliki 3 lapis harga:\n• 1. Harga Modal (HPP Real): Otomatis mencakup diskon supplier bertingkat dan PPN Masukan 11%.\n• 2. Harga Jual Normal: Gunakan tombol kalkulasi markup cepat (+20%, +25%, +30%, +35%, +40%).\n• 3. Harga Nego Minimum: Batas harga terendah kasir (+10%, +15%, +20% Modal).',
+        title: 'Atur 3 Tingkat Harga & Kelola Multi-Batch di Inventori Cabang',
+        desc: 'Buka menu Inventori Cabang. Setiap produk dan batch fisik memiliki 3 lapis harga:\n• 1. Harga Modal (HPP Real): Otomatis mencakup diskon supplier bertingkat dan PPN Masukan 11%.\n• 2. Harga Jual Normal: Gunakan tombol kalkulasi markup cepat (+15%, +20%, +25%, +30%).\n• 3. Harga Nego Minimum: Batas harga terendah kasir.\n• Multi-Batch FIFO: POS otomatis memakai harga Batch Aktif (FIFO/FEFO). Owner dapat menyesuaikan harga modal & jual per batch melalui tombol "Kelola Batch".',
         link: '/inventori-cabang',
         linkText: 'Buka Inventori Cabang',
       },
@@ -63,39 +63,44 @@ const systemWorkflows = [
         linkText: 'Buka Supplier & Pelanggan',
       },
     ],
-    tips: 'Gunakan tombol kalkulasi markup cepat di panel Inventori Cabang agar harga jual dan batas tawar kasir langsung terhitung otomatis.',
+    tips: 'Gunakan tombol "Kelola Batch" di panel Inventori Cabang untuk mengatur HPP Real, Harga Jual POS, dan Batas Nego untuk masing-masing batch pengiriman supplier.',
   },
   {
     id: 'wf-gudang',
     category: 'gudang',
     icon: 'ri-truck-line',
     color: 'info',
-    title: 'Tahap 2: Pengadaan (PO Multi-Diskon D1..D5), Penerimaan Gudang & Mutasi',
-    subtitle: 'Alur pasokan dari Purchase Order dengan diskon bertingkat hingga 5 level, kalkulasi HPP real, hingga distribusi cabang.',
+    title: 'Tahap 2: Pengadaan (PO), Penerimaan Gudang (Diskon D1..D5) & Mutasi',
+    subtitle: 'Alur pasokan dari Purchase Order kuantitas fisik, verifikasi faktur gudang, diskon bertingkat hingga 5 level, dan nomor batch/SCC.',
     steps: [
       {
         no: 1,
-        title: 'Buat PO dengan Multi-Column Diskon (D1 s/d D5 + Potongan Rp)',
-        desc: 'Buka menu Purchase Order. Masukkan No. Faktur Supplier, pilih Supplier & Cabang. Input baris barang dengan diskon bertingkat D1..D5 atau ketik langsung di kolom Format Cepat misal 10+5+2+2+1. Sistem menghitung DPP Netto secara compound.',
+        title: 'Buat Purchase Order (PO) ke Supplier',
+        desc: 'Buka menu Purchase Order. Pilih Supplier, Cabang Tujuan, Metode Pembayaran (Tunai / Lunas atau Kredit / Tempo), dan Tanggal Jatuh Tempo. Masukkan barang dan kuantitas fisik yang dipesan (Qty & Satuan).',
         link: '/purchase-orders',
         linkText: 'Buka Purchase Order',
       },
       {
         no: 2,
-        title: 'Penerimaan Barang & Pencatatan Nomor Batch',
-        desc: 'Saat barang tiba, buka menu Penerimaan Barang. Cocokkan fisik dengan faktur, masukkan Nomor Batch dan Expired Date. HPP Real per pcs otomatis terupdate di Master Produk dan stok bertambah (+).',
+        title: 'Penerimaan Barang, Diskon D1..D5 & HPP Real',
+        desc: 'Saat barang fisik dan faktur tiba di gudang, buka menu Penerimaan Barang. Cocokkan fisik barang, masukkan harga faktur aktual, diskon bertingkat (D1 s/d D5 + Potongan Rp), dan perlakuan PPN (Include/Exclude/Non-PPN). HPP Real per pcs otomatis terbentuk pada batch fisik baru.',
         link: '/penerimaan-barang',
         linkText: 'Buka Penerimaan Barang',
       },
       {
         no: 3,
+        title: 'Pencatatan Nomor Batch, Expired Date & Kode SCC Aki',
+        desc: 'Untuk produk aki/baterai, input kode serial SCC unik per unit. Untuk produk makanan/obat, tentukan tanggal kadaluarsa (Expired Date) agar sistem FEFO memprioritaskan stok yang mendekati expired terlebih dahulu.',
+      },
+      {
+        no: 4,
         title: 'Mutasi Stok Antar Cabang & Surat Jalan Digital QR Code',
         desc: 'Buka menu Mutasi Stok untuk mentransfer barang antar cabang. Dilengkapi Surat Jalan cetak/PDF dan Tanda Tangan Digital 3 Pihak dengan QR Code Verifikasi Keamanan.',
         link: '/mutasi-stok',
         linkText: 'Buka Mutasi Stok',
       },
     ],
-    tips: 'Untuk barang makanan/obat/baterai, input tanggal kadaluarsa dengan teliti agar sistem FEFO memprioritaskan stok yang mendekati expired terlebih dahulu.',
+    tips: 'Jika harga supplier naik dari PO awal, sistem mendeteksi dan memberi tanda kenaikan faktur agar Owner dapat meninjau HPP dan harga jual batch.',
   },
   {
     id: 'wf-pos',
@@ -115,7 +120,7 @@ const systemWorkflows = [
       {
         no: 2,
         title: 'Pindai Barcode / Pilih Produk & Pelanggan',
-        desc: 'Ketik nama barang atau scan barcode (F2). Pilih pelanggan jika transaksi langganan/tempo (F4) atau pelanggan umum.',
+        desc: 'Ketik nama barang atau scan barcode (F2). Sistem otomatis menarik harga dari Batch Aktif (FIFO/FEFO). Pilih pelanggan jika transaksi langganan/tempo (F4) atau pelanggan umum.',
         link: '/pos',
         linkText: 'Ke Halaman Kasir',
       },
@@ -172,8 +177,8 @@ const systemWorkflows = [
       },
       {
         no: 5,
-        title: 'Proses Retur Penjualan / Retur Pembelian',
-        desc: 'Buka menu Retur. Masukkan nomor faktur/invoice penjualan, pilih barang yang diretur, dan cantumkan alasan. Stok akan otomatis dikembalikan dan saldo kas/piutang disesuaikan.',
+        title: 'Proses Retur Penjualan & Retur Pembelian Supplier',
+        desc: 'Buka menu Retur. Pada Retur Penjualan, stok kembali bertambah (+). Pada Retur Pembelian ke Supplier, pilih kompensasi: Tukar Barang, Potong Hutang Berjalan, atau Pengembalian Uang.',
         link: '/retur',
         linkText: 'Buka Menu Retur',
       },
@@ -298,7 +303,7 @@ const faqs = [
     id: 1,
     category: 'gudang',
     question: 'Bagaimana cara menghitung HPP modal jika supplier memberikan diskon bertingkat (misal: 10% + 5% + 2%) dan PPN 11%?',
-    answer: 'Pada menu Purchase Order (PO), sistem menghitung harga bersih secara compound:\n• Netto Kemasan = Harga Bruto x (1 - D1%) x (1 - D2%) x (1 - D3%) x (1 - D4%) x (1 - D5%) - Diskon Rp.\n• Anda juga dapat mengetik langsung di kolom Format Cepat (misal: "10+5+2+2+1").\n• Live HPP Modal per Pcs dihitung: Subtotal Faktur / (Qty Beli x Isi Satuan). Angka modal ini otomatis menjadi HPP Real di Master Produk dan POS Kasir.',
+    answer: 'Pada menu Penerimaan Barang (Goods Receipt), sistem menghitung harga bersih secara compound:\n• Netto Kemasan = Harga Bruto x (1 - D1%) x (1 - D2%) x (1 - D3%) x (1 - D4%) x (1 - D5%) - Diskon Rp.\n• Anda juga dapat mengetik langsung di kolom Format Cepat (misal: "10+5+2+2+1").\n• Live HPP Modal per Pcs dihitung: Subtotal Faktur / (Qty Beli x Isi Satuan). Angka modal ini otomatis menjadi HPP Real di batch fisik baru dan POS Kasir.',
   },
   {
     id: 2,
@@ -394,7 +399,13 @@ const faqs = [
     id: '17',
     category: 'piutang_retur',
     question: 'Bagaimana cara memantau status pengiriman email dan melakukan Kirim Ulang (Retry) jika email gagal terkirim?',
-    answer: 'Pada drawer detail transaksi di Buku Piutang atau Modal Cabang, terdapat tabel "Riwayat Log Pengiriman Email" (email_logs). Jika status email "Gagal" (misal: koneksi SMTP down), sistem menampilkan pesan error dan menyediakan tombol [ 🔄 Kirim Ulang ] (Retry) yang bisa diklik langsung kapan saja.',
+    answer: 'Pada drawer detail transaksi di Buku Piutang atau Modal Cabang, terdapat tabel "Riwayat Log Pengiriman Email" (email_logs). Jika status email "Gagal" (misal: koneksi SMTP down), sistem menampilkan pesan error dan menyediakan tombol [ Kirim Ulang ] (Retry) yang bisa diklik langsung kapan saja.',
+  },
+  {
+    id: '18',
+    category: 'gudang',
+    question: 'Bagaimana jika supplier menaikkan harga barang saat stok batch lama masih ada dan sudah ada transaksi penjualan?',
+    answer: '1. Transaksi penjualan yang sudah terjadi tetap menggunakan HPP historis transaksi pada saat itu (Laba Rugi masa lalu tetap akurat).\n2. Saat penerimaan batch baru tiba di gudang dengan harga naik, batch tersebut tercatat dengan HPP modal barunya.\n3. Di menu Inventori Cabang > "Kelola Batch", Owner dapat menyesuaikan HPP Real dan Harga Jual (POS) untuk batch baru atau menerapkan harga baru ke semua batch stok fisik yang tersisa.',
   },
 ]
 
