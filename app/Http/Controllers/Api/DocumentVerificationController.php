@@ -189,50 +189,71 @@ class DocumentVerificationController extends Controller
 
         if ($type === 'goods_receipt') {
             \Illuminate\Support\Facades\DB::transaction(function () use ($document, $request) {
-                $document->load('items', 'purchaseOrder');
+                $document->load(['items.purchaseOrderItem', 'purchaseOrder.branch']);
                 $po = $document->purchaseOrder;
                 
                 foreach ($document->items as $item) {
-                    if ($item->qty_received > 0) {
-                        // Find or create product_branch
-                        $productBranch = \App\Models\ProductBranch::firstOrCreate(
-                            ['branch_id' => $po->branch_id, 'product_id' => $item->purchaseOrderItem->product_id],
-                            ['stock' => 0, 'cost_price' => 0, 'price' => 0, 'tax_percentage' => 0]
-                        );
-                        
-                        $item->update(['product_branch_id' => $productBranch->id]);
-                        
-                        $poItem = \App\Models\PurchaseOrderItem::find($item->purchase_order_item_id);
-                        $actualCostPerPiece = $item->final_cost_per_piece > 0 ? (float) $item->final_cost_per_piece : ($poItem ? (float) ($poItem->final_cost_per_piece > 0 ? $poItem->final_cost_per_piece : $poItem->unit_cost) : 0);
-                        
-                        // Create Stock Movement
-                        \App\Models\StockMovement::create([
-                            'product_branch_id' => $productBranch->id,
-                            'user_id' => $request->user()->id,
-                            'type' => 'in',
-                            'quantity' => $item->qty_received,
-                            'unit_cost' => $actualCostPerPiece,
-                            'reference_type' => 'goods_receipt',
-                            'reference_id' => $document->id,
-                            'notes' => 'Penerimaan Barang dari PO: ' . $po->po_number,
-                        ]);
-                        
-                        // Update Stock
-                        $productBranch->increment('stock', $item->qty_received);
-                        if ($actualCostPerPiece > 0) {
-                            $productBranch->update(['cost_price' => $actualCostPerPiece]);
+                    // HANYA item yang diceklis (is_received == true) dan qty_received > 0 yang menambah stok fisik & batch
+                    if ($item->is_received && $item->qty_received > 0) {
+                        $productId = $item->purchaseOrderItem ? $item->purchaseOrderItem->product_id : null;
+                        if (!$productId && $item->product_branch_id) {
+                            $pb = \App\Models\ProductBranch::find($item->product_branch_id);
+                            $productId = $pb ? $pb->product_id : null;
                         }
 
-                        // Create Product Batch for FIFO/LIFO/FEFO
-                        \App\Models\ProductBatch::create([
-                            'product_branch_id' => $productBranch->id,
-                            'qty' => $item->qty_received,
-                            'cost_price' => $actualCostPerPiece,
-                            'price' => $item->price ?? 0,
-                            'min_nego_price' => $item->min_nego_price ?? 0,
-                            'entry_date' => $document->date,
-                            'expiration_date' => $item->expiration_date,
-                        ]);
+                        if ($productId) {
+                            // Find or create product_branch
+                            $productBranch = \App\Models\ProductBranch::firstOrCreate(
+                                ['branch_id' => $po->branch_id, 'product_id' => $productId],
+                                ['stock' => 0, 'cost_price' => 0, 'price' => 0, 'tax_percentage' => 0]
+                            );
+                            
+                            $item->update(['product_branch_id' => $productBranch->id]);
+                            
+                            $poItem = $item->purchaseOrderItem;
+                            $actualCostPerPiece = $item->final_cost_per_piece > 0 
+                                ? (float) $item->final_cost_per_piece 
+                                : ($poItem ? (float) ($poItem->final_cost_per_piece > 0 ? $poItem->final_cost_per_piece : $poItem->unit_cost) : 0);
+                            
+                            $stockNotes = 'Penerimaan Barang dari PO: ' . $po->po_number;
+                            if ($item->scc_code) {
+                                $stockNotes .= ' [SCC: ' . $item->scc_code . ']';
+                            }
+                            if ($item->batch_number) {
+                                $stockNotes .= ' [Batch: ' . $item->batch_number . ']';
+                            }
+
+                            // Create Stock Movement
+                            \App\Models\StockMovement::create([
+                                'product_branch_id' => $productBranch->id,
+                                'user_id' => $request->user()->id,
+                                'type' => 'in',
+                                'quantity' => $item->qty_received,
+                                'unit_cost' => $actualCostPerPiece,
+                                'reference_type' => 'goods_receipt',
+                                'reference_id' => $document->id,
+                                'notes' => $stockNotes,
+                            ]);
+                            
+                            // Update Stock & Cost Price
+                            $productBranch->increment('stock', $item->qty_received);
+                            if ($actualCostPerPiece > 0) {
+                                $productBranch->update(['cost_price' => $actualCostPerPiece]);
+                            }
+
+                            // Create Product Batch for FIFO/LIFO/FEFO (menyimpan SCC dan Nomor Batch)
+                            \App\Models\ProductBatch::create([
+                                'product_branch_id' => $productBranch->id,
+                                'batch_number' => $item->batch_number,
+                                'scc_code' => $item->scc_code,
+                                'qty' => $item->qty_received,
+                                'cost_price' => $actualCostPerPiece,
+                                'price' => $item->price ?? 0,
+                                'min_nego_price' => $item->min_nego_price ?? 0,
+                                'entry_date' => $document->date,
+                                'expiration_date' => $item->expiration_date,
+                            ]);
+                        }
                     }
                 }
                 
@@ -242,7 +263,7 @@ class DocumentVerificationController extends Controller
                 $creator = \App\Models\User::find($document->user_id);
                 if ($creator) {
                     $title = 'Penerimaan Gudang Disetujui!';
-                    $message = 'Penerimaan barang dari PO ' . $po->po_number . ' telah disetujui. Stok di cabang ' . $po->branch->name . ' resmi bertambah.';
+                    $message = 'Penerimaan barang dari PO ' . $po->po_number . ' telah disetujui. Stok di cabang ' . ($po->branch ? $po->branch->name : '') . ' resmi bertambah.';
                     $creator->notify(new \App\Notifications\StockUpdated($title, $message, '/inventori-cabang'));
                 }
             });

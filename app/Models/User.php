@@ -60,7 +60,15 @@ class User extends Authenticatable
 
     public function employee()
     {
-        return $this->hasOne(Employee::class);
+        return $this->hasOne(Employee::class, 'user_id');
+    }
+
+    public function getNipAttribute()
+    {
+        if ($this->employee && !empty($this->employee->nik)) {
+            return $this->employee->nik;
+        }
+        return 'EMP-' . str_pad($this->id, 3, '0', STR_PAD_LEFT);
     }
 
     public function hasPermissionTo($permission, $guardName = null): bool

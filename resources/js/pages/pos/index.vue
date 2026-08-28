@@ -823,24 +823,11 @@ const submitCheckout = async () => {
       
       return
     }
-    if (dpAmountRaw.value > 0 && paymentMethod.value === 'transfer') {
-      if (!bankName.value || !bankAccountNumber.value || !bankAccountName.value) {
-        snackbar.show('Mohon lengkapi detail bank (Nama Bank, No. Rekening, Atas Nama) untuk DP', 'warning')
-        
-        return
-      }
-    }
   } else {
     // Lunas
     if (paymentMethod.value === 'cash') {
       if (!paidAmountRaw.value || paidAmountRaw.value < totalAmount.value) {
         snackbar.show('Uang bayar tidak boleh kurang dari total tagihan!', 'warning')
-        
-        return
-      }
-    } else if (paymentMethod.value === 'transfer') {
-      if (!bankName.value || !bankAccountNumber.value || !bankAccountName.value) {
-        snackbar.show('Mohon lengkapi detail bank (Nama Bank, No. Rekening, Atas Nama)', 'warning')
         
         return
       }
@@ -1749,61 +1736,29 @@ const startNewTransaction = () => {
               class="mt-4"
             >
               <VAlert
-                type="info"
+                type="success"
                 variant="tonal"
-                class="mb-4 text-caption py-2"
+                density="compact"
+                class="mb-3 text-caption py-2"
+                icon="ri-bank-card-line"
               >
-                Pilih pembayaran transfer jika pelanggan membayar menggunakan m-Banking, EDC, atau transfer rekening.
+                <strong>Pembayaran Transfer / EDC:</strong> Transaksi dapat langsung diproses instan tanpa wajib mengisi nomor rekening atau upload bukti.
               </VAlert>
-              
-              <VRow>
-                <VCol
-                  cols="12"
-                  md="6"
+
+              <div class="mb-3 d-flex align-center gap-2 flex-wrap">
+                <span class="text-caption font-weight-bold text-medium-emphasis">Bank / Metode:</span>
+                <VChip
+                  v-for="b in ['BCA', 'Mandiri', 'BRI', 'BNI', 'BSI', 'EDC Mesin']"
+                  :key="b"
+                  size="small"
+                  :color="bankName === b ? 'primary' : 'default'"
+                  :variant="bankName === b ? 'flat' : 'outlined'"
+                  class="font-weight-medium cursor-pointer"
+                  @click="bankName = (bankName === b ? '' : b)"
                 >
-                  <VTextField
-                    v-model="bankName"
-                    label="Nama Bank (misal: BCA/Mandiri)"
-                    placeholder="BCA / Mandiri"
-                    density="compact"
-                  />
-                </VCol>
-                <VCol
-                  cols="12"
-                  md="6"
-                >
-                  <VTextField
-                    v-model="bankAccountNumber"
-                    label="Nomor Rekening"
-                    density="compact"
-                  />
-                </VCol>
-                <VCol cols="12">
-                  <VTextField
-                    v-model="bankAccountName"
-                    label="Atas Nama Rekening"
-                    density="compact"
-                  />
-                </VCol>
-                <VCol cols="12">
-                  <VTextField
-                    v-model="transferPhoneNumber"
-                    label="Nomor HP Pelanggan (Opsional)"
-                    density="compact"
-                  />
-                </VCol>
-                <VCol cols="12">
-                  <VFileInput
-                    v-model="paymentProof"
-                    label="Bukti Transfer (Opsional)"
-                    accept="image/*"
-                    prepend-icon=""
-                    prepend-inner-icon="ri-image-add-line"
-                    show-size
-                    density="compact"
-                  />
-                </VCol>
-              </VRow>
+                  {{ b }}
+                </VChip>
+              </div>
             </div>
           </VExpandTransition>
 
@@ -1816,32 +1771,38 @@ const startNewTransaction = () => {
                 <VAlert
                   type="info"
                   variant="tonal"
-                  class="mb-4 text-caption py-2 text-start"
+                  density="compact"
+                  class="mb-3 text-caption py-2 text-start"
                 >
-                  Minta pelanggan memindai kode QRIS di bawah ini. Pastikan pembayaran telah berhasil diterima sebelum menekan tombol Proses.
+                  Minta pelanggan memindai kode QRIS di bawah ini. Tekan <strong>Proses Pembayaran</strong> setelah dana berhasil masuk.
                 </VAlert>
-                <div class="pa-4 bg-white rounded-lg d-inline-block border">
+                <div class="pa-4 bg-white rounded-lg d-inline-block border shadow-xs">
                   <img
                     :src="`/storage/${branches.find(b => b.id === activeBranchId).owner.qris_image}`"
                     alt="QRIS"
-                    style="max-width: 250px; height: auto;"
+                    style="max-width: 240px; height: auto;"
                     class="rounded"
                   >
-                  <div class="mt-2 font-weight-bold text-h6 text-primary">
-                    QRIS Pembayaran
+                  <div class="mt-2 font-weight-bold text-subtitle-1 text-primary">
+                    QRIS Pembayaran Resmi
                   </div>
-                  <div class="text-caption">
-                    a.n. {{ branches.find(b => b.id === activeBranchId)?.owner?.name || 'Owner' }}
+                  <div class="text-caption text-medium-emphasis">
+                    a.n. {{ branches.find(b => b.id === activeBranchId)?.owner?.name || 'Owner PT. DUMAI' }}
                   </div>
                 </div>
               </template>
               <template v-else>
                 <VAlert
-                  type="warning"
+                  type="info"
                   variant="tonal"
-                  class="mb-4 text-start"
+                  density="compact"
+                  class="mb-3 text-start"
+                  icon="ri-qr-code-line"
                 >
-                  Kode QRIS belum diunggah oleh Owner Cabang ini. Silakan hubungi Owner untuk mengatur QRIS di menu pengaturan Owner.
+                  <div><strong>Pembayaran QRIS Standee / Statis Toko:</strong></div>
+                  <div class="text-caption mt-1">
+                    Silakan arahkan pelanggan memindai QRIS fisik / standee yang tersedia di meja kasir. Setelah pelanggan menunjukkan bukti sukses, klik tombol <strong>Proses Pembayaran</strong>.
+                  </div>
                 </VAlert>
               </template>
             </div>

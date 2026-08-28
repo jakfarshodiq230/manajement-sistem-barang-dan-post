@@ -62,9 +62,9 @@
             text-align: center;
         }
         .signature-table td {
-            width: 33%;
             vertical-align: top;
-            padding-top: 50px;
+            padding: 0 6px;
+            text-align: center;
         }
         .signature-name {
             font-weight: bold;
@@ -72,20 +72,35 @@
         }
         
         .qr-section {
-            margin-top: 30px;
-            padding: 10px;
+            margin-top: 15px;
+            padding: 8px;
             border: 1px dashed #ccc;
             text-align: center;
-            width: 250px;
+            width: 180px;
             float: left;
         }
         .qr-section img {
-            width: 80px;
-            height: 80px;
+            width: 70px;
+            height: 70px;
         }
         .qr-text {
-            font-size: 10px;
-            margin-top: 5px;
+            font-size: 9px;
+            margin-top: 4px;
+            color: #555;
+        }
+        .digital-ttd-qr {
+            width: 60px;
+            height: 60px;
+            margin: 2px auto;
+        }
+        .digital-badge {
+            font-size: 8px;
+            color: #1b5e20;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .physical-ttd-space {
+            height: 60px;
         }
         .clearfix::after {
             content: "";
@@ -100,11 +115,26 @@
             <tr>
                 <td class="company-info">
                     @if(isset($branch) && isset($branch->owner))
-                        <h2>{{ strtoupper($branch->owner->name) }}</h2>
-                        <p>{{ $branch->owner->address }}<br>Telp: {{ $branch->owner->phone }} | Email: {{ $branch->owner->email }}</p>
+                        <h2 style="margin: 0 0 2px 0; font-size: 16px;">{{ strtoupper($branch->owner->name) }}</h2>
+                        <div style="font-size: 13px; font-weight: bold; color: #1a237e; margin-bottom: 3px;">
+                            {{ strtoupper($branch->name) }}
+                        </div>
+                        <p style="margin: 0; font-size: 10px; color: #555; line-height: 1.3;">
+                            {{ $branch->address ?: $branch->owner->address }}<br>
+                            Telp: {{ $branch->phone ?: $branch->owner->phone }} 
+                            @if(!empty($branch->email) || !empty($branch->owner->email))
+                                | Email: {{ $branch->email ?: $branch->owner->email }}
+                            @endif
+                        </p>
+                    @elseif(isset($branch))
+                        <h2 style="margin: 0 0 2px 0; font-size: 16px;">{{ strtoupper($branch->name) }}</h2>
+                        <p style="margin: 0; font-size: 10px; color: #555; line-height: 1.3;">
+                            {{ $branch->address ?? '-' }}<br>
+                            Telp: {{ $branch->phone ?? '-' }}
+                        </p>
                     @else
-                        <h2>NAMA PERUSAHAAN</h2>
-                        <p>Alamat Lengkap Perusahaan, Kota<br>Telp: (021) 1234567 | Email: info@perusahaan.com</p>
+                        <h2 style="margin: 0 0 2px 0; font-size: 16px;">NAMA PERUSAHAAN</h2>
+                        <p style="margin: 0; font-size: 10px; color: #555; line-height: 1.3;">Alamat Lengkap Perusahaan, Kota<br>Telp: (021) 1234567 | Email: info@perusahaan.com</p>
                     @endif
                 </td>
                 <td class="doc-info">
@@ -128,65 +158,103 @@
             <div class="qr-text">Scan QR Code ini untuk verifikasi keaslian dokumen</div>
         </div>
         
-        <div style="float: right; width: 60%;">
+        <div style="float: right; width: 70%;">
             @if(isset($type) && $type === 'goods_receipt')
             <table class="signature-table" style="width: 100%;">
                 <tr>
-                    <td style="width: 50%;">
-                        <p>Pengirim / Ekspedisi,</p>
-                        <br><br><br>
+                    <td style="width: 33%;">
+                        <p style="margin: 0 0 5px 0; font-size: 11px;">Pengirim / Ekspedisi,</p>
+                        <div class="physical-ttd-space"></div>
                         <div class="signature-name">
-                            (____________________)
+                            ( ____________________ )
                         </div>
+                        <div style="font-size: 9px; color: #777;">Tanda Tangan & Nama Terang</div>
                     </td>
-                    <td style="width: 50%;">
-                        <p>Penerima Gudang,</p>
-                        <br><br><br>
+                    <td style="width: 33%;">
+                        <p style="margin: 0 0 5px 0; font-size: 11px;">Penerima Gudang,</p>
+                        @if(isset($userQrCode) && $userQrCode)
+                            <div><img src="data:image/svg+xml;base64,{{ $userQrCode }}" class="digital-ttd-qr" alt="TTD QR Penerima"></div>
+                        @else
+                            <div class="physical-ttd-space"></div>
+                        @endif
                         <div class="signature-name">
                             @if(isset($document->user))
                                 ( {{ $document->user->name }} )
-                                <br><span style="font-weight: normal; text-decoration: none; font-size: 10px;">NIP: {{ $document->user->employee->nik ?? '-' }}</span>
+                                <br><span style="font-weight: normal; text-decoration: none; font-size: 9px; color: #555;">NIP: {{ $document->user->nip ?? ($document->user->employee->nik ?? 'EMP-' . str_pad($document->user->id, 3, '0', STR_PAD_LEFT)) }}</span>
                             @else
-                                (____________________)
+                                ( ____________________ )
+                            @endif
+                        </div>
+                    </td>
+                    <td style="width: 33%;">
+                        <p style="margin: 0 0 5px 0; font-size: 11px;">Menyetujui (Ka. Divisi),</p>
+                        @if(isset($approverQrCode) && $approverQrCode)
+                            <div><img src="data:image/svg+xml;base64,{{ $approverQrCode }}" class="digital-ttd-qr" alt="TTD QR Approver"></div>
+                        @elseif(isset($validatorQrCode) && $validatorQrCode)
+                            <div><img src="data:image/svg+xml;base64,{{ $validatorQrCode }}" class="digital-ttd-qr" alt="TTD QR Validator"></div>
+                        @else
+                            <div class="physical-ttd-space"></div>
+                        @endif
+                        <div class="signature-name">
+                            @if(isset($document->approver))
+                                ( {{ $document->approver->name }} )
+                                <br><span style="font-weight: normal; text-decoration: none; font-size: 9px; color: #555;">NIP: {{ $document->approver->nip ?? ($document->approver->employee->nik ?? 'EMP-' . str_pad($document->approver->id, 3, '0', STR_PAD_LEFT)) }}</span>
+                            @elseif(isset($document->validator))
+                                ( {{ $document->validator->name }} )
+                                <br><span style="font-weight: normal; text-decoration: none; font-size: 9px; color: #555;">NIP: {{ $document->validator->nip ?? ($document->validator->employee->nik ?? 'EMP-' . str_pad($document->validator->id, 3, '0', STR_PAD_LEFT)) }}</span>
+                            @else
+                                ( ____________________ )
                             @endif
                         </div>
                     </td>
                 </tr>
             </table>
             @else
-            <table class="signature-table">
+            <table class="signature-table" style="width: 100%;">
                 <tr>
-                    <td>
-                        <p>Dibuat Oleh,</p>
-                        <br><br><br>
+                    <td style="width: 33%;">
+                        <p style="margin: 0 0 5px 0; font-size: 11px;">Dibuat Oleh,</p>
+                        @if(isset($userQrCode) && $userQrCode)
+                            <div><img src="data:image/svg+xml;base64,{{ $userQrCode }}" class="digital-ttd-qr" alt="TTD QR Pembuat"></div>
+                        @else
+                            <div class="physical-ttd-space"></div>
+                        @endif
                         <div class="signature-name">
                             @if(isset($document->user))
                                 ( {{ $document->user->name }} )
-                                <br><span style="font-weight: normal; text-decoration: none; font-size: 10px;">NIP: {{ $document->user->employee->nik ?? '-' }}</span>
+                                <br><span style="font-weight: normal; text-decoration: none; font-size: 9px; color: #555;">NIP: {{ $document->user->nip ?? ($document->user->employee->nik ?? 'EMP-' . str_pad($document->user->id, 3, '0', STR_PAD_LEFT)) }}</span>
                             @else
                                 ( ____________________ )
                             @endif
                         </div>
                     </td>
-                    <td>
-                        <p>Diperiksa Oleh,</p>
-                        <br><br><br>
+                    <td style="width: 33%;">
+                        <p style="margin: 0 0 5px 0; font-size: 11px;">Diperiksa Oleh,</p>
+                        @if(isset($validatorQrCode) && $validatorQrCode)
+                            <div><img src="data:image/svg+xml;base64,{{ $validatorQrCode }}" class="digital-ttd-qr" alt="TTD QR Pemeriksa"></div>
+                        @else
+                            <div class="physical-ttd-space"></div>
+                        @endif
                         <div class="signature-name">
                             @if(isset($document->validated_by) && isset($document->validator))
                                 ( {{ $document->validator->name }} )
-                                <br><span style="font-weight: normal; text-decoration: none; font-size: 10px;">NIP: {{ $document->validator->employee->nik ?? '-' }}</span>
+                                <br><span style="font-weight: normal; text-decoration: none; font-size: 9px; color: #555;">NIP: {{ $document->validator->nip ?? ($document->validator->employee->nik ?? 'EMP-' . str_pad($document->validator->id, 3, '0', STR_PAD_LEFT)) }}</span>
                             @else
                                 ( ____________________ )
                             @endif
                         </div>
                     </td>
-                    <td>
-                        <p>Disetujui Oleh,</p>
-                        <br><br><br>
+                    <td style="width: 33%;">
+                        <p style="margin: 0 0 5px 0; font-size: 11px;">Disetujui Oleh,</p>
+                        @if(isset($approverQrCode) && $approverQrCode)
+                            <div><img src="data:image/svg+xml;base64,{{ $approverQrCode }}" class="digital-ttd-qr" alt="TTD QR Approver"></div>
+                        @else
+                            <div class="physical-ttd-space"></div>
+                        @endif
                         <div class="signature-name">
                             @if(isset($document->approved_by) && isset($document->approver))
                                 ( {{ $document->approver->name }} )
-                                <br><span style="font-weight: normal; text-decoration: none; font-size: 10px;">NIP: {{ $document->approver->employee->nik ?? '-' }}</span>
+                                <br><span style="font-weight: normal; text-decoration: none; font-size: 9px; color: #555;">NIP: {{ $document->approver->nip ?? ($document->approver->employee->nik ?? 'EMP-' . str_pad($document->approver->id, 3, '0', STR_PAD_LEFT)) }}</span>
                             @else
                                 ( ____________________ )
                             @endif

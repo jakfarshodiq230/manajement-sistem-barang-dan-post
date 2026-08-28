@@ -39,26 +39,57 @@ class DocumentPdfController extends Controller
         
         // Load specific relations depending on type
         if ($type === 'purchase_order') {
-            $document->load(['supplier', 'items.product', 'branch.owner', 'user.employee']);
+            $document->load(['supplier', 'items.product', 'branch.owner', 'user.employee', 'validator.employee', 'approver.employee']);
         } elseif ($type === 'goods_receipt') {
-            $document->load(['purchaseOrder.supplier', 'purchaseOrder.branch.owner', 'items.productBranch.product', 'user.employee']);
+            $document->load(['purchaseOrder.supplier', 'purchaseOrder.branch.owner', 'items.productBranch.product', 'user.employee', 'validator.employee', 'approver.employee']);
         } elseif ($type === 'return_transaction') {
-            $document->load(['branch.owner', 'items.product', 'user.employee']);
+            $document->load(['branch.owner', 'items.product', 'user.employee', 'validator.employee', 'approver.employee']);
         } elseif ($type === 'sale') {
-            $document->load(['branch.owner', 'items.product', 'user.employee']);
+            $document->load(['branch.owner', 'items.product', 'user.employee', 'validator.employee', 'approver.employee']);
+        }
+
+        // Generate Digital Signature QR Codes
+        $userQrCode = null;
+        if ($document->user) {
+            $userTtdUrl = $verifyUrl . '?signer=creator&u=' . $document->user->id;
+            $userQrCode = base64_encode(QrCode::format('svg')->size(65)->generate($userTtdUrl));
+        }
+
+        $validatorQrCode = null;
+        if ($document->validator) {
+            $validatorTtdUrl = $verifyUrl . '?signer=validator&u=' . $document->validator->id;
+            $validatorQrCode = base64_encode(QrCode::format('svg')->size(65)->generate($validatorTtdUrl));
+        }
+
+        $approverQrCode = null;
+        if ($document->approver || ($document->approval_status === 'approved' && $document->validated_by)) {
+            $approverUser = $document->approver ?: $document->validator;
+            $approverTtdUrl = $verifyUrl . '?signer=approver&u=' . ($approverUser ? $approverUser->id : 1);
+            $approverQrCode = base64_encode(QrCode::format('svg')->size(65)->generate($approverTtdUrl));
         }
 
         $branch = null;
-        if (isset($document->branch)) {
+        if (isset($document->branch) && $document->branch) {
             $branch = $document->branch;
-        } elseif (isset($document->purchaseOrder) && isset($document->purchaseOrder->branch)) {
+        } elseif (isset($document->purchaseOrder) && isset($document->purchaseOrder->branch) && $document->purchaseOrder->branch) {
             $branch = $document->purchaseOrder->branch;
+        }
+
+        if (!$branch) {
+            $branch = \App\Models\Branch::with('owner')->first();
+        }
+
+        if ($branch && !$branch->relationLoaded('owner')) {
+            $branch->load('owner');
         }
 
         $data = [
             'document' => $document,
             'branch' => $branch,
             'qrCode' => $qrCode,
+            'userQrCode' => $userQrCode,
+            'validatorQrCode' => $validatorQrCode,
+            'approverQrCode' => $approverQrCode,
             'verifyUrl' => $verifyUrl,
             'type' => $type
         ];

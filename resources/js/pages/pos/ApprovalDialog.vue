@@ -6,6 +6,14 @@ const props = defineProps({
     type: Boolean,
     required: true,
   },
+  title: {
+    type: String,
+    default: 'Otorisasi Diperlukan',
+  },
+  description: {
+    type: String,
+    default: 'Transaksi ini memerlukan persetujuan dan PIN dari Kepala Cabang / Supervisor.',
+  },
 })
 
 const emit = defineEmits([
@@ -92,14 +100,13 @@ const handleCancel = () => {
             class="me-2"
             size="24"
           />
-          Otorisasi Diperlukan
+          {{ props.title }}
         </VCardTitle>
       </VCardItem>
 
       <VCardText class="pt-6">
         <p class="mb-6 text-body-1">
-          Terdapat barang dengan harga jual di bawah harga modal (Nego). 
-          Transaksi ini memerlukan persetujuan dari Kepala Cabang.
+          {{ props.description }}
         </p>
 
         <VAutocomplete
