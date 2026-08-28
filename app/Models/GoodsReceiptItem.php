@@ -29,6 +29,11 @@ class GoodsReceiptItem extends Model
         'min_nego_price',
         'final_cost_per_piece',
         'expiration_date',
+        'batch_number',
+        'scc_code',
+        'is_received',
+        'qty_rejected',
+        'rejection_reason',
     ];
 
     public function getActivitylogOptions(): \Spatie\Activitylog\LogOptions
@@ -49,5 +54,10 @@ class GoodsReceiptItem extends Model
     public function productBranch()
     {
         return $this->belongsTo(ProductBranch::class);
+    }
+
+    public function product()
+    {
+        return $this->hasOneThrough(Product::class, ProductBranch::class, 'id', 'id', 'product_branch_id', 'product_id');
     }
 }
