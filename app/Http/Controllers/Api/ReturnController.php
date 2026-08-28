@@ -71,7 +71,7 @@ class ReturnController extends Controller
             'branch_id' => 'required|exists:branches,id',
             'reference_type' => 'required|in:purchase,sale',
             'reference_id' => 'required|integer',
-            'return_type' => 'required|in:tukar_barang,pengembalian_uang',
+            'return_type' => 'required|in:tukar_barang,pengembalian_uang,pengembalian_dana,potong_hutang',
             'items' => 'required|array|min:1',
             'items.*.product_branch_id' => 'required|exists:product_branches,id',
             'items.*.qty' => 'required|integer|min:1',
@@ -143,7 +143,7 @@ class ReturnController extends Controller
             'user',
             'approver',
             'items.productBranch.product',
-            'purchaseOrder',
+            'purchaseOrder.supplier',
             'sale'
         ])->findOrFail($id);
 
@@ -154,7 +154,7 @@ class ReturnController extends Controller
     {
         $returnTransaction = ReturnTransaction::with([
             'items.productBranch.product',
-            'purchaseOrder',
+            'purchaseOrder.supplier',
             'sale',
             'branch'
         ])->findOrFail($id);
@@ -165,9 +165,10 @@ class ReturnController extends Controller
 
         DB::beginTransaction();
         try {
+            $approverId = $request->input('approver_id') ?: ($request->user() ? $request->user()->id : null);
             $returnTransaction->update([
                 'status' => 'completed',
-                'approved_by' => $request->user()->id,
+                'approved_by' => $approverId,
                 'approved_at' => now(),
             ]);
 
@@ -282,14 +283,100 @@ class ReturnController extends Controller
                 }
             }
 
+            // Jika Retur Pembelian bertipe Pengembalian Dana / Potong Hutang -> Terbitkan Saldo Kredit Supplier (Supplier Credit Note)
+            if ($returnTransaction->reference_type === 'purchase' && in_array($returnTransaction->return_type, ['pengembalian_dana', 'pengembalian_uang', 'potong_hutang'])) {
+                $po = $returnTransaction->purchaseOrder;
+                $supplierId = $po ? $po->supplier_id : null;
+
+                if ($supplierId) {
+                    $datePrefix = date('Ymd');
+                    $crdCount = \App\Models\SupplierCredit::where('credit_number', 'like', "CRD-{$datePrefix}-%")->count() + 1;
+                    $creditNumber = "CRD-{$datePrefix}-" . str_pad($crdCount, 4, '0', STR_PAD_LEFT);
+
+                    \App\Models\SupplierCredit::create([
+                        'credit_number' => $creditNumber,
+                        'supplier_id' => $supplierId,
+                        'branch_id' => $returnTransaction->branch_id,
+                        'return_transaction_id' => $returnTransaction->id,
+                        'purchase_order_id' => $po ? $po->id : null,
+                        'amount' => $returnTransaction->total_amount,
+                        'used_amount' => 0,
+                        'remaining_amount' => $returnTransaction->total_amount,
+                        'status' => 'available',
+                        'notes' => "Saldo Kredit Retur / Potong Hutang Pembelian Selanjutnya dari Retur #{$returnTransaction->return_number}",
+                        'created_by' => $request->user() ? $request->user()->id : 1,
+                    ]);
+                }
+            }
+
             DB::commit();
             return response()->json([
-                'message' => 'Retur berhasil disetujui dan stok telah disesuaikan',
+                'message' => 'Retur berhasil disetujui dan stok telah disesuaikan' . ($returnTransaction->reference_type === 'purchase' && in_array($returnTransaction->return_type, ['pengembalian_dana', 'pengembalian_uang', 'potong_hutang']) ? '. Saldo kredit potong hutang supplier telah diterbitkan!' : ''),
                 'return_transaction' => $returnTransaction->load(['items.productBranch.product', 'branch', 'user', 'approver'])
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Gagal menyetujui retur', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Penerimaan Barang Pengganti dari Supplier untuk Retur bertipe Tukar Barang
+     */
+    public function receiveReplacement(Request $request, $id)
+    {
+        $returnTransaction = ReturnTransaction::with([
+            'items.productBranch.product',
+            'purchaseOrder.supplier',
+            'branch'
+        ])->findOrFail($id);
+
+        if ($returnTransaction->reference_type !== 'purchase' || $returnTransaction->return_type !== 'tukar_barang') {
+            return response()->json(['message' => 'Hanya retur pembelian dengan tipe tukar barang yang dapat menerima barang pengganti.'], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            foreach ($returnTransaction->items as $item) {
+                $pb = ProductBranch::find($item->product_branch_id);
+                if (!$pb) continue;
+
+                $pb->increment('stock', $item->qty);
+
+                \App\Models\ProductBatch::create([
+                    'product_branch_id' => $pb->id,
+                    'qty' => $item->qty,
+                    'cost_price' => $pb->cost_price ?? 0,
+                    'price' => $pb->price ?? 0,
+                    'min_nego_price' => $pb->min_nego_price ?? 0,
+                    'entry_date' => now(),
+                ]);
+
+                StockMovement::create([
+                    'product_branch_id' => $pb->id,
+                    'type' => 'in',
+                    'quantity' => $item->qty,
+                    'unit_cost' => $pb->cost_price ?? 0,
+                    'notes' => "Penerimaan Barang Pengganti Supplier (Retur #{$returnTransaction->return_number})",
+                    'user_id' => $request->user()->id,
+                    'reference_type' => ReturnTransaction::class,
+                    'reference_id' => $returnTransaction->id
+                ]);
+            }
+
+            $returnTransaction->update([
+                'notes' => ($returnTransaction->notes ? $returnTransaction->notes . ' | ' : '') . '[Barang pengganti telah diterima fisik pada ' . now()->format('d/m/Y H:i') . ']',
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Barang pengganti berhasil diterima! Stok cabang dan nomor batch fisik telah bertambah.',
+                'return_transaction' => $returnTransaction->load(['items.productBranch.product', 'branch', 'user', 'approver'])
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Gagal memproses penerimaan barang pengganti: ' . $e->getMessage()], 500);
         }
     }
 

@@ -280,10 +280,28 @@ function resetForm() {
               </VCol>
 
               <VCol cols="12">
+                <VSelect
+                  v-model="returnType"
+                  :items="referenceType === 'purchase' ? [
+                    { title: 'Tukar Barang (Barang Diganti Fisik oleh Supplier)', value: 'tukar_barang' },
+                    { title: 'Pengembalian Dana / Potong Hutang Berjalan Bulan Selanjutnya', value: 'potong_hutang' }
+                  ] : [
+                    { title: 'Pengembalian Uang ke Pelanggan', value: 'pengembalian_uang' },
+                    { title: 'Tukar Barang', value: 'tukar_barang' }
+                  ]"
+                  item-title="title"
+                  item-value="value"
+                  label="Metode Penanganan Retur"
+                  persistent-hint
+                  :hint="referenceType === 'purchase' && returnType === 'potong_hutang' ? 'Dana retur akan otomatis diterbitkan sebagai Saldo Kredit untuk memotong tagihan PO supplier berikutnya.' : ''"
+                />
+              </VCol>
+
+              <VCol cols="12">
                 <VTextarea
                   v-model="notes"
-                  label="Alasan Retur"
-                  placeholder="Deskripsi kerusakan atau alasan pengembalian"
+                  label="Alasan Retur / Kerusakan"
+                  placeholder="Deskripsi kerusakan fisik, bocor, atau alasan pengembalian ke supplier"
                   rows="2"
                   :rules="[v => !!v || 'Alasan retur wajib diisi']"
                 />

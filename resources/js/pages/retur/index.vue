@@ -131,7 +131,7 @@ const handleApprovalSuccess = async approverId => {
       method: 'POST',
       body: { approver_id: approverId },
     })
-    snackbar.show(res.message || 'Retur berhasil disetujui (Approved)', 'success')
+    snackbar.show(res.message || 'Retur berhasil disetujui (Approved) dengan otorisasi PIN!', 'success')
     isDetailDialogVisible.value = false
     fetchData()
   } catch (error) {
@@ -146,6 +146,36 @@ const handleApprovalSuccess = async approverId => {
 const handleApprovalCancel = () => {
   isApprovalDialogVisible.value = false
   returnToApprove.value = null
+}
+
+const isReceivingReplacement = ref(false)
+const isReceiveReplacementDialogVisible = ref(false)
+const returnToReceiveReplacement = ref(null)
+
+const openReceiveReplacementDialog = returnTx => {
+  returnToReceiveReplacement.value = returnTx
+  isReceiveReplacementDialogVisible.value = true
+}
+
+const executeReceiveReplacement = async () => {
+  if (!returnToReceiveReplacement.value) return
+
+  isReceivingReplacement.value = true
+  try {
+    const res = await $api(`/apps/returns/${returnToReceiveReplacement.value.id}/receive-replacement`, {
+      method: 'POST',
+    })
+    snackbar.show(res.message || 'Barang pengganti berhasil diterima fisik & stok telah bertambah!', 'success')
+    isReceiveReplacementDialogVisible.value = false
+    isDetailDialogVisible.value = false
+    fetchData()
+  } catch (error) {
+    console.error(error)
+    const err = error.response?._data?.message || 'Gagal memproses penerimaan barang pengganti'
+    snackbar.show(err, 'error')
+  } finally {
+    isReceivingReplacement.value = false
+  }
 }
 </script>
 
@@ -288,22 +318,40 @@ const handleApprovalCancel = () => {
         <!-- Compensation / Return Type -->
         <template #item.return_type="{ item }">
           <VChip
+            v-if="item.return_type === 'potong_hutang'"
             size="small"
-            :color="item.return_type === 'tukar_barang' ? 'info' : 'warning'"
-            variant="tonal"
+            color="success"
+            variant="flat"
+            class="font-weight-bold"
           >
-            <VIcon
-              :icon="item.return_type === 'tukar_barang' ? 'ri-exchange-box-line' : 'ri-refund-line'"
-              size="14"
-              class="me-1"
-            />
-            {{ item.return_type === 'tukar_barang' ? 'Tukar Barang' : 'Refund Uang' }}
+            <VIcon icon="ri-money-dollar-circle-line" size="14" class="me-1" />
+            Potong Hutang Supplier
+          </VChip>
+          <VChip
+            v-else-if="item.return_type === 'tukar_barang'"
+            size="small"
+            color="info"
+            variant="tonal"
+            class="font-weight-medium"
+          >
+            <VIcon icon="ri-exchange-box-line" size="14" class="me-1" />
+            Tukar Barang
+          </VChip>
+          <VChip
+            v-else
+            size="small"
+            color="warning"
+            variant="tonal"
+            class="font-weight-medium"
+          >
+            <VIcon icon="ri-refund-line" size="14" class="me-1" />
+            Refund Uang
           </VChip>
         </template>
 
         <!-- Total Amount -->
         <template #item.total_amount="{ item }">
-          <span class="font-weight-bold">{{ formatRupiah(item.total_amount) }}</span>
+          <span class="font-weight-bold font-mono text-primary">{{ formatRupiah(item.total_amount) }}</span>
         </template>
 
         <!-- Status -->
@@ -325,7 +373,7 @@ const handleApprovalCancel = () => {
 
         <!-- Actions -->
         <template #item.actions="{ item }">
-          <div class="d-flex gap-1 justify-center align-center">
+          <div class="d-flex gap-1 justify-center align-center flex-wrap">
             <VBtn
               size="small"
               variant="tonal"
@@ -345,6 +393,18 @@ const handleApprovalCancel = () => {
               @click="promptApprove(item)"
             >
               Approve
+            </VBtn>
+
+            <VBtn
+              v-if="item.reference_type === 'purchase' && item.return_type === 'tukar_barang' && item.status === 'completed' && !item.notes?.includes('telah diterima fisik')"
+              size="small"
+              color="success"
+              variant="tonal"
+              prepend-icon="ri-inbox-archive-line"
+              :loading="isReceivingReplacement"
+              @click="receiveReplacementGoods(item)"
+            >
+              Terima Pengganti
             </VBtn>
           </div>
         </template>
@@ -399,6 +459,18 @@ const handleApprovalCancel = () => {
         <VDivider />
 
         <VCardText class="px-6 py-4">
+          <!-- Notification for Potong Hutang / Saldo Kredit -->
+          <VAlert
+            v-if="selectedReturn.return_type === 'potong_hutang' && selectedReturn.status === 'completed'"
+            type="success"
+            variant="tonal"
+            density="compact"
+            class="mb-4 text-caption"
+            icon="ri-wallet-3-line"
+          >
+            <strong>Saldo Kredit Otomatis:</strong> Nilai retur sebesar <strong>{{ formatRupiah(selectedReturn.total_amount) }}</strong> telah diterbitkan sebagai saldo kredit supplier dan otomatis dapat memotong pembayaran tagihan PO supplier berikutnya.
+          </VAlert>
+
           <!-- Information Rows -->
           <VRow class="mb-4">
             <VCol cols="12" md="6">
@@ -411,7 +483,7 @@ const handleApprovalCancel = () => {
             <VCol cols="12" md="6">
               <div class="text-caption text-medium-emphasis">Kompensasi:</div>
               <div class="font-weight-medium">
-                {{ selectedReturn.return_type === 'tukar_barang' ? 'Tukar Barang Sejenis' : 'Pengembalian Uang (Refund)' }}
+                {{ selectedReturn.return_type === 'potong_hutang' ? 'Pengembalian Dana / Potong Hutang Berjalan' : (selectedReturn.return_type === 'tukar_barang' ? 'Tukar Barang Sejenis' : 'Pengembalian Uang (Refund)') }}
               </div>
             </VCol>
 
@@ -476,7 +548,7 @@ const handleApprovalCancel = () => {
 
         <VDivider />
 
-        <VCardActions class="px-6 py-4 justify-space-between bg-grey-50">
+        <VCardActions class="px-6 py-4 justify-space-between bg-grey-50 flex-wrap gap-2">
           <VBtn
             variant="outlined"
             color="secondary"
@@ -485,22 +557,82 @@ const handleApprovalCancel = () => {
             Tutup
           </VBtn>
 
-          <VBtn
-            v-if="selectedReturn.status === 'pending'"
-            color="primary"
-            variant="elevated"
-            prepend-icon="ri-check-line"
-            @click="promptApprove(selectedReturn)"
+          <div class="d-flex gap-2">
+            <VBtn
+              v-if="selectedReturn.reference_type === 'purchase' && selectedReturn.return_type === 'tukar_barang' && selectedReturn.status === 'completed' && !selectedReturn.notes?.includes('telah diterima fisik')"
+              color="success"
+              variant="flat"
+              prepend-icon="ri-inbox-archive-line"
+              :loading="isReceivingReplacement"
+              @click="openReceiveReplacementDialog(selectedReturn)"
+            >
+              Terima Barang Pengganti
+            </VBtn>
+
+            <VBtn
+              v-if="selectedReturn.status === 'pending'"
+              color="primary"
+              variant="elevated"
+              prepend-icon="ri-check-line"
+              @click="promptApprove(selectedReturn)"
+            >
+              Setujui Retur (Approve)
+            </VBtn>
+          </div>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Dialog Konfirmasi Terima Barang Pengganti Retur -->
+    <VDialog
+      v-model="isReceiveReplacementDialogVisible"
+      max-width="520"
+    >
+      <VCard class="rounded-xl overflow-hidden shadow-lg">
+        <VCardTitle class="pa-5 pb-3 font-weight-bold text-h6 text-success d-flex align-center gap-2 bg-success-subtle border-b">
+          <VIcon icon="ri-inbox-archive-line" color="success" size="24" />
+          Konfirmasi Penerimaan Barang Pengganti
+        </VCardTitle>
+        <VCardText class="pa-5 pt-4">
+          <p class="text-body-1 mb-2">
+            Catat penerimaan barang pengganti fisik dari supplier untuk Retur <strong>#{{ returnToReceiveReplacement?.return_number }}</strong>?
+          </p>
+          <VAlert
+            type="success"
+            variant="tonal"
+            class="text-caption mt-3 mb-0 rounded-lg"
+            icon="ri-information-line"
           >
-            Setujui Retur (Approve)
+            Stok fisik cabang dan nomor batch baru akan otomatis bertambah sesuai dengan item retur pengganti.
+          </VAlert>
+        </VCardText>
+        <VCardActions class="pa-5 pt-0 justify-end gap-2 border-t bg-grey-50">
+          <VBtn
+            variant="outlined"
+            color="secondary"
+            @click="isReceiveReplacementDialogVisible = false"
+          >
+            Batal
+          </VBtn>
+          <VBtn
+            color="success"
+            variant="flat"
+            prepend-icon="ri-inbox-archive-line"
+            class="font-weight-bold"
+            :loading="isReceivingReplacement"
+            @click="executeReceiveReplacement"
+          >
+            Ya, Terima Barang Pengganti
           </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
 
-    <!-- Approval Dialog from POS -->
+    <!-- Dialog Otorisasi PIN Persetujuan Retur -->
     <ApprovalDialog
       v-model:is-dialog-visible="isApprovalDialogVisible"
+      title="Otorisasi Persetujuan Retur Barang"
+      :description="`Transaksi Retur #${returnToApprove?.return_number || ''} memerlukan persetujuan dan verifikasi PIN dari Kepala Cabang / Supervisor.`"
       @success="handleApprovalSuccess"
       @cancel="handleApprovalCancel"
     />
