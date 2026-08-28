@@ -263,6 +263,8 @@ const manageBatches = item => {
   isManageBatchesDialogVisible.value = true
 }
 
+const openBatchesDialog = manageBatches
+
 const confirmDelete = async id => {
   if (confirm('Apakah Anda yakin ingin menghapus produk ini dari cabang?')) {
     try {
@@ -432,6 +434,16 @@ const confirmDelete = async id => {
                   </div>
                 </div>
               </VCol>
+
+              <!-- 5. Ketentuan Multi-Batch & FIFO -->
+              <VCol cols="12" class="mt-2">
+                <div class="pa-3 bg-info-lighten-5 border border-info border-opacity-25 rounded-lg text-caption text-info d-flex align-center gap-2">
+                  <VIcon icon="ri-information-fill" size="20" />
+                  <div>
+                    <strong>Ketentuan Barang dengan Banyak Batch Fisik (Multi-Batch):</strong> Jika suatu produk memiliki beberapa batch pengiriman dari supplier dengan modal berbeda, sistem kasir POS secara otomatis menggunakan harga dari <strong>Batch Aktif (metode FIFO/FEFO)</strong>. Owner dapat mengedit modal & harga jual setiap batch atau menyamakan seluruh batch melalui tombol <strong>"Kelola Batch"</strong>.
+                  </div>
+                </div>
+              </VCol>
             </VRow>
           </div>
         </VExpandTransition>
@@ -451,65 +463,62 @@ const confirmDelete = async id => {
                 :items="branches"
                 item-title="name"
                 item-value="id"
-                placeholder="Semua Cabang"
+                label="Filter Cabang"
+                placeholder="Pilih Cabang"
                 density="compact"
-                hide-details
-                clearable
-                @update:model-value="() => { page = 1; fetchData(); }"
-              />
-            </div>
-            <div style="width: 250px;">
-              <VTextField
-                v-model="search"
-                prepend-inner-icon="ri-search-line"
-                placeholder="Cari produk cabang..."
-                density="compact"
-                hide-details
                 variant="outlined"
                 clearable
-                @update:model-value="handleSearch"
+                hide-details
+                @update:model-value="fetchData"
+              />
+            </div>
+            <div style="width: 280px;">
+              <VTextField
+                v-model="search"
+                placeholder="Cari nama barang / SKU..."
+                prepend-inner-icon="ri-search-line"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+                @update:model-value="fetchData"
               />
             </div>
           </div>
         </div>
       </VCardItem>
 
-
-
-      <VDataTableServer
-        v-model:items-per-page="itemsPerPage"
-        v-model:page="page"
-        :headers="tableHeaders"
-        :items="filteredItems"
-        :items-length="totalItems"
-        :loading="isLoading"
-        class="text-no-wrap"
-        @update:options="fetchData"
-      >
+      <VCardText class="pa-0 mt-3">
+        <VDataTableServer
+          v-model:items-per-page="itemsPerPage"
+          v-model:page="page"
+          :items="filteredItems"
+          :items-length="totalItems"
+          :headers="tableHeaders"
+          :loading="isLoading"
+          class="text-no-wrap"
+          @update:options="fetchData"
+        >
+        <!-- Product & SKU -->
         <template #item.product.name="{ item }">
-          <div class="d-flex align-center">
+          <div class="d-flex align-center py-2">
             <VAvatar
-              size="45"
-              color="info"
-              variant="tonal"
-              class="mr-3 rounded"
+              size="40"
+              rounded="lg"
+              class="me-3 border"
+              :color="item.product?.image ? undefined : 'primary'"
+              :variant="item.product?.image ? undefined : 'tonal'"
             >
               <VImg
                 v-if="item.product?.image"
                 :src="`/storage/${item.product.image}`"
-                alt="Produk"
                 cover
               />
-              <VIcon
-                v-else
-                icon="ri-box-3-line"
-              />
+              <span v-else class="text-uppercase font-weight-bold">{{ item.product?.name?.substring(0, 2) }}</span>
             </VAvatar>
             <div class="d-flex flex-column">
-              <h6 class="text-h6 font-weight-medium mb-0">
-                {{ item.product?.name }}
-              </h6>
-              <span class="text-caption text-disabled">SKU: {{ item.product?.sku }}</span>
+              <span class="font-weight-bold text-body-1 text-high-emphasis">{{ item.product?.name }}</span>
+              <span class="text-caption font-mono text-medium-emphasis">SKU: {{ item.product?.sku || '-' }}</span>
             </div>
           </div>
         </template>
@@ -520,17 +529,27 @@ const confirmDelete = async id => {
 
         <template #item.cost_price="{ item }">
           <div>
-            <div class="d-flex align-center">
-              <span class="text-error font-weight-medium">{{ formatRupiah(item.active_batch?.cost_price || item.cost_price) }}</span>
-              <VIcon
-                v-if="item.active_batch"
-                icon="ri-information-line"
-                size="14"
-                class="ms-1 text-disabled"
-                title="Harga modal batch aktif (FEFO/FIFO)"
-              />
+            <div class="d-flex align-center flex-wrap gap-1">
+              <span class="text-error font-weight-bold text-subtitle-2">{{ formatRupiah(item.active_batch?.cost_price || item.cost_price) }}</span>
+              <VChip
+                v-if="item.product_batches && item.product_batches.length > 1"
+                size="x-small"
+                color="primary"
+                variant="tonal"
+                class="cursor-pointer font-weight-bold"
+                title="Klik untuk melihat dan mengedit harga per batch"
+                @click="manageBatches(item)"
+              >
+                {{ item.product_batches.length }} Batch
+              </VChip>
             </div>
-            <div class="text-caption text-medium-emphasis" style="font-size: 10px;">
+            <div v-if="item.active_batch?.scc_code || item.active_batch?.batch_number" class="text-caption text-primary font-weight-medium" style="font-size: 11px;">
+              Batch Aktif: <strong>{{ item.active_batch.scc_code || item.active_batch.batch_number }}</strong>
+            </div>
+            <div v-else-if="item.product_batches && item.product_batches.length > 1" class="text-caption text-medium-emphasis" style="font-size: 10px;">
+              (Harga Batch Aktif FIFO)
+            </div>
+            <div v-else class="text-caption text-medium-emphasis" style="font-size: 10px;">
               (Inc. PPN Masukan)
             </div>
           </div>
@@ -538,17 +557,22 @@ const confirmDelete = async id => {
 
         <template #item.price="{ item }">
           <div>
-            <div class="d-flex align-center">
-              <span class="font-weight-bold text-success">{{ formatRupiah(item.active_batch?.price || item.price) }}</span>
-              <VIcon
-                v-if="item.active_batch"
-                icon="ri-information-line"
-                size="14"
-                class="ms-1 text-disabled"
-                title="Harga jual batch aktif (FEFO/FIFO)"
-              />
+            <div class="d-flex align-center flex-wrap gap-1">
+              <span class="font-weight-bold text-success text-subtitle-2">{{ formatRupiah(item.active_batch?.price || item.price) }}</span>
+              <VChip
+                v-if="item.product_batches && item.product_batches.some(b => b.qty > 0 && Number(b.price) === 0)"
+                size="x-small"
+                color="warning"
+                variant="flat"
+                class="cursor-pointer font-weight-bold"
+                title="Ada batch yang belum diset harga jualnya. Klik untuk mengatur."
+                @click="manageBatches(item)"
+              >
+                <VIcon icon="ri-error-warning-line" size="14" class="mr-1" />
+                Set Harga
+              </VChip>
             </div>
-            <div v-if="(item.active_batch?.price || item.price) > (item.active_batch?.cost_price || item.cost_price)" class="text-caption text-success font-weight-medium" style="font-size: 10px;">
+            <div v-if="(item.active_batch?.price || item.price) > (item.active_batch?.cost_price || item.cost_price)" class="text-caption text-success font-weight-medium" style="font-size: 10.5px;">
               Laba: +{{ formatRupiah((item.active_batch?.price || item.price) - (item.active_batch?.cost_price || item.cost_price)) }}
             </div>
           </div>
@@ -605,10 +629,11 @@ const confirmDelete = async id => {
             </VChip>
             <span
               v-if="item.stock <= (item.product?.min_stock || 5) && item.stock > 0"
-              class="text-caption text-warning font-weight-bold mt-1"
+              class="text-caption text-warning font-weight-bold mt-1 d-flex align-center"
               style="font-size: 10px;"
             >
-              ⚠️ Perlu Restok (Min: {{ item.product?.min_stock || 5 }})
+              <VIcon icon="ri-alert-line" size="12" class="me-1" />
+              Perlu Restok (Min: {{ item.product?.min_stock || 5 }})
             </span>
             <span
               v-else-if="item.stock <= 0"
@@ -646,10 +671,11 @@ const confirmDelete = async id => {
             size="small"
             color="secondary"
             variant="tonal"
+            prepend-icon="ri-qr-code-line"
             class="mr-2"
             @click="manageBatches(item)"
           >
-            Batch
+            Kelola Batch & SCC
           </VBtn>
           <IconBtn
             v-if="$can('write', 'Inventori Cabang')"
@@ -668,7 +694,8 @@ const confirmDelete = async id => {
           </IconBtn>
         </template>
       </VDataTableServer>
-    </VCard>
+    </VCardText>
+  </VCard>
 
     <AddNewProductBranchDrawer
       v-model:is-drawer-open="isAddNewDrawerVisible"

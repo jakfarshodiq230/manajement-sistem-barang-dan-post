@@ -10,7 +10,7 @@ class ProductBranchController extends Controller
 {
     public function index(Request $request)
     {
-        $query = ProductBranch::with(['product.category', 'branch']);
+        $query = ProductBranch::with(['product.category', 'branch', 'productBatches']);
         
         if ($request->has('branch_id')) {
             $query->where('branch_id', $request->branch_id);
@@ -223,23 +223,58 @@ class ProductBranchController extends Controller
 
     public function updateBatchPrice(Request $request, $batchId)
     {
-        if (!request()->user()->can('Inventori Cabang Write')) {
+        $user = $request->user() ?: auth()->user();
+        if ($user && !$user->can('Inventori Cabang Write') && !$user->can('manage all')) {
             abort(403, 'Unauthorized action.');
         }
 
         $request->validate([
+            'cost_price' => 'nullable|numeric|min:0',
             'price' => 'required|numeric|min:0',
             'min_nego_price' => 'nullable|numeric|min:0',
+            'apply_to_all_batches' => 'nullable|boolean',
         ]);
 
         $batch = \App\Models\ProductBatch::findOrFail($batchId);
         
-        $batch->price = $request->price;
-        $batch->min_nego_price = $request->min_nego_price ?? 0;
+        if ($request->has('cost_price')) {
+            $batch->cost_price = (float) $request->cost_price;
+        }
+        $batch->price = (float) $request->price;
+        $batch->min_nego_price = $request->min_nego_price ? (float) $request->min_nego_price : 0;
         $batch->save();
 
+        $pb = $batch->productBranch;
+        if ($pb) {
+            if ($request->apply_to_all_batches) {
+                \App\Models\ProductBatch::where('product_branch_id', $pb->id)->update([
+                    'cost_price' => $batch->cost_price,
+                    'price' => $batch->price,
+                    'min_nego_price' => $batch->min_nego_price,
+                ]);
+            }
+            
+            // Sync ProductBranch default price and HPP
+            $activeBatch = $pb->productBatches()->where('qty', '>', 0)->orderBy('id', 'asc')->first();
+            if ($activeBatch && $activeBatch->id === $batch->id) {
+                if ($request->has('cost_price')) {
+                    $pb->cost_price = $batch->cost_price;
+                }
+                $pb->price = $batch->price;
+                $pb->min_nego_price = $batch->min_nego_price;
+                $pb->save();
+            } elseif ($request->apply_to_all_batches || $pb->price == 0) {
+                if ($request->has('cost_price')) {
+                    $pb->cost_price = $batch->cost_price;
+                }
+                $pb->price = $batch->price;
+                $pb->min_nego_price = $batch->min_nego_price;
+                $pb->save();
+            }
+        }
+
         return response()->json([
-            'message' => 'Harga batch berhasil diperbarui',
+            'message' => 'Harga modal (HPP) & harga jual batch berhasil diperbarui',
             'batch' => $batch
         ]);
     }
