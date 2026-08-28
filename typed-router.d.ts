@@ -174,6 +174,8 @@ declare module 'vue-router/auto-routes' {
     'pages-typography': RouteRecordInfo<'pages-typography', '/pages/typography', Record<never, never>, Record<never, never>>,
     'pages-user-profile-tab': RouteRecordInfo<'pages-user-profile-tab', '/pages/user-profile/:tab', { tab: ParamValue<true> }, { tab: ParamValue<false> }>,
     'panduan-sistem': RouteRecordInfo<'panduan-sistem', '/panduan-sistem', Record<never, never>, Record<never, never>>,
+    'payables': RouteRecordInfo<'payables', '/payables', Record<never, never>, Record<never, never>>,
+    'payables-payable-detail-drawer': RouteRecordInfo<'payables-payable-detail-drawer', '/payables/PayableDetailDrawer', Record<never, never>, Record<never, never>>,
     'penerimaan-barang': RouteRecordInfo<'penerimaan-barang', '/penerimaan-barang', Record<never, never>, Record<never, never>>,
     'penerimaan-barang-print-id': RouteRecordInfo<'penerimaan-barang-print-id', '/penerimaan-barang/print/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     'penerimaan-barang-receive-goods-drawer': RouteRecordInfo<'penerimaan-barang-receive-goods-drawer', '/penerimaan-barang/ReceiveGoodsDrawer', Record<never, never>, Record<never, never>>,

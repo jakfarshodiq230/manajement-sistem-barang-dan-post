@@ -91,6 +91,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     // Purchase Orders endpoints
     Route::apiResource('purchase-orders', \App\Http\Controllers\Api\PurchaseOrderController::class);
     // Goods Receipts endpoints
+    Route::post('goods-receipts/{id}/approve', [\App\Http\Controllers\Api\GoodsReceiptController::class, 'approve']);
+    Route::post('goods-receipts/{id}/reject', [\App\Http\Controllers\Api\GoodsReceiptController::class, 'reject']);
     Route::apiResource('goods-receipts', \App\Http\Controllers\Api\GoodsReceiptController::class);
     
     // Customers and Receivables
@@ -106,8 +108,18 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     // Sales endpoints
     Route::apiResource('sales', \App\Http\Controllers\Api\SaleController::class);
     // Returns endpoints
-    Route::apiResource('returns', \App\Http\Controllers\Api\ReturnController::class);
     Route::post('returns/{id}/approve', [\App\Http\Controllers\Api\ReturnController::class, 'approve']);
+    Route::post('returns/{id}/receive-replacement', [\App\Http\Controllers\Api\ReturnController::class, 'receiveReplacement']);
+    Route::apiResource('returns', \App\Http\Controllers\Api\ReturnController::class);
+
+    // Supplier Credits endpoints (Potong Hutang / Saldo Retur Supplier)
+    Route::apiResource('supplier-credits', \App\Http\Controllers\Api\SupplierCreditController::class)->only(['index', 'show']);
+
+    // Accounts Payable (Buku Hutang Supplier & Cicilan)
+    Route::apiResource('payables', \App\Http\Controllers\Api\PayableController::class);
+    Route::post('payables/{id}/pay', [\App\Http\Controllers\Api\PayableController::class, 'recordPayment']);
+    Route::delete('payables/{payableId}/payments/{paymentId}', [\App\Http\Controllers\Api\PayableController::class, 'voidPayment']);
+
     // Products endpoints
     Route::post('products/import', [\App\Http\Controllers\Api\ProductController::class, 'import']);
     Route::apiResource('products', \App\Http\Controllers\Api\ProductController::class);
