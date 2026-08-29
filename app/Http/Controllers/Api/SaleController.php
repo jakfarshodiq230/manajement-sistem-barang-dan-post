@@ -12,29 +12,47 @@ class SaleController extends Controller
      */
     public function index(Request $request)
     {
-        $query = \App\Models\Sale::with(['branch', 'user', 'approver', 'items.productBranch.product', 'receivable.payments']);
+        $query = \App\Models\Sale::with(['branch', 'user', 'customer', 'validator', 'approver', 'bankAccount:id,bank_name,account_number,account_name,color']);
         
         $search = $request->query('search');
-        $itemsPerPage = $request->query('itemsPerPage', 15);
+        $itemsPerPage = $request->query('itemsPerPage', 10);
         $page = $request->query('page', 1);
 
-        if ($request->has('branch_id')) {
+        if ($request->has('branch_id') && $request->branch_id) {
             $query->where('branch_id', $request->branch_id);
         }
-        
+
+        if ($request->has('bank_account_id') && $request->bank_account_id) {
+            $query->where('bank_account_id', $request->bank_account_id);
+        }
+
+        if ($request->has('payment_status')) {
+            $status = $request->payment_status;
+            if ($status === 'lunas') {
+                $query->where('status', 'completed')->where('payment_method', '!=', 'tempo');
+            } elseif ($status === 'tempo') {
+                $query->where('payment_method', 'tempo');
+            } elseif ($status === 'batal') {
+                $query->where('status', 'cancelled');
+            }
+        }
+
+        if ($request->has('start_date') && $request->has('end_date')) {
+            $query->whereDate('date', '>=', $request->start_date)
+                  ->whereDate('date', '<=', $request->end_date);
+        }
+
         if ($search) {
             $query->where(function($q) use ($search) {
                 $q->where('invoice_number', 'like', "%{$search}%")
-                  ->orWhereHas('user', function($u) use ($search) {
-                      $u->where('name', 'like', "%{$search}%");
+                  ->orWhereHas('customer', function($c) use ($search) {
+                      $c->where('name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('bankAccount', function($b) use ($search) {
+                      $b->where('bank_name', 'like', "%{$search}%")
+                        ->orWhere('account_number', 'like', "%{$search}%");
                   });
             });
-        }
-        
-        if ($request->has('start_date') && $request->has('end_date')) {
-            $startDate = \Carbon\Carbon::parse($request->start_date)->startOfDay();
-            $endDate = \Carbon\Carbon::parse($request->end_date)->endOfDay();
-            $query->whereBetween('date', [$startDate, $endDate]);
         }
         
         $query->orderBy('created_at', 'desc');
@@ -68,9 +86,25 @@ class SaleController extends Controller
         foreach ($summaryData as $row) {
             $method = $row->payment_method;
             if (array_key_exists($method, $summary)) {
-                $summary[$method] = $row->total_net;
+                $summary[$method] = (float) $row->total_net;
             }
         }
+
+        // Breakdown per Bank Account
+        $bankSummaryQuery = clone $query;
+        if (!$request->has('start_date') && !$request->has('end_date')) {
+            $bankSummaryQuery->whereDate('date', now()->toDateString());
+        }
+        $bankSummaryQuery->reorder();
+        $bankSummaryQuery->limit(PHP_INT_MAX)->offset(0);
+
+        $bankBreakdownData = $bankSummaryQuery->select('bank_account_id', 'bank_name', \Illuminate\Support\Facades\DB::raw("COUNT(*) as tx_count"), \Illuminate\Support\Facades\DB::raw("SUM(total_amount) as total_amount"))
+            ->where('status', '!=', 'cancelled')
+            ->whereNotNull('bank_account_id')
+            ->groupBy('bank_account_id', 'bank_name')
+            ->get();
+
+        $summary['by_bank'] = $bankBreakdownData;
 
         $response = [
             'data' => $sales,
@@ -105,6 +139,7 @@ class SaleController extends Controller
             'items.*.qty' => 'required|integer|min:1',
             'items.*.price' => 'required|numeric|min:0',
             'payment_method' => 'nullable|in:cash,transfer,qris,tempo',
+            'bank_account_id' => 'nullable|exists:bank_accounts,id',
             'paid_amount' => 'nullable|numeric|min:0',
             'change_amount' => 'nullable|numeric|min:0',
             'bank_name' => 'nullable|string',
@@ -182,6 +217,11 @@ class SaleController extends Controller
                 $finalCustomerId = $cust->id;
             }
             
+            $bankAccount = null;
+            if ($request->bank_account_id) {
+                $bankAccount = \App\Models\BankAccount::find($request->bank_account_id);
+            }
+
             $sale = \App\Models\Sale::create([
                 'invoice_number' => $invoice_number,
                 'branch_id' => $request->branch_id,
@@ -194,11 +234,12 @@ class SaleController extends Controller
                 'status' => 'completed',
                 'notes' => $request->notes,
                 'payment_method' => $request->payment_method ?? 'cash',
+                'bank_account_id' => $bankAccount ? $bankAccount->id : null,
                 'paid_amount' => $request->payment_method === 'tempo' ? ($request->dp_amount ?? 0) : ($request->paid_amount ?? 0),
                 'change_amount' => $request->change_amount ?? 0,
-                'bank_name' => $request->bank_name,
-                'bank_account_number' => $request->bank_account_number,
-                'bank_account_name' => $request->bank_account_name,
+                'bank_name' => $bankAccount ? $bankAccount->bank_name : $request->bank_name,
+                'bank_account_number' => $bankAccount ? $bankAccount->account_number : $request->bank_account_number,
+                'bank_account_name' => $bankAccount ? $bankAccount->account_name : $request->bank_account_name,
                 'transfer_phone_number' => $request->transfer_phone_number,
                 'customer_id' => $finalCustomerId,
                 'due_date' => $request->payment_method === 'tempo' ? $request->due_date : null,
@@ -336,6 +377,14 @@ class SaleController extends Controller
                 'total_tax' => $total_tax,
                 'total_amount' => $total_amount
             ]);
+
+            // Update BankAccount current balance if paid via bank/qris
+            if ($bankAccount) {
+                $amountToAdd = $paymentMethod === 'tempo' ? ($request->dp_amount ?? 0) : $total_amount;
+                if ($amountToAdd > 0) {
+                    $bankAccount->increment('current_balance', $amountToAdd);
+                }
+            }
 
             // Jika tempo atau split payment dengan piutang, catat di piutang
             if ($paymentMethod === 'tempo' || $paymentMethod === 'split' || ($request->has_receivable && $request->credit_amount > 0)) {
@@ -481,6 +530,16 @@ class SaleController extends Controller
                             'entry_date' => now(),
                         ]);
                     }
+                }
+            }
+
+            // Revert bank account balance if paid via bank
+            if ($sale->bank_account_id && $sale->total_amount > 0) {
+                $bankAccount = \App\Models\BankAccount::find($sale->bank_account_id);
+                if ($bankAccount) {
+                    $amountToDeduct = $sale->payment_method === 'tempo' ? (float)($sale->paid_amount ?? 0) : (float)$sale->total_amount;
+                    $bankAccount->current_balance = max(0, (float)$bankAccount->current_balance - $amountToDeduct);
+                    $bankAccount->save();
                 }
             }
 

@@ -23,6 +23,7 @@ class Sale extends Model
         'status',
         'notes',
         'payment_method',
+        'bank_account_id',
         'bank_name',
         'bank_account_number',
         'bank_account_name',
@@ -38,6 +39,10 @@ class Sale extends Model
         return \Spatie\Activitylog\LogOptions::defaults()->logAll();
     }
 
+    public function bankAccount()
+    {
+        return $this->belongsTo(BankAccount::class);
+    }
 
     public function branch()
     {

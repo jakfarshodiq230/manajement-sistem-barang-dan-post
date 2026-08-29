@@ -14,6 +14,7 @@ class ReceivablePayment extends Model
         'payment_date',
         'amount',
         'payment_method',
+        'bank_account_id',
         'payment_proof',
         'bank_name',
         'bank_account_number',
@@ -25,6 +26,11 @@ class ReceivablePayment extends Model
     public function getActivitylogOptions(): \Spatie\Activitylog\LogOptions
     {
         return \Spatie\Activitylog\LogOptions::defaults()->logAll();
+    }
+
+    public function bankAccount()
+    {
+        return $this->belongsTo(BankAccount::class);
     }
 
     public function receivable()

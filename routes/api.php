@@ -115,10 +115,15 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     // Supplier Credits endpoints (Potong Hutang / Saldo Retur Supplier)
     Route::apiResource('supplier-credits', \App\Http\Controllers\Api\SupplierCreditController::class)->only(['index', 'show']);
 
-    // Accounts Payable (Buku Hutang Supplier & Cicilan)
+    // Accounts Payable (Buku Hutang Supplier & Rekap Tagihan Bulanan)
+    Route::get('payables/invoices', [\App\Http\Controllers\Api\PayableController::class, 'invoices']);
+    Route::get('payables/periods', [\App\Http\Controllers\Api\PayableController::class, 'periods']);
     Route::apiResource('payables', \App\Http\Controllers\Api\PayableController::class);
     Route::post('payables/{id}/pay', [\App\Http\Controllers\Api\PayableController::class, 'recordPayment']);
-    Route::delete('payables/{payableId}/payments/{paymentId}', [\App\Http\Controllers\Api\PayableController::class, 'voidPayment']);
+    Route::delete('payables/{id}/payments/{paymentId}', [\App\Http\Controllers\Api\PayableController::class, 'voidPayment']);
+
+    // Bank Accounts (Master Rekening Bank & Saldo Penerimaan)
+    Route::apiResource('bank-accounts', \App\Http\Controllers\Api\BankAccountController::class);
 
     // Products endpoints
     Route::post('products/import', [\App\Http\Controllers\Api\ProductController::class, 'import']);
