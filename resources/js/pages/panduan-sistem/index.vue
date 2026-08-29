@@ -20,13 +20,14 @@ const setCategory = catId => {
 const categories = [
   { id: 'all', title: 'Semua Panduan', icon: 'ri-apps-2-line' },
   { id: 'master', title: '1. Master Data', icon: 'ri-database-2-line' },
-  { id: 'gudang', title: '2. Gudang & Logistik', icon: 'ri-truck-line' },
-  { id: 'pos', title: '3. Kasir & Transaksi POS', icon: 'ri-shopping-cart-2-line' },
-  { id: 'retur_piutang', title: '4. Retur & Piutang', icon: 'ri-exchange-dollar-line' },
-  { id: 'audit_laporan', title: '5. Audit & Opname', icon: 'ri-archive-stack-line' },
-  { id: 'keuangan', title: '6. Keuangan & Laporan', icon: 'ri-file-chart-line' },
-  { id: 'modal_roi', title: '7. Modal & ROI Cabang', icon: 'ri-hand-coin-line' },
-  { id: 'security', title: '8. Keamanan & RBAC', icon: 'ri-shield-keyhole-line' },
+  { id: 'bank', title: '2. Rekening Bank & QRIS', icon: 'ri-bank-card-line' },
+  { id: 'gudang', title: '3. Gudang & Logistik', icon: 'ri-truck-line' },
+  { id: 'pos', title: '4. Kasir & Transaksi POS', icon: 'ri-shopping-cart-2-line' },
+  { id: 'retur_piutang', title: '5. Retur & Piutang', icon: 'ri-exchange-dollar-line' },
+  { id: 'audit_laporan', title: '6. Audit & Opname', icon: 'ri-archive-stack-line' },
+  { id: 'keuangan', title: '7. Keuangan & Closing', icon: 'ri-file-chart-line' },
+  { id: 'modal_roi', title: '8. Modal & ROI Cabang', icon: 'ri-hand-coin-line' },
+  { id: 'security', title: '9. Keamanan & RBAC', icon: 'ri-shield-keyhole-line' },
 ]
 
 // Visual Architecture Flow Steps
@@ -41,6 +42,14 @@ const visualFlowSteps = [
   },
   {
     step: 2,
+    title: 'Rekening Bank & QRIS',
+    icon: 'ri-bank-card-line',
+    color: 'info',
+    desc: 'Daftarkan rekening bank penerima (BCA, Mandiri, BRI, QRIS) dan saldo berjalan.',
+    route: '/bank-accounts',
+  },
+  {
+    step: 3,
     title: 'Pengadaan & Gudang',
     icon: 'ri-truck-line',
     color: 'info',
@@ -48,7 +57,7 @@ const visualFlowSteps = [
     route: '/penerimaan-barang',
   },
   {
-    step: 3,
+    step: 4,
     title: 'Kasir POS & Penjualan',
     icon: 'ri-shopping-cart-2-line',
     color: 'success',
@@ -56,7 +65,7 @@ const visualFlowSteps = [
     route: '/pos',
   },
   {
-    step: 4,
+    step: 5,
     title: 'Buku Piutang & Retur',
     icon: 'ri-exchange-dollar-line',
     color: 'warning',
@@ -64,7 +73,7 @@ const visualFlowSteps = [
     route: '/receivables',
   },
   {
-    step: 5,
+    step: 6,
     title: 'Audit & Stock Opname',
     icon: 'ri-archive-stack-line',
     color: 'error',
@@ -72,15 +81,15 @@ const visualFlowSteps = [
     route: '/audit/stock-opname',
   },
   {
-    step: 6,
-    title: 'Laba Rugi & Rekap Kasir',
+    step: 7,
+    title: 'Closing Kasir & Rekonsiliasi',
     icon: 'ri-file-chart-line',
     color: 'secondary',
-    desc: 'Closing harian kasir, kalkulasi HPP riil, neraca, dan cetak PDF tahunan.',
-    route: '/audit/rekap',
+    desc: 'Closing harian kasir, rincian penerimaan per rekening bank, dan rekap tahunan.',
+    route: '/audit/closing-harian',
   },
   {
-    step: 7,
+    step: 8,
     title: 'Modal & ROI Cabang',
     icon: 'ri-hand-coin-line',
     color: 'primary',
@@ -91,6 +100,39 @@ const visualFlowSteps = [
 
 // Detailed Module Guides
 const guides = [
+  {
+    id: 'master-bank',
+    category: 'bank',
+    icon: 'ri-bank-card-line',
+    color: 'info',
+    title: '2. Modul Rekening Bank, Multi-Bank Owner & Barcode QRIS',
+    subtitle: 'Manajemen rekening bank penampung (BCA, Mandiri, BRI, QRIS), saldo berjalan, dan pelacakan mutasi bon per cabang',
+    steps: [
+      {
+        title: 'Pendaftaran Master Rekening Bank',
+        desc: 'Buka menu Daftar Rekening Bank (/bank-accounts). Daftarkan seluruh rekening yang dimiliki Owner (BCA, Mandiri, BRI, BNI, BSI, QRIS Merchant, Mesin EDC). Masukkan Nama Bank, Nomor Rekening, Nama Pemilik Rekening (A.N), Saldo Awal, Warna Kartu Visual, dan upload gambar barcode QRIS jika ada.',
+        link: '/bank-accounts',
+        linkText: 'Buka Rekening Bank',
+      },
+      {
+        title: 'Filter Periode Bulanan & Tahunan Interaktif',
+        desc: 'Gunakan pemilih Tahun dan bar 12 Bulan (Januari - Desember) di bagian atas untuk melihat tren omzet masuk dan jumlah transaksi per bank pada periode yang dipilih.',
+      },
+      {
+        title: 'Integrasi POS Kasir & Pemilihan Bank Dinamis',
+        desc: 'Saat kasir memilih metode Transfer Bank atau QRIS di kasir POS (/pos), sistem secara dinamis menampilkan pilihan rekening bank dari database lengkap dengan nomor rekening, nama pemilik, dan tombol salin 1-klik.',
+        link: '/pos',
+        linkText: 'Ke Kasir POS',
+      },
+      {
+        title: 'Rekonsiliasi Bank di Tutup Shift & Closing Harian',
+        desc: 'Saat kasir melakukan Tutup Shift di POS atau Closing Harian di menu Audit, sistem memisahkan perhitungan Kas Fisik Tunai di laci dan Rincian Penerimaan per Rekening Bank secara transparan.',
+        link: '/audit/closing-harian',
+        linkText: 'Buka Closing Harian',
+      },
+    ],
+    tips: 'Setiap transaksi penjualan non-tunai di POS otomatis menambah saldo berjalan (current balance) rekening bank penerima secara real-time.',
+  },
   {
     id: 'master-data',
     category: 'master',

@@ -16,16 +16,54 @@ const activePanel = ref([0, 1, 2])
 const workflowCategories = [
   { id: 'all', title: 'Semua Alur', icon: 'ri-apps-2-line' },
   { id: 'master', title: '1. Master Data', icon: 'ri-database-2-line' },
-  { id: 'gudang', title: '2. Pengadaan & Gudang', icon: 'ri-truck-line' },
-  { id: 'pos', title: '3. Kasir & Transaksi', icon: 'ri-shopping-cart-2-line' },
-  { id: 'piutang_retur', title: '4. Piutang & Retur', icon: 'ri-exchange-dollar-line' },
-  { id: 'opname', title: '5. Opname & Audit Stok', icon: 'ri-archive-stack-line' },
-  { id: 'laporan', title: '6. Laporan & Keuangan', icon: 'ri-file-chart-line' },
-  { id: 'modal_roi', title: '7. Modal & ROI Cabang', icon: 'ri-hand-coin-line' },
+  { id: 'bank', title: '2. Rekening Bank & QRIS', icon: 'ri-bank-card-line' },
+  { id: 'gudang', title: '3. Pengadaan & Gudang', icon: 'ri-truck-line' },
+  { id: 'pos', title: '4. Kasir & Transaksi', icon: 'ri-shopping-cart-2-line' },
+  { id: 'piutang_retur', title: '5. Piutang & Retur', icon: 'ri-exchange-dollar-line' },
+  { id: 'opname', title: '6. Opname & Audit Stok', icon: 'ri-archive-stack-line' },
+  { id: 'laporan', title: '7. Laporan & Keuangan', icon: 'ri-file-chart-line' },
+  { id: 'modal_roi', title: '8. Modal & ROI Cabang', icon: 'ri-hand-coin-line' },
 ]
 
 // 1. Alur Sistem Lengkap & Step-by-Step
 const systemWorkflows = [
+  {
+    id: 'wf-bank',
+    category: 'bank',
+    icon: 'ri-bank-card-line',
+    color: 'info',
+    title: 'Tahap 2: Manajemen Rekening Bank, Multi-Bank & Barcode QRIS',
+    subtitle: 'Pengelolaan daftar rekening bank penampung (BCA, Mandiri, BRI, QRIS), saldo berjalan, serta integrasi POS dan Closing Harian.',
+    steps: [
+      {
+        no: 1,
+        title: 'Daftarkan Master Rekening Bank',
+        desc: 'Buka menu Daftar Rekening Bank (/bank-accounts). Daftarkan seluruh rekening yang dimiliki (BCA, Mandiri, BRI, QRIS, EDC). Masukkan nomor rekening, nama pemilik (A.N), saldo awal, dan upload barcode QRIS.',
+        link: '/bank-accounts',
+        linkText: 'Buka Rekening Bank',
+      },
+      {
+        no: 2,
+        title: 'Filter Periode Bulan & Tahun',
+        desc: 'Gunakan bar 12 bulan dan pemilih tahun di bagian atas untuk memantau omzet masuk dan total transaksi per bank.',
+      },
+      {
+        no: 3,
+        title: 'Pilihan Bank Dinamis di POS Kasir',
+        desc: 'Saat transaksi non-tunai di POS (/pos), kasir memilih bank penerima dari database lengkap dengan nomor rekening dan tombol salin.',
+        link: '/pos',
+        linkText: 'Ke Kasir POS',
+      },
+      {
+        no: 4,
+        title: 'Rekonsiliasi Bank di Closing Harian Kasir',
+        desc: 'Sistem audit closing harian memisahkan kalkulasi fisik kasir di laci vs pendapatan per rekening bank secara akurat.',
+        link: '/audit/closing-harian',
+        linkText: 'Buka Closing Harian',
+      },
+    ],
+    tips: 'Setiap pembayaran non-tunai di kasir otomatis menambah saldo rekening bank terkait secara real-time.',
+  },
   {
     id: 'wf-master',
     category: 'master',

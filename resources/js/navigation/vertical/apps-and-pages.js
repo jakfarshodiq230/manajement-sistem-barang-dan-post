@@ -93,6 +93,16 @@ export default [
     ],
   },
   {
+    title: 'Pusat Laporan',
+    icon: { icon: 'ri-file-chart-line' },
+    to: 'laporan',
+  },
+  {
+    title: 'Daftar Rekening Bank',
+    icon: { icon: 'ri-bank-card-line' },
+    to: 'bank-accounts',
+  },
+  {
     title: 'Pengaturan Pengguna',
     icon: { icon: 'ri-user-settings-line' },
     to: 'pengaturan-pengguna',

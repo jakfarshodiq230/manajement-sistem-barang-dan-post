@@ -284,6 +284,12 @@ class DashboardController extends Controller
             ->groupBy('payment_method')
             ->get();
 
+        // Bank Accounts Revenue Breakdown
+        $bankBreakdown = (clone $query)->whereNotNull('bank_account_id')
+            ->select('bank_account_id', 'bank_name', DB::raw('count(*) as count'), DB::raw('sum(total_amount) as total'))
+            ->groupBy('bank_account_id', 'bank_name')
+            ->get();
+
         // Top 5 Best Selling Products
         $saleIds = $currentSales->pluck('id');
         $topProducts = [];
@@ -307,24 +313,30 @@ class DashboardController extends Controller
 
         // Recent 5 Sales Transactions
         $recentTransactions = (clone $query)
-            ->with(['user:id,name', 'customer:id,name', 'branch:id,name'])
+            ->with(['user:id,name', 'customer:id,name', 'branch:id,name', 'bankAccount:id,bank_name,account_number,color'])
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get();
 
         return response()->json([
-            'summary' => [
-                'sales' => ['value' => $curCount, 'growth' => $calcGrowth($curCount, $pastCount)],
-                'revenue' => ['value' => $curRevenue, 'growth' => $calcGrowth($curRevenue, $pastRevenue)],
-                'profit' => ['value' => $curProfit, 'growth' => $calcGrowth($curProfit, $pastProfit)],
-                'aov' => ['value' => $aov],
-                'discount' => ['value' => (float)$totalDiscount],
-                'margin' => $curRevenue > 0 ? round(($curProfit / $curRevenue) * 100, 1) : 0,
-            ],
-            'chart' => $chartData,
-            'payment_breakdown' => $paymentBreakdown,
-            'top_products' => $topProducts,
-            'recent_transactions' => $recentTransactions,
+            'success' => true,
+            'data' => [
+                'kpi' => [
+                    'revenue' => (float)$curRevenue,
+                    'revenue_growth' => $calcGrowth($curRevenue, $pastRevenue),
+                    'profit' => (float)$curProfit,
+                    'profit_growth' => $calcGrowth($curProfit, $pastProfit),
+                    'orders_count' => $curCount,
+                    'orders_growth' => $calcGrowth($curCount, $pastCount),
+                    'aov' => $aov,
+                    'total_discount' => (float)$totalDiscount
+                ],
+                'chart' => $chartData,
+                'payment_breakdown' => $paymentBreakdown,
+                'bank_breakdown' => $bankBreakdown,
+                'top_products' => $topProducts,
+                'recent_transactions' => $recentTransactions
+            ]
         ]);
     }
 

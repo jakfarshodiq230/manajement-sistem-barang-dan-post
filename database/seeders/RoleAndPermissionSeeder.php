@@ -60,8 +60,11 @@ class RoleAndPermissionSeeder extends Seeder
         $mManajemenKaryawan = Module::firstOrCreate(['slug' => 'apps/employees'], [
             'name' => 'Manajemen Karyawan', 'parent_id' => $mMasterData->id, 'sequence' => 6, 'status' => 'Aktif', 'icon' => 'ri-user-2-line'
         ]);
+        $mRekeningBank = Module::firstOrCreate(['slug' => 'bank-accounts'], [
+            'name' => 'Rekening Bank', 'parent_id' => $mMasterData->id, 'sequence' => 7, 'status' => 'Aktif', 'icon' => 'ri-bank-card-line'
+        ]);
 
-        // --- TRANSAKSI ---
+        // --- TRANSAKSI & OPERASIONAL ---
         $mTransaksi = Module::firstOrCreate(['slug' => 'transaksi-main'], [
             'name' => 'Transaksi', 'sequence' => 3, 'category' => 'Operasional', 'status' => 'Aktif', 'icon' => 'ri-shopping-cart-line'
         ]);
@@ -83,33 +86,56 @@ class RoleAndPermissionSeeder extends Seeder
         $mReturBarang = Module::firstOrCreate(['slug' => 'retur'], [
             'name' => 'Retur Barang', 'parent_id' => $mTransaksi->id, 'sequence' => 6, 'status' => 'Aktif', 'icon' => 'ri-arrow-go-back-line'
         ]);
+        $mMutasiStok = Module::firstOrCreate(['slug' => 'mutasi-stok'], [
+            'name' => 'Mutasi Stok', 'parent_id' => $mTransaksi->id, 'sequence' => 7, 'status' => 'Aktif', 'icon' => 'ri-arrow-left-right-line'
+        ]);
+
+        // --- KEUANGAN & KAS ---
+        $mKeuangan = Module::firstOrCreate(['slug' => 'keuangan'], [
+            'name' => 'Keuangan', 'sequence' => 4, 'category' => 'Keuangan', 'status' => 'Aktif', 'icon' => 'ri-wallet-3-line'
+        ]);
+        $mKasKecil = Module::firstOrCreate(['slug' => 'kas-kecil'], [
+            'name' => 'Kas Kecil', 'parent_id' => $mKeuangan->id, 'sequence' => 1, 'status' => 'Aktif', 'icon' => 'ri-wallet-3-line'
+        ]);
+        $mPiutang = Module::firstOrCreate(['slug' => 'receivables'], [
+            'name' => 'Buku Piutang', 'parent_id' => $mKeuangan->id, 'sequence' => 2, 'status' => 'Aktif', 'icon' => 'ri-hand-coin-line'
+        ]);
+        $mHutang = Module::firstOrCreate(['slug' => 'payables'], [
+            'name' => 'Hutang Pembelian', 'parent_id' => $mKeuangan->id, 'sequence' => 3, 'status' => 'Aktif', 'icon' => 'ri-money-dollar-circle-line'
+        ]);
+        $mBranchCapitals = Module::firstOrCreate(['slug' => 'apps/branch-capitals'], [
+            'name' => 'Setoran Modal & ROI', 'parent_id' => $mKeuangan->id, 'sequence' => 4, 'status' => 'Aktif', 'icon' => 'ri-funds-line'
+        ]);
 
         // --- AUDIT & LAPORAN ---
         $mAuditLaporan = Module::firstOrCreate(['slug' => 'audit-laporan'], [
-            'name' => 'Audit & Laporan', 'sequence' => 4, 'category' => 'Laporan', 'status' => 'Aktif', 'icon' => 'ri-file-chart-line'
+            'name' => 'Audit & Laporan', 'sequence' => 5, 'category' => 'Laporan', 'status' => 'Aktif', 'icon' => 'ri-file-chart-line'
+        ]);
+        $mPusatLaporan = Module::firstOrCreate(['slug' => 'laporan'], [
+            'name' => 'Pusat Laporan', 'parent_id' => $mAuditLaporan->id, 'sequence' => 1, 'status' => 'Aktif', 'icon' => 'ri-file-chart-line'
         ]);
         $mClosingHarian = Module::firstOrCreate(['slug' => 'audit/closing-harian'], [
-            'name' => 'Closing Harian', 'parent_id' => $mAuditLaporan->id, 'sequence' => 1, 'status' => 'Aktif', 'icon' => 'ri-file-text-line'
+            'name' => 'Closing Harian', 'parent_id' => $mAuditLaporan->id, 'sequence' => 2, 'status' => 'Aktif', 'icon' => 'ri-file-text-line'
         ]);
         $mStockOpname = Module::firstOrCreate(['slug' => 'audit/stock-opname'], [
-            'name' => 'Stock Opname', 'parent_id' => $mAuditLaporan->id, 'sequence' => 2, 'status' => 'Aktif', 'icon' => 'ri-file-list-3-line'
+            'name' => 'Stock Opname', 'parent_id' => $mAuditLaporan->id, 'sequence' => 3, 'status' => 'Aktif', 'icon' => 'ri-file-list-3-line'
         ]);
         $mRekapTahunan = Module::firstOrCreate(['slug' => 'audit/rekap'], [
-            'name' => 'Rekap Tahunan', 'parent_id' => $mAuditLaporan->id, 'sequence' => 3, 'status' => 'Aktif', 'icon' => 'ri-book-2-line'
+            'name' => 'Rekap Tahunan', 'parent_id' => $mAuditLaporan->id, 'sequence' => 4, 'status' => 'Aktif', 'icon' => 'ri-book-2-line'
         ]);
         $mRiwayatStok = Module::firstOrCreate(['slug' => 'audit-laporan/riwayat-stok'], [
-            'name' => 'Riwayat Stok', 'parent_id' => $mAuditLaporan->id, 'sequence' => 4, 'status' => 'Aktif', 'icon' => 'ri-history-line'
+            'name' => 'Riwayat Stok', 'parent_id' => $mAuditLaporan->id, 'sequence' => 5, 'status' => 'Aktif', 'icon' => 'ri-history-line'
         ]);
         $mStokSaatIni = Module::firstOrCreate(['slug' => 'audit-laporan/stok-saat-ini'], [
-            'name' => 'Stok Saat Ini', 'parent_id' => $mAuditLaporan->id, 'sequence' => 5, 'status' => 'Aktif', 'icon' => 'ri-archive-line'
+            'name' => 'Stok Saat Ini', 'parent_id' => $mAuditLaporan->id, 'sequence' => 6, 'status' => 'Aktif', 'icon' => 'ri-archive-line'
         ]);
         $mFastSlowMoving = Module::firstOrCreate(['slug' => 'audit-laporan/fast-slow-moving'], [
-            'name' => 'Fast/Slow Moving', 'parent_id' => $mAuditLaporan->id, 'sequence' => 6, 'status' => 'Aktif', 'icon' => 'ri-bar-chart-grouped-line'
+            'name' => 'Fast/Slow Moving', 'parent_id' => $mAuditLaporan->id, 'sequence' => 7, 'status' => 'Aktif', 'icon' => 'ri-bar-chart-grouped-line'
         ]);
 
         // --- PENGATURAN ---
         $mPengaturan = Module::firstOrCreate(['slug' => 'pengaturan'], [
-            'name' => 'Pengaturan', 'sequence' => 5, 'category' => 'Sistem', 'status' => 'Aktif', 'icon' => 'ri-settings-3-line'
+            'name' => 'Pengaturan', 'sequence' => 6, 'category' => 'Sistem', 'status' => 'Aktif', 'icon' => 'ri-settings-3-line'
         ]);
         $mPengguna = Module::firstOrCreate(['slug' => 'pengaturan-pengguna'], [
             'name' => 'Pengguna', 'parent_id' => $mPengaturan->id, 'sequence' => 1, 'status' => 'Aktif', 'icon' => 'ri-user-settings-line'
@@ -145,6 +171,7 @@ class RoleAndPermissionSeeder extends Seeder
             'Cabang'               => $mCabang->id,
             'Manajemen Owner'      => $mManajemenOwner->id,
             'Manajemen Karyawan'   => $mManajemenKaryawan->id,
+            'Rekening Bank'        => $mRekeningBank->id,
             // Transaksi
             'Transaksi'            => $mTransaksi->id,
             'Purchase Order'       => $mPurchaseOrder->id,
@@ -153,8 +180,16 @@ class RoleAndPermissionSeeder extends Seeder
             'Kasir (POS)'          => $mKasirPOS->id,
             'Penjualan'            => $mPenjualan->id,
             'Retur Barang'         => $mReturBarang->id,
+            'Mutasi Stok'          => $mMutasiStok->id,
+            // Keuangan
+            'Keuangan'             => $mKeuangan->id,
+            'Kas Kecil'            => $mKasKecil->id,
+            'Buku Piutang'         => $mPiutang->id,
+            'Hutang Pembelian'     => $mHutang->id,
+            'Setoran Modal & ROI'  => $mBranchCapitals->id,
             // Audit & Laporan
             'Audit & Laporan'      => $mAuditLaporan->id,
+            'Pusat Laporan'        => $mPusatLaporan->id,
             'Closing Harian'       => $mClosingHarian->id,
             'Stock Opname'         => $mStockOpname->id,
             'Rekap Tahunan'        => $mRekapTahunan->id,
@@ -224,6 +259,7 @@ class RoleAndPermissionSeeder extends Seeder
             'Master Data Read', 'Produk Read', 'Produk Write', 'Produk Create',
             'Kategori Barang Read', 'Data Supplier Read',
             'Manajemen Karyawan Read', 'Manajemen Karyawan Write', 'Manajemen Karyawan Create',
+            'Rekening Bank Read',
             'Transaksi Read', 'Transaksi Write', 'Transaksi Create', 'Transaksi Approve',
             'Inventori Cabang Read', 'Inventori Cabang Write', 'Inventori Cabang Create',
             'Purchase Order Read', 'Purchase Order Create', 'Purchase Order Write', 'Purchase Order Approve',
@@ -232,7 +268,11 @@ class RoleAndPermissionSeeder extends Seeder
             'Retur Barang Read', 'Retur Barang Create',
             'Kasir (POS) Read', 'Kasir (POS) Create',
             'Mutasi Stok Read', 'Mutasi Stok Create', 'Mutasi Stok Write', 'Mutasi Stok Approve', 'Mutasi Stok Validate',
-            'Audit & Laporan Read', 'Audit Read', 'Closing Harian Read', 'Closing Harian Create', 'Closing Harian Write',
+            'Keuangan Read', 'Kas Kecil Read', 'Kas Kecil Create', 'Kas Kecil Write',
+            'Buku Piutang Read', 'Buku Piutang Write', 'Buku Piutang Create',
+            'Hutang Pembelian Read', 'Setoran Modal & ROI Read', 'Setoran Modal & ROI Create',
+            'Audit & Laporan Read', 'Audit Read', 'Pusat Laporan Read',
+            'Closing Harian Read', 'Closing Harian Create', 'Closing Harian Write',
             'Stock Opname Read', 'Stock Opname Create', 'Stock Opname Write',
             'Riwayat Stok Read', 'Stok Saat Ini Read', 'Fast/Slow Moving Read',
             'Pengaturan Read', 'Pengguna Read',
@@ -240,25 +280,31 @@ class RoleAndPermissionSeeder extends Seeder
         ]);
         $roleAdminCabang->syncPermissions(Permission::whereIn('name', $adminCabangPerms)->get());
 
-        // 4. Kasir — POS and sales only
+        // 4. Kasir — POS, sales, kas kecil, and piutang payments
         $roleKasir = Role::firstOrCreate(['name' => 'Kasir', 'guard_name' => 'web']);
         $kasirPerms = collect([
             'Dashboards Read', 'Dashboard Analytics Read',
             'Kasir (POS) Read', 'Kasir (POS) Create', 'Kasir (POS) Write',
             'Penjualan Read',
             'Inventori Cabang Read',
+            'Rekening Bank Read',
+            'Kas Kecil Read', 'Kas Kecil Create',
+            'Buku Piutang Read', 'Buku Piutang Write',
+            'Closing Harian Read', 'Closing Harian Create',
             'view dashboard', 'view transactions', 'create transactions',
         ]);
         $roleKasir->syncPermissions(Permission::whereIn('name', $kasirPerms)->get());
 
-        // 5. Auditor — read-only audit access
+        // 5. Auditor — read-only audit and financial access
         $roleAuditor = Role::firstOrCreate(['name' => 'Auditor', 'guard_name' => 'web']);
         $auditorPerms = collect([
             'Dashboards Read', 'Dashboard Analytics Read', 'Dashboard Penjualan Read',
             'Dashboard Barang Read', 'Dashboard Keuntungan Read', 'Dashboard Audit Read',
-            'Audit Read', 'Audit & Laporan Read', 'Closing Harian Read', 'Stock Opname Read', 'Rekap Tahunan Read',
+            'Audit Read', 'Audit & Laporan Read', 'Pusat Laporan Read',
+            'Closing Harian Read', 'Stock Opname Read', 'Rekap Tahunan Read',
             'Riwayat Stok Read', 'Stok Saat Ini Read', 'Fast/Slow Moving Read',
             'Penjualan Read', 'Purchase Order Read', 'Penerimaan Gudang Read',
+            'Rekening Bank Read', 'Kas Kecil Read', 'Buku Piutang Read', 'Hutang Pembelian Read', 'Setoran Modal & ROI Read',
             'view dashboard', 'view transactions', 'view audit logs',
         ]);
         $roleAuditor->syncPermissions(Permission::whereIn('name', $auditorPerms)->get());
