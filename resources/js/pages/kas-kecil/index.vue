@@ -35,13 +35,14 @@ const deletingItem = ref(null)
 
 // Form Fields
 const formCategory = ref('')
+const customCategoryInput = ref('')
 const formBranchId = ref(null)
 const formAmount = ref('')
 const formDate = ref(new Date().toISOString().substring(0, 10))
 const formDescription = ref('')
 const formReceiptImage = ref('')
 
-const categories = [
+const defaultCategories = [
   'Operasional Toko',
   'Listrik & PLN',
   'Air & Galon Minum',
@@ -51,6 +52,12 @@ const categories = [
   'Kebersihan & Perlengkapan',
   'Lain-lain',
 ]
+
+const categories = ref([...defaultCategories])
+
+const isCustomCategory = computed(() => {
+  return formCategory.value === 'Lain-lain' || formCategory.value === 'Lainnya' || formCategory.value === '+ Tambah Kategori Baru...'
+})
 
 const formatDate = dateStr => {
   if (!dateStr) return '-'
@@ -119,6 +126,11 @@ const fetchData = async () => {
     pettyCashes.value = res.data || []
     totalItems.value = res.total || 0
     totalExpenseAmount.value = res.totalAmount || 0
+
+    if (res.categories && Array.isArray(res.categories)) {
+      const merged = Array.from(new Set([...defaultCategories, ...res.categories]))
+      categories.value = merged
+    }
   } catch (e) {
     console.error(e)
     snackbar.show('Gagal memuat data kas kecil', 'error')
@@ -140,6 +152,7 @@ onMounted(async () => {
 const openAddDialog = () => {
   editingItem.value = null
   formCategory.value = 'Operasional Toko'
+  customCategoryInput.value = ''
   formBranchId.value = branches.value[0]?.id || null
   formAmount.value = ''
   formDate.value = new Date().toISOString().substring(0, 10)
@@ -150,7 +163,11 @@ const openAddDialog = () => {
 
 const openEditDialog = item => {
   editingItem.value = item
+  if (item.category && !categories.value.includes(item.category)) {
+    categories.value.push(item.category)
+  }
   formCategory.value = item.category
+  customCategoryInput.value = ''
   formBranchId.value = item.branch_id
   formAmount.value = formatInputRupiah(item.amount)
   formDate.value = item.date ? item.date.substring(0, 10) : new Date().toISOString().substring(0, 10)
@@ -165,6 +182,30 @@ const openDeleteDialog = item => {
 }
 
 const savePettyCash = async () => {
+  let resolvedCategory = formCategory.value
+
+  if (isCustomCategory.value) {
+    if (!customCategoryInput.value.trim()) {
+      snackbar.show('Silakan ketik nama kategori baru Anda', 'warning')
+      return
+    }
+    resolvedCategory = customCategoryInput.value.trim()
+    // Otomatis tambahkan ke list categories agar langsung muncul di dropdown & filter
+    if (!categories.value.includes(resolvedCategory)) {
+      const idx = categories.value.indexOf('Lain-lain')
+      if (idx !== -1) {
+        categories.value.splice(idx, 0, resolvedCategory)
+      } else {
+        categories.value.push(resolvedCategory)
+      }
+    }
+  }
+
+  if (!resolvedCategory) {
+    snackbar.show('Pilih atau masukkan kategori pengeluaran', 'warning')
+    return
+  }
+
   if (!formAmount.value || parseInputRupiah(formAmount.value) <= 0) {
     snackbar.show('Jumlah pengeluaran harus lebih dari 0', 'warning')
     return
@@ -178,7 +219,7 @@ const savePettyCash = async () => {
   try {
     const payload = {
       branch_id: formBranchId.value,
-      category: formCategory.value,
+      category: resolvedCategory,
       amount: parseInputRupiah(formAmount.value),
       date: formDate.value,
       description: formDescription.value,
@@ -198,11 +239,11 @@ const savePettyCash = async () => {
       })
       snackbar.show('Pengeluaran kas kecil berhasil dicatat', 'success')
     }
-
     isAddEditDialogVisible.value = false
     await fetchData()
   } catch (e) {
-    snackbar.show(e.data?.message || 'Gagal menyimpan catatan kas kecil', 'error')
+    console.error(e)
+    snackbar.show(e.data?.message || 'Gagal menyimpan data kas kecil', 'error')
   } finally {
     isSubmitting.value = false
   }
@@ -447,11 +488,34 @@ const confirmDelete = async () => {
             <VCol cols="12">
               <VSelect
                 v-model="formCategory"
-                :items="categories"
+                :items="[...categories, '+ Tambah Kategori Baru...']"
                 label="Kategori Pengeluaran *"
                 density="compact"
                 variant="outlined"
+                prepend-inner-icon="ri-folder-line"
               />
+            </VCol>
+
+            <!-- Input Kategori Baru / Lainnya jika dipilih -->
+            <VCol v-if="isCustomCategory" cols="12">
+              <div class="pa-3 rounded-lg border border-primary" style="background-color: rgba(var(--v-theme-primary), 0.05);">
+                <div class="d-flex align-center gap-2 mb-2 text-primary font-weight-bold text-caption">
+                  <VIcon icon="ri-add-circle-line" size="16" />
+                  Ketik Nama Kategori Baru:
+                </div>
+                <VTextField
+                  v-model="customCategoryInput"
+                  label="Nama Kategori Pengeluaran Baru *"
+                  placeholder="Contoh: Servis Mesin Genset / Beli Kipas Angin"
+                  density="compact"
+                  variant="outlined"
+                  autofocus
+                  hide-details
+                />
+                <span class="text-caption text-medium-emphasis mt-1 d-block" style="font-size: 11px;">
+                  ✨ Kategori baru ini akan otomatis tersimpan dan dapat dipilih kembali di masa mendatang.
+                </span>
+              </div>
             </VCol>
 
             <VCol cols="12">

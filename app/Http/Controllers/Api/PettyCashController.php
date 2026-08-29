@@ -53,12 +53,26 @@ class PettyCashController extends Controller
         $totalAmount = (clone $query)->sum('amount');
         $items = $query->paginate($request->query('itemsPerPage', 15));
 
+        $defaultCategories = [
+            'Operasional Toko',
+            'Listrik & PLN',
+            'Air & Galon Minum',
+            'Bensin & Transportasi Kurir',
+            'ATK & Kertas Thermal',
+            'Konsumsi & Snack Lembur',
+            'Kebersihan & Perlengkapan',
+            'Lain-lain',
+        ];
+        $dbCategories = PettyCash::distinct()->pluck('category')->filter()->values()->all();
+        $allCategories = array_values(array_unique(array_merge($defaultCategories, $dbCategories)));
+
         return response()->json([
             'data' => $items->items(),
             'total' => $items->total(),
             'totalAmount' => (float) $totalAmount,
             'currentPage' => $items->currentPage(),
             'lastPage' => $items->lastPage(),
+            'categories' => $allCategories,
         ]);
     }
 
