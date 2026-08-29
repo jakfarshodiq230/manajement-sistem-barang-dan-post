@@ -11,6 +11,7 @@ class PayablePayment extends Model
 
     protected $fillable = [
         'payment_number',
+        'payable_statement_id',
         'payable_id',
         'payment_date',
         'amount',
@@ -35,6 +36,11 @@ class PayablePayment extends Model
         return \Spatie\Activitylog\LogOptions::defaults()->logAll();
     }
 
+    public function payableStatement()
+    {
+        return $this->belongsTo(PayableStatement::class);
+    }
+
     public function payable()
     {
         return $this->belongsTo(Payable::class);
@@ -43,6 +49,11 @@ class PayablePayment extends Model
     public function supplierCredit()
     {
         return $this->belongsTo(SupplierCredit::class);
+    }
+
+    public function paymentItems()
+    {
+        return $this->hasMany(PayablePaymentItem::class, 'payable_payment_id');
     }
 
     public function creator()

@@ -623,7 +623,7 @@ const executeDeletePO = async () => {
     <!-- Tracking & Approval Dialog (Kepala Divisi Review) -->
     <VDialog
       v-model="isTrackingDialogVisible"
-      max-width="960"
+      max-width="1150"
     >
       <VCard v-if="trackingPO">
         <VCardTitle class="d-flex justify-space-between align-center px-6 pt-6 pb-4 bg-light">
@@ -674,7 +674,7 @@ const executeDeletePO = async () => {
         >
           <!-- Rejection Alert if any -->
           <VAlert
-            v-if="trackingPO.goods_receipt?.approval_status === 'rejected'"
+            v-if="trackingPO.goods_receipt?.rejection_reason"
             type="error"
             variant="tonal"
             density="compact"
@@ -711,11 +711,11 @@ const executeDeletePO = async () => {
               </VCol>
               <VCol cols="12" sm="4" class="mt-2">
                 <div class="text-caption text-medium-emphasis">Tanggal Barang Sampai:</div>
-                <div class="font-weight-bold">{{ trackingPO.goods_receipt.received_date || '-' }}</div>
+                <div class="font-weight-bold">{{ formatDate(trackingPO.goods_receipt.received_date || trackingPO.goods_receipt.date) }}</div>
               </VCol>
               <VCol cols="12" sm="4" class="mt-2">
                 <div class="text-caption text-medium-emphasis">Tanggal Jatuh Tempo Faktur:</div>
-                <div class="font-weight-bold text-error">{{ trackingPO.goods_receipt.due_date ? String(trackingPO.goods_receipt.due_date).substring(0, 10) : '-' }}</div>
+                <div class="font-weight-bold text-error">{{ formatDate(trackingPO.goods_receipt.due_date) }}</div>
               </VCol>
               <VCol cols="12" sm="4" class="mt-2">
                 <div class="text-caption text-medium-emphasis">Kepala Divisi (Validasi Harga):</div>
@@ -729,12 +729,12 @@ const executeDeletePO = async () => {
                   <VImg
                     v-for="(photo, idx) in trackingPO.goods_receipt.photos"
                     :key="idx"
-                    :src="photo"
+                    :src="photo.startsWith('http') || photo.startsWith('/storage') ? photo : ('/storage/' + photo)"
                     width="100"
                     height="80"
                     cover
                     class="rounded-lg border cursor-pointer hover-elevation"
-                    @click="openPhotoZoom(photo)"
+                    @click="openPhotoZoom(photo.startsWith('http') || photo.startsWith('/storage') ? photo : ('/storage/' + photo))"
                   />
                 </div>
               </VCol>
@@ -775,44 +775,99 @@ const executeDeletePO = async () => {
               </span>
             </div>
 
-            <div class="border rounded overflow-hidden">
-              <table class="w-100 text-left" style="border-collapse: collapse; font-size: 13px;">
+            <div class="border rounded overflow-x-auto shadow-xs">
+              <table class="w-100 text-left" style="border-collapse: collapse; font-size: 12.5px; min-width: 900px;">
                 <thead>
                   <tr class="bg-grey-100 border-b text-medium-emphasis font-weight-bold">
-                    <th class="pa-3">Barang & SKU</th>
+                    <th class="pa-3" style="min-width: 170px;">Barang & Batch</th>
                     <th class="pa-3 text-center" style="width: 100px;">Qty Diterima</th>
-                    <th class="pa-3 text-right" style="width: 130px;">Harga Gross (Rp)</th>
-                    <th class="pa-3 text-center" style="width: 150px;">Diskon Bertingkat</th>
-                    <th class="pa-3 text-right" style="width: 130px;">Harga Netto Satuan</th>
-                    <th class="pa-3 text-right" style="width: 140px;">Subtotal Netto</th>
+                    <th class="pa-3 text-right" style="width: 110px;">Harga Gross</th>
+                    <th class="pa-3 text-center" style="width: 100px;">Diskon</th>
+                    <th class="pa-3 text-right" style="width: 125px;">Harga Modal (HPP)</th>
+                    <th class="pa-3 text-right" style="width: 125px;">Harga Jual Toko</th>
+                    <th class="pa-3 text-right" style="width: 120px;">Batas Min. Nego</th>
+                    <th class="pa-3 text-right" style="width: 125px;">Subtotal Faktur</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr
                     v-for="i in (trackingPO.goods_receipt?.items || trackingPO.items || [])"
                     :key="i.id"
-                    class="border-b"
+                    class="border-b hover-bg"
                   >
+                    <!-- Barang & Batch -->
                     <td class="pa-3">
-                      <div class="font-weight-bold">{{ i.product?.name || i.product_branch?.product?.name || 'Item' }}</div>
-                      <div class="text-caption text-medium-emphasis font-mono"><code>{{ i.product?.sku || '-' }}</code></div>
+                      <div class="font-weight-bold text-high-emphasis">
+                        {{ i.product?.name || i.product_branch?.product?.name || 'Item' }}
+                      </div>
+                      <div class="text-caption text-medium-emphasis font-mono">
+                        <code>{{ i.product?.sku || i.product_branch?.product?.sku || '-' }}</code>
+                      </div>
+                      <div v-if="i.batch_number || i.expiration_date" class="text-caption text-primary mt-1" style="font-size: 11px;">
+                        <span v-if="i.batch_number">Batch: <strong>{{ i.batch_number }}</strong></span>
+                        <span v-if="i.expiration_date" class="ms-1">| Exp: <strong>{{ formatDate(i.expiration_date) }}</strong></span>
+                      </div>
                     </td>
-                    <td class="pa-3 text-center font-weight-bold text-primary">
-                      {{ i.qty }} {{ i.unit_name || 'pcs' }}
+
+                    <!-- Qty Diterima & Satuan -->
+                    <td class="pa-3 text-center">
+                      <div class="font-weight-bold text-primary">
+                        {{ i.qty_received || i.qty }} {{ i.unit_name || 'pcs' }}
+                      </div>
+                      <div v-if="i.conversion_qty && i.conversion_qty > 1" class="text-caption text-medium-emphasis" style="font-size: 10.5px;">
+                        (Isi {{ i.conversion_qty }} pcs)
+                      </div>
                     </td>
+
+                    <!-- Harga Gross -->
                     <td class="pa-3 text-right font-mono">
                       {{ formatRupiah(i.gross_price || i.unit_cost) }}
                     </td>
+
+                    <!-- Diskon Bertingkat -->
                     <td class="pa-3 text-center">
-                      <VChip size="x-small" variant="tonal" color="warning" class="font-mono">
+                      <VChip size="x-small" variant="tonal" color="warning" class="font-mono font-weight-bold">
                         {{ formatDiscountTiers(i) }}
                       </VChip>
                     </td>
-                    <td class="pa-3 text-right font-mono font-weight-medium">
-                      {{ formatRupiah(i.unit_cost || (i.total_price && i.qty ? i.total_price / i.qty : i.gross_price)) }}
+
+                    <!-- Harga Modal HPP Dasar per Pcs/Satuan -->
+                    <td class="pa-3 text-right font-mono">
+                      <div class="font-weight-bold text-primary">
+                        {{ formatRupiah(i.final_cost_per_piece || i.net_unit_price || i.unit_cost) }}
+                      </div>
+                      <div class="text-caption text-disabled" style="font-size: 10px;">
+                        HPP per {{ (i.conversion_qty && i.conversion_qty > 1) ? 'pcs' : (i.unit_name || 'satuan') }}
+                      </div>
                     </td>
+
+                    <!-- Harga Jual Toko -->
+                    <td class="pa-3 text-right font-mono">
+                      <div class="font-weight-bold text-success">
+                        {{ (i.price || i.selling_price) > 0 ? formatRupiah(i.price || i.selling_price) : '-' }}
+                      </div>
+                      <div
+                        v-if="(i.price || i.selling_price) > 0 && (i.final_cost_per_piece || i.unit_cost) > 0"
+                        class="text-caption text-success font-weight-medium"
+                        style="font-size: 10px;"
+                      >
+                        +{{ formatRupiah((i.price || i.selling_price) - (i.final_cost_per_piece || i.unit_cost)) }}
+                      </div>
+                    </td>
+
+                    <!-- Batas Min. Nego -->
+                    <td class="pa-3 text-right font-mono">
+                      <div class="font-weight-bold text-warning">
+                        {{ (i.min_nego_price || 0) > 0 ? formatRupiah(i.min_nego_price) : '-' }}
+                      </div>
+                      <div v-if="(i.min_nego_price || 0) > 0" class="text-caption text-medium-emphasis" style="font-size: 10px;">
+                        Batas Kasir
+                      </div>
+                    </td>
+
+                    <!-- Subtotal Netto Faktur -->
                     <td class="pa-3 text-right font-bold font-mono text-primary">
-                      {{ formatRupiah(i.total_price || (i.qty * (i.unit_cost || i.gross_price || 0))) }}
+                      {{ formatRupiah(i.total_price || i.subtotal || ((i.qty_received || i.qty || 1) * (i.net_unit_price || i.unit_cost || i.gross_price || 0))) }}
                     </td>
                   </tr>
                 </tbody>

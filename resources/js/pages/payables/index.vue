@@ -1,14 +1,27 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useSnackbarStore } from '@/stores/snackbar'
 import PayableDetailDrawer from './PayableDetailDrawer.vue'
 
-const payables = ref([])
-const isLoading = ref(false)
-const totalItems = ref(0)
+const activeTab = ref('statements') // 'statements' | 'invoices'
+
+// State for Statements
+const statements = ref([])
+const isLoadingStatements = ref(false)
+const totalStatements = ref(0)
 const page = ref(1)
 const itemsPerPage = ref(10)
 
+// State for Invoices tab
+const invoices = ref([])
+const isLoadingInvoices = ref(false)
+const totalInvoices = ref(0)
+const invoicePage = ref(1)
+const invoiceItemsPerPage = ref(10)
+
+// Filters
+const selectedPeriod = ref('all')
+const availablePeriods = ref([])
 const selectedStatus = ref('')
 const selectedSupplier = ref(null)
 const selectedBranch = ref(null)
@@ -31,7 +44,7 @@ const summary = ref({
 })
 
 const isDetailDrawerVisible = ref(false)
-const selectedPayableId = ref(null)
+const selectedStatementId = ref(null)
 
 const snackbar = useSnackbarStore()
 
@@ -43,6 +56,20 @@ const formatCurrency = value => {
 const formatDate = dateString => {
   if (!dateString) return '-'
   return new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+const formatDateRange = (start, end) => {
+  if (!start || !end) return '-'
+  const dStart = new Date(start).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
+  const dEnd = new Date(end).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+  return `${dStart} - ${dEnd}`
+}
+
+const formatMonthLabel = periodMonth => {
+  if (!periodMonth) return '-'
+  const [year, month] = periodMonth.split('-')
+  const date = new Date(year, parseInt(month) - 1, 1)
+  return date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
 }
 
 const fetchInitialOptions = async () => {
@@ -58,14 +85,15 @@ const fetchInitialOptions = async () => {
   }
 }
 
-const fetchPayables = async () => {
-  isLoading.value = true
+const fetchStatements = async () => {
+  isLoadingStatements.value = true
   try {
     const params = {
       page: page.value,
       itemsPerPage: itemsPerPage.value,
     }
 
+    if (selectedPeriod.value && selectedPeriod.value !== 'all') params.period_month = selectedPeriod.value
     if (selectedStatus.value) params.status = selectedStatus.value
     if (selectedSupplier.value) params.supplier_id = selectedSupplier.value
     if (selectedBranch.value) params.branch_id = selectedBranch.value
@@ -73,18 +101,54 @@ const fetchPayables = async () => {
 
     const res = await $api('/apps/payables', { query: params })
 
-    payables.value = res.data || res || []
+    statements.value = res.data || res || []
     if (res.total !== undefined) {
-      totalItems.value = res.total
+      totalStatements.value = res.total
     }
     if (res.summary) {
       summary.value = res.summary
     }
+    if (res.available_periods) {
+      availablePeriods.value = res.available_periods
+    }
   } catch (error) {
-    console.error('Failed to fetch payables:', error)
-    snackbar.show('Gagal mengambil data buku hutang supplier', 'error')
+    console.error('Failed to fetch payable statements:', error)
+    snackbar.show('Gagal mengambil data tagihan bulanan supplier', 'error')
   } finally {
-    isLoading.value = false
+    isLoadingStatements.value = false
+  }
+}
+
+const fetchInvoices = async () => {
+  isLoadingInvoices.value = true
+  try {
+    const params = {
+      page: invoicePage.value,
+      itemsPerPage: invoiceItemsPerPage.value,
+    }
+
+    if (selectedSupplier.value) params.supplier_id = selectedSupplier.value
+    if (selectedBranch.value) params.branch_id = selectedBranch.value
+    if (searchQuery.value) params.search = searchQuery.value
+
+    const res = await $api('/apps/payables/invoices', { query: params })
+
+    invoices.value = res.data || res || []
+    if (res.total !== undefined) {
+      totalInvoices.value = res.total
+    }
+  } catch (error) {
+    console.error('Failed to fetch invoices:', error)
+  } finally {
+    isLoadingInvoices.value = false
+  }
+}
+
+const refreshAll = () => {
+  if (activeTab.value === 'statements') {
+    fetchStatements()
+  } else {
+    fetchInvoices()
   }
 }
 
@@ -92,29 +156,51 @@ watch(searchQuery, () => {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
     page.value = 1
-    fetchPayables()
+    invoicePage.value = 1
+    refreshAll()
   }, 450)
 })
 
-watch([selectedStatus, selectedSupplier, selectedBranch], () => {
+watch([selectedPeriod, selectedStatus, selectedSupplier, selectedBranch], () => {
   page.value = 1
-  fetchPayables()
+  invoicePage.value = 1
+  refreshAll()
+})
+
+watch(activeTab, newTab => {
+  if (newTab === 'statements') {
+    fetchStatements()
+  } else {
+    fetchInvoices()
+  }
 })
 
 onMounted(async () => {
   await fetchInitialOptions()
-  fetchPayables()
+  fetchStatements()
 })
 
-const tableHeaders = [
-  { title: 'NO. AP & FAKTUR SUPPLIER', key: 'payable_number', minWidth: '220px' },
+const statementHeaders = [
+  { title: 'NO. TAGIHAN & SIKLUS', key: 'statement_number', minWidth: '220px' },
   { title: 'SUPPLIER / VENDOR', key: 'supplier.name', minWidth: '180px' },
   { title: 'CABANG', key: 'branch.name' },
+  { title: 'FAKTUR', key: 'total_invoices_count', align: 'center' },
   { title: 'TOTAL TAGIHAN', key: 'total_amount', align: 'end' },
-  { title: 'SUDAH BAYAR', key: 'paid_amount', align: 'end' },
+  { title: 'SUDAH DIBAYAR', key: 'paid_amount', align: 'end' },
   { title: 'SISA HUTANG', key: 'remaining_amount', align: 'end' },
+  { title: 'PROGRES PELUNASAN', key: 'progress', minWidth: '160px' },
   { title: 'JATUH TEMPO', key: 'due_date' },
   { title: 'STATUS', key: 'status', align: 'center' },
+  { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
+]
+
+const invoiceHeaders = [
+  { title: 'NO. AP & FAKTUR SUPPLIER', key: 'payable_number', minWidth: '200px' },
+  { title: 'TGL FAKTUR / TERIMA', key: 'invoice_date' },
+  { title: 'SUPPLIER / VENDOR', key: 'supplier.name' },
+  { title: 'CABANG', key: 'branch.name' },
+  { title: 'TAGIHAN BULANAN', key: 'payable_statement.statement_number', minWidth: '180px' },
+  { title: 'TOTAL NOMINAL', key: 'total_amount', align: 'end' },
   { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
 ]
 
@@ -132,6 +218,13 @@ const isDueSoon = item => {
   return d >= today && d <= next7Days
 }
 
+const getStatementProgress = item => {
+  if (!item || Number(item.total_amount) === 0) return 0
+  const paid = Number(item.paid_amount) || 0
+  const total = Number(item.total_amount) || 1
+  return Math.min(100, Math.round((paid / total) * 100))
+}
+
 const getStatusBadge = item => {
   if (item.status === 'paid') return { color: 'success', text: 'Lunas', icon: 'ri-check-double-line' }
   if (isOverdue(item)) return { color: 'error', text: 'Lewat Jatuh Tempo', icon: 'ri-error-warning-line' }
@@ -139,13 +232,13 @@ const getStatusBadge = item => {
   return { color: 'secondary', text: 'Belum Dibayar', icon: 'ri-file-list-line' }
 }
 
-const openDetailDrawer = payableId => {
-  selectedPayableId.value = payableId
+const openDetailDrawer = statementId => {
+  selectedStatementId.value = statementId
   isDetailDrawerVisible.value = true
 }
 
 const onPaymentUpdated = () => {
-  fetchPayables()
+  fetchStatements()
 }
 </script>
 
@@ -159,8 +252,37 @@ const onPaymentUpdated = () => {
           Buku Hutang Supplier (Accounts Payable)
         </h4>
         <p class="text-body-1 text-medium-emphasis mb-0">
-          Kelola seluruh kewajiban tagihan pengadaan barang ke supplier, jatuh tempo pembayaran, dan riwayat cicilan.
+          Akumulasi tagihan pembelian barang per siklus cutoff (tgl 26 - 25), jatuh tempo pembayaran bulan depan, dan progres cicilan per bulan.
         </p>
+      </div>
+
+      <!-- Quick Actions / Period Picker -->
+      <div class="d-flex align-center gap-3">
+        <div style="min-width: 260px;">
+          <VSelect
+            v-model="selectedPeriod"
+            :items="[
+              { period_month: 'all', label: 'Semua Periode Tagihan' },
+              ...availablePeriods
+            ]"
+            item-title="label"
+            item-value="period_month"
+            density="compact"
+            variant="outlined"
+            label="Periode Tagihan Siklus"
+            hide-details
+            prepend-inner-icon="ri-calendar-event-line"
+          />
+        </div>
+        <VBtn
+          color="primary"
+          variant="tonal"
+          prepend-icon="ri-refresh-line"
+          :loading="isLoadingStatements || isLoadingInvoices"
+          @click="refreshAll"
+        >
+          Muat Ulang
+        </VBtn>
       </div>
     </div>
 
@@ -171,12 +293,12 @@ const onPaymentUpdated = () => {
         <VCard class="h-100 shadow-xs border-dashed">
           <VCardText class="d-flex align-center justify-space-between">
             <div>
-              <span class="text-caption text-medium-emphasis font-weight-medium">Total Tagihan Hutang:</span>
+              <span class="text-caption text-medium-emphasis font-weight-medium">Total Tagihan Periode:</span>
               <h5 class="text-h5 font-weight-bold font-mono text-primary mt-1">
                 {{ formatCurrency(summary.total_payable) }}
               </h5>
               <span class="text-caption text-medium-emphasis">
-                {{ summary.count_total }} Transaksi PO/Faktur
+                {{ summary.count_total }} Tagihan Bulanan Aktif
               </span>
             </div>
             <VAvatar color="primary" variant="tonal" size="48" class="rounded-xl">
@@ -196,7 +318,7 @@ const onPaymentUpdated = () => {
                 {{ formatCurrency(summary.total_paid) }}
               </h5>
               <span class="text-caption text-success font-weight-medium">
-                {{ summary.count_paid }} Faktur Lunas
+                {{ summary.count_paid }} Tagihan Lunas
               </span>
             </div>
             <VAvatar color="success" variant="tonal" size="48" class="rounded-xl">
@@ -216,7 +338,7 @@ const onPaymentUpdated = () => {
                 {{ formatCurrency(summary.total_remaining) }}
               </h5>
               <span class="text-caption text-warning font-weight-medium">
-                {{ summary.count_unpaid + summary.count_partial }} Faktur Aktif
+                {{ summary.count_unpaid + summary.count_partial }} Tagihan Belum Lunas
               </span>
             </div>
             <VAvatar color="error" variant="tonal" size="48" class="rounded-xl">
@@ -236,7 +358,7 @@ const onPaymentUpdated = () => {
                 {{ formatCurrency(summary.total_overdue) }}
               </h5>
               <span class="text-caption text-error font-weight-medium">
-                {{ summary.count_overdue }} Faktur Menunggak
+                {{ summary.count_overdue }} Tagihan Menunggak
               </span>
             </div>
             <VAvatar color="error" variant="flat" size="48" class="rounded-xl">
@@ -247,224 +369,392 @@ const onPaymentUpdated = () => {
       </VCol>
     </VRow>
 
-    <!-- Main Table Card -->
+    <!-- Main Card with Tabs -->
     <VCard class="rounded-xl overflow-hidden shadow-xs border">
-      <!-- Filter Toolbar -->
-      <div class="pa-4 border-b bg-var-theme-surface d-flex justify-space-between align-center flex-wrap gap-4">
-        <!-- Status Tabs / Filter -->
-        <div class="d-flex align-center gap-2 flex-wrap">
-          <VBtn
-            size="small"
-            :variant="selectedStatus === '' ? 'flat' : 'tonal'"
-            color="primary"
-            class="rounded-lg"
-            @click="selectedStatus = ''"
-          >
-            Semua ({{ summary.count_total }})
-          </VBtn>
-          <VBtn
-            size="small"
-            :variant="selectedStatus === 'unpaid' ? 'flat' : 'tonal'"
-            color="secondary"
-            class="rounded-lg"
-            @click="selectedStatus = 'unpaid'"
-          >
-            Belum Bayar ({{ summary.count_unpaid }})
-          </VBtn>
-          <VBtn
-            size="small"
-            :variant="selectedStatus === 'partial' ? 'flat' : 'tonal'"
-            color="warning"
-            class="rounded-lg"
-            @click="selectedStatus = 'partial'"
-          >
-            Dicicil ({{ summary.count_partial }})
-          </VBtn>
-          <VBtn
-            size="small"
-            :variant="selectedStatus === 'paid' ? 'flat' : 'tonal'"
-            color="success"
-            class="rounded-lg"
-            @click="selectedStatus = 'paid'"
-          >
-            Lunas ({{ summary.count_paid }})
-          </VBtn>
-          <VBtn
-            size="small"
-            :variant="selectedStatus === 'overdue' ? 'flat' : 'tonal'"
-            color="error"
-            class="rounded-lg"
-            @click="selectedStatus = 'overdue'"
-          >
-            Lewat Tempo ({{ summary.count_overdue }})
-          </VBtn>
-        </div>
-
-        <!-- Search and Select Filters -->
-        <div class="d-flex align-center gap-3 flex-wrap">
-          <div style="width: 200px;">
-            <VSelect
-              v-model="selectedSupplier"
-              :items="suppliers"
-              item-title="name"
-              item-value="id"
-              label="Filter Supplier"
-              placeholder="Semua Supplier"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
-            />
-          </div>
-
-          <div style="width: 180px;">
-            <VSelect
-              v-model="selectedBranch"
-              :items="branches"
-              item-title="name"
-              item-value="id"
-              label="Filter Cabang"
-              placeholder="Semua Cabang"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
-            />
-          </div>
-
-          <div style="width: 250px;">
-            <VTextField
-              v-model="searchQuery"
-              placeholder="Cari faktur / supplier..."
-              prepend-inner-icon="ri-search-line"
-              density="compact"
-              variant="outlined"
-              clearable
-              hide-details
-            />
-          </div>
-        </div>
+      <!-- Tabs Header -->
+      <div class="border-b bg-var-theme-surface">
+        <VTabs v-model="activeTab" color="primary">
+          <VTab value="statements" class="font-weight-bold">
+            <VIcon icon="ri-calendar-check-line" size="18" class="mr-2" />
+            Rekap Tagihan Bulanan (Billing Statements)
+            <VChip size="x-small" color="primary" class="ml-2 font-weight-bold">{{ totalStatements }}</VChip>
+          </VTab>
+          <VTab value="invoices" class="font-weight-bold">
+            <VIcon icon="ri-file-list-line" size="18" class="mr-2" />
+            Rincian Seluruh Faktur Pembelian (All Invoices)
+            <VChip size="x-small" color="secondary" class="ml-2 font-weight-bold">{{ totalInvoices }}</VChip>
+          </VTab>
+        </VTabs>
       </div>
 
-      <!-- Data Table -->
-      <VDataTableServer
-        v-model:items-per-page="itemsPerPage"
-        v-model:page="page"
-        :items="payables"
-        :items-length="totalItems"
-        :headers="tableHeaders"
-        :loading="isLoading"
-        class="text-no-wrap"
-        @update:options="fetchPayables"
-      >
-        <!-- No. AP & Faktur Supplier -->
-        <template #item.payable_number="{ item }">
-          <div class="py-2">
-            <div class="font-weight-bold font-mono text-primary text-body-2">
-              {{ item.payable_number }}
-            </div>
-            <div v-if="item.invoice_number_supplier" class="text-caption text-high-emphasis">
-              Faktur: <code>{{ item.invoice_number_supplier }}</code>
-            </div>
-            <div v-if="item.purchase_order" class="text-caption text-medium-emphasis">
-              PO: {{ item.purchase_order.po_number }}
-            </div>
-          </div>
-        </template>
-
-        <!-- Supplier -->
-        <template #item.supplier.name="{ item }">
-          <div>
-            <div class="font-weight-bold text-body-2">{{ item.supplier?.name || '-' }}</div>
-            <div class="text-caption text-medium-emphasis">{{ item.supplier?.phone || '-' }}</div>
-          </div>
-        </template>
-
-        <!-- Cabang -->
-        <template #item.branch.name="{ item }">
-          <span class="text-body-2">{{ item.branch?.name || '-' }}</span>
-        </template>
-
-        <!-- Total Tagihan -->
-        <template #item.total_amount="{ item }">
-          <span class="font-weight-bold font-mono text-body-2 text-primary">
-            {{ formatCurrency(item.total_amount) }}
-          </span>
-        </template>
-
-        <!-- Sudah Bayar -->
-        <template #item.paid_amount="{ item }">
-          <span class="font-weight-bold font-mono text-body-2 text-success">
-            {{ formatCurrency(item.paid_amount) }}
-          </span>
-        </template>
-
-        <!-- Sisa Hutang -->
-        <template #item.remaining_amount="{ item }">
-          <span class="font-weight-bold font-mono text-body-2 text-error">
-            {{ formatCurrency(item.remaining_amount) }}
-          </span>
-        </template>
-
-        <!-- Jatuh Tempo -->
-        <template #item.due_date="{ item }">
-          <div>
-            <div class="text-body-2" :class="isOverdue(item) ? 'text-error font-weight-bold' : ''">
-              {{ formatDate(item.due_date) }}
-            </div>
-            <VChip
-              v-if="isOverdue(item)"
-              size="x-small"
-              color="error"
-              variant="flat"
-              class="font-weight-bold mt-1"
+      <!-- TAB 1: Statements View -->
+      <div v-show="activeTab === 'statements'">
+        <!-- Filter Toolbar -->
+        <div class="pa-4 border-b bg-var-theme-surface d-flex justify-space-between align-center flex-wrap gap-4">
+          <!-- Status Tabs / Filter -->
+          <div class="d-flex align-center gap-2 flex-wrap">
+            <VBtn
+              size="small"
+              :variant="selectedStatus === '' ? 'flat' : 'tonal'"
+              color="primary"
+              class="rounded-lg"
+              @click="selectedStatus = ''"
             >
-              Lewat Tempo
-            </VChip>
-            <VChip
-              v-else-if="isDueSoon(item)"
-              size="x-small"
+              Semua ({{ summary.count_total }})
+            </VBtn>
+            <VBtn
+              size="small"
+              :variant="selectedStatus === 'unpaid' ? 'flat' : 'tonal'"
+              color="secondary"
+              class="rounded-lg"
+              @click="selectedStatus = 'unpaid'"
+            >
+              Belum Bayar ({{ summary.count_unpaid }})
+            </VBtn>
+            <VBtn
+              size="small"
+              :variant="selectedStatus === 'partial' ? 'flat' : 'tonal'"
               color="warning"
-              variant="tonal"
-              class="font-weight-bold mt-1"
+              class="rounded-lg"
+              @click="selectedStatus = 'partial'"
             >
-              Jatuh Tempo Segera
-            </VChip>
+              Dicicil ({{ summary.count_partial }})
+            </VBtn>
+            <VBtn
+              size="small"
+              :variant="selectedStatus === 'paid' ? 'flat' : 'tonal'"
+              color="success"
+              class="rounded-lg"
+              @click="selectedStatus = 'paid'"
+            >
+              Lunas ({{ summary.count_paid }})
+            </VBtn>
+            <VBtn
+              size="small"
+              :variant="selectedStatus === 'overdue' ? 'flat' : 'tonal'"
+              color="error"
+              class="rounded-lg"
+              @click="selectedStatus = 'overdue'"
+            >
+              Lewat Tempo ({{ summary.count_overdue }})
+            </VBtn>
           </div>
-        </template>
 
-        <!-- Status -->
-        <template #item.status="{ item }">
-          <VChip
-            :color="getStatusBadge(item).color"
-            size="small"
-            class="font-weight-bold"
-          >
-            <VIcon :icon="getStatusBadge(item).icon" size="14" class="mr-1" />
-            {{ getStatusBadge(item).text }}
-          </VChip>
-        </template>
+          <!-- Search and Select Filters -->
+          <div class="d-flex align-center gap-3 flex-wrap">
+            <div style="width: 200px;">
+              <VSelect
+                v-model="selectedSupplier"
+                :items="suppliers"
+                item-title="name"
+                item-value="id"
+                label="Filter Supplier"
+                placeholder="Semua Supplier"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
+            </div>
 
-        <!-- Aksi -->
-        <template #item.actions="{ item }">
-          <VBtn
-            size="small"
-            color="primary"
-            variant="tonal"
-            prepend-icon="ri-wallet-3-line"
-            class="font-weight-bold"
-            @click="openDetailDrawer(item.id)"
-          >
-            {{ item.status === 'paid' ? 'Detail' : 'Bayar / Cicil' }}
-          </VBtn>
-        </template>
-      </VDataTableServer>
+            <div style="width: 180px;">
+              <VSelect
+                v-model="selectedBranch"
+                :items="branches"
+                item-title="name"
+                item-value="id"
+                label="Filter Cabang"
+                placeholder="Semua Cabang"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
+            </div>
+
+            <div style="width: 240px;">
+              <VTextField
+                v-model="searchQuery"
+                placeholder="Cari no. tagihan / supplier..."
+                prepend-inner-icon="ri-search-line"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Data Table Statements -->
+        <VDataTableServer
+          v-model:items-per-page="itemsPerPage"
+          v-model:page="page"
+          :items="statements"
+          :items-length="totalStatements"
+          :headers="statementHeaders"
+          :loading="isLoadingStatements"
+          class="text-no-wrap"
+          @update:options="fetchStatements"
+        >
+          <!-- No. Tagihan & Siklus -->
+          <template #item.statement_number="{ item }">
+            <div class="py-2">
+              <div class="font-weight-bold font-mono text-primary text-body-2">
+                {{ item.statement_number }}
+              </div>
+              <div class="d-flex align-center gap-1 mt-1">
+                <VChip size="x-small" color="primary" variant="tonal" class="font-weight-bold">
+                  {{ formatMonthLabel(item.period_month) }}
+                </VChip>
+                <span class="text-caption text-medium-emphasis">
+                  ({{ formatDateRange(item.period_start_date, item.period_end_date) }})
+                </span>
+              </div>
+            </div>
+          </template>
+
+          <!-- Supplier -->
+          <template #item.supplier.name="{ item }">
+            <div>
+              <div class="font-weight-bold text-body-2">{{ item.supplier?.name || '-' }}</div>
+              <div class="text-caption text-medium-emphasis">{{ item.supplier?.phone || '-' }}</div>
+            </div>
+          </template>
+
+          <!-- Cabang -->
+          <template #item.branch.name="{ item }">
+            <span class="text-body-2">{{ item.branch?.name || 'Semua Cabang' }}</span>
+          </template>
+
+          <!-- Total Invoices -->
+          <template #item.total_invoices_count="{ item }">
+            <VChip size="small" variant="tonal" color="info" class="font-weight-bold">
+              <VIcon icon="ri-file-list-3-line" size="14" class="mr-1" />
+              {{ item.total_invoices_count || (item.payables ? item.payables.length : 0) }} Faktur
+            </VChip>
+          </template>
+
+          <!-- Total Tagihan -->
+          <template #item.total_amount="{ item }">
+            <span class="font-weight-bold font-mono text-body-2 text-primary">
+              {{ formatCurrency(item.total_amount) }}
+            </span>
+          </template>
+
+          <!-- Sudah Bayar -->
+          <template #item.paid_amount="{ item }">
+            <span class="font-weight-bold font-mono text-body-2 text-success">
+              {{ formatCurrency(item.paid_amount) }}
+            </span>
+          </template>
+
+          <!-- Sisa Hutang -->
+          <template #item.remaining_amount="{ item }">
+            <span class="font-weight-bold font-mono text-body-2 text-error">
+              {{ formatCurrency(item.remaining_amount) }}
+            </span>
+          </template>
+
+          <!-- Progres Pelunasan -->
+          <template #item.progress="{ item }">
+            <div style="min-width: 140px;" class="py-1">
+              <div class="d-flex justify-space-between text-caption font-weight-bold mb-1">
+                <span>{{ getStatementProgress(item) }}%</span>
+                <span class="text-caption text-medium-emphasis font-weight-normal">
+                  {{ item.status === 'paid' ? 'Lunas' : 'Sisa ' + formatCurrency(item.remaining_amount) }}
+                </span>
+              </div>
+              <VProgressLinear
+                :model-value="getStatementProgress(item)"
+                height="6"
+                rounded
+                :color="item.status === 'paid' ? 'success' : (getStatementProgress(item) > 0 ? 'warning' : 'secondary')"
+              />
+            </div>
+          </template>
+
+          <!-- Jatuh Tempo -->
+          <template #item.due_date="{ item }">
+            <div>
+              <div class="text-body-2" :class="isOverdue(item) ? 'text-error font-weight-bold' : ''">
+                {{ formatDate(item.due_date) }}
+              </div>
+              <VChip
+                v-if="isOverdue(item)"
+                size="x-small"
+                color="error"
+                variant="flat"
+                class="font-weight-bold mt-1"
+              >
+                Lewat Tempo
+              </VChip>
+              <VChip
+                v-else-if="isDueSoon(item)"
+                size="x-small"
+                color="warning"
+                variant="tonal"
+                class="font-weight-bold mt-1"
+              >
+                Jatuh Tempo Segera
+              </VChip>
+              <span v-else class="text-caption text-medium-emphasis d-block">
+                Bulan Depan
+              </span>
+            </div>
+          </template>
+
+          <!-- Status -->
+          <template #item.status="{ item }">
+            <VChip
+              :color="getStatusBadge(item).color"
+              size="small"
+              class="font-weight-bold"
+            >
+              <VIcon :icon="getStatusBadge(item).icon" size="14" class="mr-1" />
+              {{ getStatusBadge(item).text }}
+            </VChip>
+          </template>
+
+          <!-- Aksi -->
+          <template #item.actions="{ item }">
+            <VBtn
+              size="small"
+              color="primary"
+              :variant="item.status === 'paid' ? 'tonal' : 'flat'"
+              prepend-icon="ri-checkbox-multiple-line"
+              class="font-weight-bold"
+              @click="openDetailDrawer(item.id)"
+            >
+              {{ item.status === 'paid' ? 'Rincian Barang' : 'Bayar / Pilih Barang' }}
+            </VBtn>
+          </template>
+        </VDataTableServer>
+      </div>
+
+      <!-- TAB 2: Invoices Breakdown View -->
+      <div v-show="activeTab === 'invoices'">
+        <div class="pa-4 border-b bg-var-theme-surface d-flex justify-space-between align-center flex-wrap gap-4">
+          <div class="text-body-2 text-medium-emphasis">
+            Daftar seluruh kuitansi penerimaan barang (Goods Receipts) dan status pengelompokan tagihan bulanannya.
+          </div>
+          <div class="d-flex align-center gap-3">
+            <div style="width: 200px;">
+              <VSelect
+                v-model="selectedSupplier"
+                :items="suppliers"
+                item-title="name"
+                item-value="id"
+                label="Filter Supplier"
+                placeholder="Semua Supplier"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
+            </div>
+            <div style="width: 250px;">
+              <VTextField
+                v-model="searchQuery"
+                placeholder="Cari no. faktur / PO..."
+                prepend-inner-icon="ri-search-line"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+              />
+            </div>
+          </div>
+        </div>
+
+        <VDataTableServer
+          v-model:items-per-page="invoiceItemsPerPage"
+          v-model:page="invoicePage"
+          :items="invoices"
+          :items-length="totalInvoices"
+          :headers="invoiceHeaders"
+          :loading="isLoadingInvoices"
+          class="text-no-wrap"
+          @update:options="fetchInvoices"
+        >
+          <!-- No AP & Faktur Supplier -->
+          <template #item.payable_number="{ item }">
+            <div class="py-2">
+              <div class="font-weight-bold font-mono text-primary text-body-2">
+                {{ item.payable_number }}
+              </div>
+              <div v-if="item.invoice_number_supplier" class="text-caption text-high-emphasis">
+                Faktur: <code>{{ item.invoice_number_supplier }}</code>
+              </div>
+              <div v-if="item.purchase_order" class="text-caption text-medium-emphasis">
+                PO: {{ item.purchase_order.po_number }}
+              </div>
+            </div>
+          </template>
+
+          <!-- Tanggal Faktur -->
+          <template #item.invoice_date="{ item }">
+            <span class="text-body-2">{{ formatDate(item.invoice_date) }}</span>
+          </template>
+
+          <!-- Supplier -->
+          <template #item.supplier.name="{ item }">
+            <div>
+              <div class="font-weight-bold text-body-2">{{ item.supplier?.name || '-' }}</div>
+              <div class="text-caption text-medium-emphasis">{{ item.supplier?.phone || '-' }}</div>
+            </div>
+          </template>
+
+          <!-- Cabang -->
+          <template #item.branch.name="{ item }">
+            <span class="text-body-2">{{ item.branch?.name || '-' }}</span>
+          </template>
+
+          <!-- Tagihan Bulanan (Statement) -->
+          <template #item.payable_statement.statement_number="{ item }">
+            <div v-if="item.payable_statement">
+              <a
+                href="javascript:void(0)"
+                class="font-mono text-primary font-weight-bold text-caption text-decoration-underline"
+                @click="openDetailDrawer(item.payable_statement.id)"
+              >
+                {{ item.payable_statement.statement_number }}
+              </a>
+              <div class="text-caption text-medium-emphasis">
+                Periode: {{ formatMonthLabel(item.payable_statement.period_month) }}
+              </div>
+            </div>
+            <span v-else class="text-disabled">-</span>
+          </template>
+
+          <!-- Total Nominal -->
+          <template #item.total_amount="{ item }">
+            <span class="font-weight-bold font-mono text-body-2 text-primary">
+              {{ formatCurrency(item.total_amount) }}
+            </span>
+          </template>
+
+          <!-- Aksi -->
+          <template #item.actions="{ item }">
+            <VBtn
+              v-if="item.payable_statement"
+              size="small"
+              color="primary"
+              variant="tonal"
+              prepend-icon="ri-file-list-3-line"
+              @click="openDetailDrawer(item.payable_statement.id)"
+            >
+              Lihat Tagihan Bulan
+            </VBtn>
+          </template>
+        </VDataTableServer>
+      </div>
     </VCard>
 
-    <!-- Drawer Detail & Cicilan -->
+    <!-- Drawer Detail & Cicilan Tagihan Bulanan -->
     <PayableDetailDrawer
       v-model:is-drawer-open="isDetailDrawerVisible"
-      :payable-id="selectedPayableId"
+      :statement-id="selectedStatementId"
       @payment-recorded="onPaymentUpdated"
       @payment-voided="onPaymentUpdated"
     />

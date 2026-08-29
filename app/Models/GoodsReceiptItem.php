@@ -26,6 +26,9 @@ class GoodsReceiptItem extends Model
         'discount_amount',
         'net_unit_price',
         'price',
+        'paid_amount',
+        'remaining_amount',
+        'payment_status',
         'min_nego_price',
         'final_cost_per_piece',
         'expiration_date',
@@ -36,9 +39,24 @@ class GoodsReceiptItem extends Model
         'rejection_reason',
     ];
 
+    protected $casts = [
+        'paid_amount' => 'decimal:2',
+        'remaining_amount' => 'decimal:2',
+        'gross_price' => 'decimal:2',
+        'net_unit_price' => 'decimal:2',
+        'price' => 'decimal:2',
+        'min_nego_price' => 'decimal:2',
+        'final_cost_per_piece' => 'decimal:2',
+    ];
+
     public function getActivitylogOptions(): \Spatie\Activitylog\LogOptions
     {
         return \Spatie\Activitylog\LogOptions::defaults()->logAll();
+    }
+
+    public function paymentAllocations()
+    {
+        return $this->hasMany(PayablePaymentItem::class, 'goods_receipt_item_id');
     }
 
     public function goodsReceipt()

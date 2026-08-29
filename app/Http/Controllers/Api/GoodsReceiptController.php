@@ -652,18 +652,24 @@ class GoodsReceiptController extends Controller
                 $po->update(['status' => 'completed']);
             }
 
-            // Catat atau Sinkronkan ke Buku Hutang Supplier (Accounts Payable)
+            // Catat atau Sinkronkan ke Buku Hutang Supplier (Accounts Payable & Rekap Tagihan Bulanan)
             if ($gr->total_amount > 0) {
                 $existingPayable = \App\Models\Payable::where('goods_receipt_id', $gr->id)->first();
                 if (!$existingPayable) {
-                    \App\Models\Payable::create([
-                        'payable_number' => 'AP-' . date('Ymd') . '-' . rand(1000, 9999),
+                    $invDate = $gr->date ?: ($po ? $po->date : now()->toDateString());
+                    $suppId = $po ? $po->supplier_id : 1;
+                    $brId = $po ? $po->branch_id : 1;
+                    $stmt = \App\Http\Controllers\Api\PayableController::getOrCreateStatementForSupplier($suppId, $brId, $invDate, $user ? $user->id : 1);
+
+                    $newPayable = \App\Models\Payable::create([
+                        'payable_statement_id' => $stmt->id,
+                        'payable_number' => 'AP-' . date('Ymd', strtotime($invDate)) . '-' . rand(1000, 9999),
                         'purchase_order_id' => $po ? $po->id : null,
                         'goods_receipt_id' => $gr->id,
-                        'supplier_id' => $po ? $po->supplier_id : 1,
-                        'branch_id' => $po ? $po->branch_id : 1,
+                        'supplier_id' => $suppId,
+                        'branch_id' => $brId,
                         'invoice_number_supplier' => $gr->invoice_number_supplier ?: ($po ? $po->invoice_number_supplier : null),
-                        'invoice_date' => $gr->date ?: ($po ? $po->date : now()),
+                        'invoice_date' => $invDate,
                         'due_date' => $gr->due_date ?: ($po ? $po->due_date : null),
                         'total_amount' => (float)$gr->total_amount,
                         'paid_amount' => 0,
@@ -672,6 +678,8 @@ class GoodsReceiptController extends Controller
                         'notes' => $gr->notes ?: ($po ? $po->notes : null),
                         'created_by' => $user ? $user->id : 1,
                     ]);
+
+                    $stmt->recalculateTotals();
                 }
             }
 

@@ -10,6 +10,7 @@ class Payable extends Model
     use HasFactory, \Spatie\Activitylog\Traits\LogsActivity, \App\Traits\ScopedByBranch;
 
     protected $fillable = [
+        'payable_statement_id',
         'payable_number',
         'purchase_order_id',
         'goods_receipt_id',
@@ -37,6 +38,11 @@ class Payable extends Model
     public function getActivitylogOptions(): \Spatie\Activitylog\LogOptions
     {
         return \Spatie\Activitylog\LogOptions::defaults()->logAll();
+    }
+
+    public function payableStatement()
+    {
+        return $this->belongsTo(PayableStatement::class);
     }
 
     public function purchaseOrder()
