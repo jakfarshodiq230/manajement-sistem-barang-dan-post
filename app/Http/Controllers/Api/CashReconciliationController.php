@@ -36,7 +36,19 @@ class CashReconciliationController extends Controller
         }
 
         $perPage = (int) $request->input('itemsPerPage', 10);
-        return response()->json($query->paginate($perPage));
+        $paginator = $query->paginate($perPage);
+
+        // Attach bank breakdown calculation to each historical closing item
+        $paginator->getCollection()->transform(function ($item) {
+            $dateStr = is_string($item->date) ? substr($item->date, 0, 10) : $item->date->format('Y-m-d');
+            $calc = $this->calculateCashComponents($item->branch_id, $dateStr);
+            $item->bank_breakdown = $calc['bank_breakdown'] ?? [];
+            $item->total_bank_received = $calc['total_bank_received'] ?? 0;
+            $item->grand_total_sales = $calc['grand_total_sales'] ?? 0;
+            return $item;
+        });
+
+        return response()->json($paginator);
     }
 
     public function monitoring(Request $request)
@@ -259,7 +271,7 @@ class CashReconciliationController extends Controller
     }
 
     /**
-     * Helper to compute all cash components for a branch and date
+     * Helper to compute all cash components & bank account breakdown for a branch and date
      */
     protected function calculateCashComponents(int $branchId, string $date): array
     {
@@ -278,6 +290,7 @@ class CashReconciliationController extends Controller
             ->where('status', '!=', 'cancelled')
             ->where('payment_method', 'tempo')
             ->whereNull('bank_name')
+            ->whereNull('bank_account_id')
             ->sum('paid_amount');
 
         // 3. Pelunasan Piutang Tunai (+)
@@ -322,7 +335,100 @@ class CashReconciliationController extends Controller
 
         $expectedCash = ($cashSales + $dpCashSales + $receivableCashPayments + $capitalInjections) - ($capitalReturns + $pettyCashAmount);
 
+        // =========================================================================
+        // 7. RINCIAN PENDAPATAN PER REKENING BANK / NON-TUNAI (TRANSFER, QRIS, EDC)
+        // =========================================================================
+        $bankAccounts = \App\Models\BankAccount::where(function ($q) use ($branchId) {
+            $q->where('branch_id', $branchId)->orWhereNull('branch_id');
+        })->where('is_active', true)->get();
+
+        $bankBreakdown = [];
+        $totalBankReceived = 0;
+
+        foreach ($bankAccounts as $bank) {
+            // Sales via this bank account
+            $salesAmount = (float) DB::table('sales')
+                ->where('branch_id', $branchId)
+                ->whereDate('date', $date)
+                ->where('status', '!=', 'cancelled')
+                ->where(function ($q) use ($bank) {
+                    $q->where('bank_account_id', $bank->id)
+                      ->orWhere('bank_name', $bank->bank_name);
+                })
+                ->sum('total_amount');
+
+            $salesCount = DB::table('sales')
+                ->where('branch_id', $branchId)
+                ->whereDate('date', $date)
+                ->where('status', '!=', 'cancelled')
+                ->where(function ($q) use ($bank) {
+                    $q->where('bank_account_id', $bank->id)
+                      ->orWhere('bank_name', $bank->bank_name);
+                })
+                ->count();
+
+            // Receivable payments via this bank
+            $receivableAmount = (float) DB::table('receivable_payments')
+                ->join('receivables', 'receivable_payments.receivable_id', '=', 'receivables.id')
+                ->where('receivables.branch_id', $branchId)
+                ->whereDate('receivable_payments.payment_date', $date)
+                ->where(function ($q) use ($bank) {
+                    $q->where('receivable_payments.bank_account_id', $bank->id)
+                      ->orWhere('receivable_payments.bank_name', $bank->bank_name);
+                })
+                ->sum('receivable_payments.amount');
+
+            $totalBank = $salesAmount + $receivableAmount;
+            $totalBankReceived += $totalBank;
+
+            $bankBreakdown[] = [
+                'bank_id'           => $bank->id,
+                'bank_name'         => $bank->bank_name,
+                'account_number'    => $bank->account_number,
+                'account_name'      => $bank->account_name,
+                'type'              => $bank->type,
+                'color'             => $bank->color ?: '#0066AE',
+                'sales_amount'      => $salesAmount,
+                'sales_count'       => $salesCount,
+                'receivable_amount' => $receivableAmount,
+                'total_amount'      => $totalBank,
+            ];
+        }
+
+        // Other non-cash sales not mapped to any registered bank
+        $otherNonCashSales = (float) DB::table('sales')
+            ->where('branch_id', $branchId)
+            ->whereDate('date', $date)
+            ->where('status', '!=', 'cancelled')
+            ->whereIn('payment_method', ['transfer', 'qris', 'edc'])
+            ->whereNull('bank_account_id')
+            ->whereNull('bank_name')
+            ->sum('total_amount');
+
+        if ($otherNonCashSales > 0) {
+            $totalBankReceived += $otherNonCashSales;
+            $bankBreakdown[] = [
+                'bank_id'           => null,
+                'bank_name'         => 'Transfer / QRIS Lainnya (Belum Ditentukan)',
+                'account_number'    => '-',
+                'account_name'      => '-',
+                'type'              => 'bank_transfer',
+                'color'             => '#7367F0',
+                'sales_amount'      => $otherNonCashSales,
+                'sales_count'       => DB::table('sales')->where('branch_id', $branchId)->whereDate('date', $date)->whereIn('payment_method', ['transfer', 'qris', 'edc'])->whereNull('bank_account_id')->whereNull('bank_name')->count(),
+                'receivable_amount' => 0,
+                'total_amount'      => $otherNonCashSales,
+            ];
+        }
+
+        $grandTotalSales = (float) DB::table('sales')
+            ->where('branch_id', $branchId)
+            ->whereDate('date', $date)
+            ->where('status', '!=', 'cancelled')
+            ->sum('total_amount');
+
         return [
+            // Kas Tunai Fisik Kasir
             'cash_sales_amount'          => (float) $cashSales,
             'dp_cash_amount'             => (float) $dpCashSales,
             'receivable_payments_amount' => (float) $receivableCashPayments,
@@ -330,6 +436,14 @@ class CashReconciliationController extends Controller
             'capital_returns_amount'     => (float) $capitalReturns,
             'petty_cash_amount'          => (float) $pettyCashAmount,
             'expected_cash'              => (float) $expectedCash,
+
+            // Rincian Bank Akun & Non-Tunai
+            'bank_breakdown'             => $bankBreakdown,
+            'total_bank_received'        => (float) $totalBankReceived,
+
+            // Grand Total
+            'grand_total_sales'          => (float) $grandTotalSales,
+            'grand_total_cash_and_bank'  => (float) ($expectedCash + $totalBankReceived),
         ];
     }
 }

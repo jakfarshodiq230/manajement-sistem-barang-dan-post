@@ -82,6 +82,56 @@ const bankAccountNumber = ref('')
 const bankAccountName = ref('')
 const transferPhoneNumber = ref('')
 const paymentProof = ref(null)
+const bankAccounts = ref([])
+const selectedBankAccountId = ref(null)
+
+const selectedBankAccount = computed(() => {
+  return bankAccounts.value.find(b => b.id === selectedBankAccountId.value) || null
+})
+
+const transferBankAccounts = computed(() => {
+  return bankAccounts.value.filter(b => b.type === 'bank_transfer' || b.type === 'edc_debit' || b.type === 'edc_credit')
+})
+
+const qrisBankAccounts = computed(() => {
+  return bankAccounts.value.filter(b => b.type === 'qris')
+})
+
+const fetchBankAccounts = async () => {
+  try {
+    const res = await $api('/apps/bank-accounts', {
+      params: {
+        is_active: true,
+        branch_id: activeBranchId.value || undefined,
+      },
+    })
+    bankAccounts.value = res.data || []
+    if (bankAccounts.value.length > 0) {
+      if (!selectedBankAccountId.value) {
+        const defaultBank = bankAccounts.value.find(b => b.is_default) || bankAccounts.value[0]
+        if (defaultBank) {
+          selectBankAccount(defaultBank)
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Failed to fetch bank accounts in POS:', e)
+  }
+}
+
+const selectBankAccount = bank => {
+  if (!bank) return
+  selectedBankAccountId.value = bank.id
+  bankName.value = bank.bank_name
+  bankAccountNumber.value = bank.account_number || ''
+  bankAccountName.value = bank.account_name || ''
+}
+
+const copyToClipboard = (text, label) => {
+  if (!text) return
+  navigator.clipboard.writeText(text)
+  snackbar.show(`${label || 'Nomor rekening'} berhasil disalin!`, 'success')
+}
 
 const isAddCustomerDrawerVisible = ref(false)
 
@@ -407,6 +457,7 @@ const fetchData = async () => {
     await Promise.all([
       checkCurrentShift(),
       fetchHeldBills(),
+      fetchBankAccounts(),
     ])
 
     // Select active branch: Priority: Shift branch -> User branch -> Kantor Pusat (ID 1) -> First branch
@@ -883,7 +934,10 @@ const confirmAndSubmitCheckout = () => {
     if (paymentMethod.value === 'cash') {
       formData.append('paid_amount', paidAmountRaw.value)
       formData.append('change_amount', changeAmount.value)
-    } else if (paymentMethod.value === 'transfer') {
+    } else if (paymentMethod.value === 'transfer' || paymentMethod.value === 'qris') {
+      if (selectedBankAccountId.value) {
+        formData.append('bank_account_id', selectedBankAccountId.value)
+      }
       formData.append('bank_name', bankName.value)
       formData.append('bank_account_number', bankAccountNumber.value)
       formData.append('bank_account_name', bankAccountName.value)
@@ -891,8 +945,6 @@ const confirmAndSubmitCheckout = () => {
       if (paymentProof.value && paymentProof.value.length > 0) {
         formData.append('payment_proof', paymentProof.value[0])
       }
-      formData.append('paid_amount', totalAmount.value)
-    } else if (paymentMethod.value === 'qris') {
       formData.append('paid_amount', totalAmount.value)
     }
   }
@@ -1730,44 +1782,98 @@ const startNewTransaction = () => {
             </div>
           </VExpandTransition>
 
+          <!-- Dynamic Bank Transfer / EDC Selection from Database -->
           <VExpandTransition>
             <div
               v-if="(transactionType === 'lunas' || dpAmountRaw > 0) && paymentMethod === 'transfer'"
               class="mt-4"
             >
-              <VAlert
-                type="success"
-                variant="tonal"
-                density="compact"
-                class="mb-3 text-caption py-2"
-                icon="ri-bank-card-line"
-              >
-                <strong>Pembayaran Transfer / EDC:</strong> Transaksi dapat langsung diproses instan tanpa wajib mengisi nomor rekening atau upload bukti.
-              </VAlert>
+              <div class="mb-2">
+                <span class="text-caption font-weight-bold text-high-emphasis">Pilih Rekening Bank Penerima:</span>
+              </div>
 
-              <div class="mb-3 d-flex align-center gap-2 flex-wrap">
-                <span class="text-caption font-weight-bold text-medium-emphasis">Bank / Metode:</span>
+              <!-- Dynamic Bank Chips -->
+              <div class="mb-3 d-flex align-center gap-2 flex-wrap" v-if="bankAccounts.length > 0">
                 <VChip
-                  v-for="b in ['BCA', 'Mandiri', 'BRI', 'BNI', 'BSI', 'EDC Mesin']"
-                  :key="b"
+                  v-for="b in bankAccounts.filter(acc => acc.type !== 'qris')"
+                  :key="b.id"
                   size="small"
-                  :color="bankName === b ? 'primary' : 'default'"
-                  :variant="bankName === b ? 'flat' : 'outlined'"
-                  class="font-weight-medium cursor-pointer"
-                  @click="bankName = (bankName === b ? '' : b)"
+                  :color="selectedBankAccountId === b.id ? 'primary' : 'default'"
+                  :variant="selectedBankAccountId === b.id ? 'flat' : 'outlined'"
+                  class="font-weight-bold cursor-pointer"
+                  @click="selectBankAccount(b)"
                 >
-                  {{ b }}
+                  <VIcon icon="ri-bank-card-line" size="14" class="me-1" />
+                  {{ b.bank_name }}
+                  <span v-if="b.is_default" class="ms-1 font-weight-normal text-caption">(Utama)</span>
                 </VChip>
+              </div>
+
+              <!-- Selected Bank Details Info Card -->
+              <div v-if="selectedBankAccount" class="pa-3 rounded-lg border bg-var-theme-surface shadow-xs mb-2">
+                <div class="d-flex justify-space-between align-center mb-1">
+                  <div class="d-flex align-center gap-2">
+                    <VIcon icon="ri-bank-line" color="primary" size="18" />
+                    <span class="font-weight-bold text-subtitle-2 text-primary">{{ selectedBankAccount.bank_name }}</span>
+                  </div>
+                  <VChip size="x-small" color="info" variant="tonal">
+                    {{ selectedBankAccount.branch?.name || 'Semua Cabang (Global)' }}
+                  </VChip>
+                </div>
+                
+                <div class="d-flex justify-space-between align-center text-caption py-1 border-b">
+                  <span class="text-medium-emphasis">Nomor Rekening:</span>
+                  <div class="d-flex align-center gap-1">
+                    <strong class="font-mono font-weight-bold text-high-emphasis" style="font-size: 13px;">
+                      {{ selectedBankAccount.account_number || '-' }}
+                    </strong>
+                    <VBtn
+                      v-if="selectedBankAccount.account_number"
+                      icon="ri-file-copy-line"
+                      size="x-small"
+                      variant="text"
+                      color="primary"
+                      title="Salin Nomor Rekening"
+                      @click="copyToClipboard(selectedBankAccount.account_number, 'Nomor rekening ' + selectedBankAccount.bank_name)"
+                    />
+                  </div>
+                </div>
+
+                <div class="d-flex justify-space-between align-center text-caption pt-1">
+                  <span class="text-medium-emphasis">Atas Nama (A.N):</span>
+                  <strong class="text-uppercase text-high-emphasis">{{ selectedBankAccount.account_name || '-' }}</strong>
+                </div>
+              </div>
+              <div v-else class="text-caption text-disabled italic mb-2">
+                Belum ada rekening bank yang dipilih.
               </div>
             </div>
           </VExpandTransition>
 
+          <!-- Dynamic QRIS Selection & Display from Database -->
           <VExpandTransition>
             <div
               v-if="(transactionType === 'lunas' || dpAmountRaw > 0) && paymentMethod === 'qris'"
               class="mt-4 text-center"
             >
-              <template v-if="branches.find(b => b.id === activeBranchId)?.owner?.qris_image">
+              <!-- QRIS Bank Account Selector -->
+              <div class="mb-3 d-flex justify-center gap-2 flex-wrap" v-if="qrisBankAccounts.length > 1">
+                <VChip
+                  v-for="b in qrisBankAccounts"
+                  :key="b.id"
+                  size="small"
+                  :color="selectedBankAccountId === b.id ? 'primary' : 'default'"
+                  :variant="selectedBankAccountId === b.id ? 'flat' : 'outlined'"
+                  class="font-weight-bold cursor-pointer"
+                  @click="selectBankAccount(b)"
+                >
+                  <VIcon icon="ri-qr-code-line" size="14" class="me-1" />
+                  {{ b.bank_name }}
+                </VChip>
+              </div>
+
+              <!-- QRIS Display -->
+              <template v-if="selectedBankAccount?.qris_image || branches.find(b => b.id === activeBranchId)?.owner?.qris_image">
                 <VAlert
                   type="info"
                   variant="tonal"
@@ -1778,16 +1884,19 @@ const startNewTransaction = () => {
                 </VAlert>
                 <div class="pa-4 bg-white rounded-lg d-inline-block border shadow-xs">
                   <img
-                    :src="`/storage/${branches.find(b => b.id === activeBranchId).owner.qris_image}`"
+                    :src="selectedBankAccount?.qris_image || `/storage/${branches.find(b => b.id === activeBranchId)?.owner?.qris_image}`"
                     alt="QRIS"
-                    style="max-width: 240px; height: auto;"
+                    style="max-width: 220px; height: auto;"
                     class="rounded"
                   >
-                  <div class="mt-2 font-weight-bold text-subtitle-1 text-primary">
-                    QRIS Pembayaran Resmi
+                  <div class="mt-2 font-weight-bold text-subtitle-2 text-primary">
+                    {{ selectedBankAccount?.bank_name || 'QRIS Pembayaran Resmi' }}
+                  </div>
+                  <div v-if="selectedBankAccount?.account_number" class="text-caption font-mono text-medium-emphasis">
+                    {{ selectedBankAccount.account_number }}
                   </div>
                   <div class="text-caption text-medium-emphasis">
-                    a.n. {{ branches.find(b => b.id === activeBranchId)?.owner?.name || 'Owner PT. DUMAI' }}
+                    a.n. {{ selectedBankAccount?.account_name || branches.find(b => b.id === activeBranchId)?.owner?.name || 'PT. DUMAI' }}
                   </div>
                 </div>
               </template>
@@ -2160,8 +2269,34 @@ const startNewTransaction = () => {
             </div>
             <VDivider class="my-2" />
             <div class="d-flex justify-space-between py-1 text-body-1">
-              <span class="font-weight-bold">Ekspektasi Kas di Laci:</span>
+              <span class="font-weight-bold">Ekspektasi Kas Fisik Laci:</span>
               <span class="font-weight-bold text-primary">{{ formatRupiah(shiftSummary.expected_cash) }}</span>
+            </div>
+
+            <!-- Rincian Penerimaan per Bank & QRIS Selama Shift -->
+            <div v-if="shiftSummary.bank_breakdown && shiftSummary.bank_breakdown.length > 0" class="mt-3 pt-2 border-t">
+              <div class="d-flex align-center gap-1 text-caption font-weight-bold text-primary text-uppercase mb-1">
+                <VIcon icon="ri-bank-card-line" size="14" />
+                Rincian Penerimaan Bank & QRIS (Shift Ini):
+              </div>
+              <div
+                v-for="b in shiftSummary.bank_breakdown"
+                :key="b.bank_account_id"
+                class="d-flex justify-space-between py-1 text-caption border-b"
+              >
+                <div>
+                  <span class="font-weight-bold">{{ b.bank_name }}:</span>
+                  <span v-if="b.bank_account_number" class="text-disabled font-mono ms-1" style="font-size: 10px;">
+                    ({{ b.bank_account_number }})
+                  </span>
+                  <span class="text-caption text-primary ms-1">[{{ b.count }} tx]</span>
+                </div>
+                <span class="font-weight-bold font-mono text-primary">+ {{ formatRupiah(b.total) }}</span>
+              </div>
+              <div class="d-flex justify-space-between pt-1 text-caption font-weight-bold">
+                <span>Total Omzet Non-Tunai:</span>
+                <span class="text-success">{{ formatRupiah(shiftSummary.total_non_cash_sales) }}</span>
+              </div>
             </div>
           </div>
 

@@ -6,9 +6,11 @@ import SaleDetailDrawer from './SaleDetailDrawer.vue'
 const sales = ref([])
 const search = ref('')
 const selectedStatus = ref(null)
+const selectedBank = ref(null)
+const bankAccounts = ref([])
 const dateRange = ref('')
 const isLoading = ref(false)
-const summary = ref({ cash: 0, transfer: 0, qris: 0, tempo: 0 })
+const summary = ref({ cash: 0, transfer: 0, qris: 0, tempo: 0, by_bank: [] })
 const isDrawerVisible = ref(false)
 const selectedSale = ref(null)
 
@@ -23,6 +25,15 @@ const saleToVoid = ref(null)
 const voidPin = ref('')
 
 const snackbar = useSnackbarStore()
+
+const fetchBankAccounts = async () => {
+  try {
+    const res = await $api('/apps/bank-accounts')
+    bankAccounts.value = res.data || []
+  } catch (e) {
+    console.error('Failed to fetch bank accounts for filter:', e)
+  }
+}
 
 const displayDate = computed(() => {
   if (dateRange.value) {
@@ -61,6 +72,9 @@ const fetchSales = async () => {
     if (selectedStatus.value) {
       params.payment_status = selectedStatus.value
     }
+    if (selectedBank.value) {
+      params.bank_account_id = selectedBank.value
+    }
     if (dateRange.value) {
       const dates = dateRange.value.split(' to ')
       params.start_date = dates[0]
@@ -93,6 +107,7 @@ const handleSearch = () => {
 }
 
 onMounted(() => {
+  fetchBankAccounts()
   fetchSales()
 })
 
@@ -102,7 +117,7 @@ const tableHeaders = [
   { title: 'CABANG', key: 'branch.name' },
   { title: 'KASIR', key: 'user.name' },
   { title: 'TOTAL (RP)', key: 'total_amount' },
-  { title: 'METODE BAYAR', key: 'payment_method' },
+  { title: 'METODE & BANK PENERIMA', key: 'payment_method' },
   { title: 'STATUS', key: 'status' },
   { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
 ]
@@ -287,24 +302,38 @@ const exportToExcel = () => {
     <!-- Card -->
     <VCard>
       <!-- Card Header -->
-      <VCardText class="d-flex flex-wrap gap-4 align-center">
+      <VCardText class="d-flex flex-wrap gap-3 align-center">
         <AppDateTimePicker
           v-model="dateRange"
           placeholder="Filter Rentang Tanggal"
           prepend-inner-icon="ri-calendar-line"
           :config="{ mode: 'range' }"
           density="compact"
-          style="width: 250px;"
+          style="width: 230px;"
           hide-details
           clearable
           @update:model-value="handleSearch"
         />
+        <div style="min-width: 200px;">
+          <VSelect
+            v-model="selectedBank"
+            :items="[{ title: 'Semua Rekening / Kas', value: null }, ...bankAccounts.map(b => ({ title: `${b.bank_name} (${b.account_number || 'Cash'})`, value: b.id }))]"
+            item-title="title"
+            item-value="value"
+            placeholder="Filter Bank Penerima"
+            density="compact"
+            variant="outlined"
+            clearable
+            hide-details
+            @update:model-value="fetchSales"
+          />
+        </div>
         <VTextField
           v-model="search"
-          placeholder="Cari No Bon atau Kasir..."
+          placeholder="Cari No Bon, Pelanggan, Kasir..."
           prepend-inner-icon="ri-search-line"
           density="compact"
-          style="width: 250px;"
+          style="width: 240px;"
           hide-details
           clearable
           @update:model-value="handleSearch"
@@ -335,20 +364,49 @@ const exportToExcel = () => {
         @update:options="fetchSales"
       >
         <template #item.invoice_number="{ item }">
-          <span class="font-weight-bold text-primary">{{ item.invoice_number }}</span>
+          <span class="font-weight-bold text-primary font-mono cursor-pointer" @click="viewDetail(item)">
+            {{ item.invoice_number }}
+          </span>
         </template>
         
         <template #item.total_amount="{ item }">
-          <span class="font-weight-medium">{{ formatRupiah(item.total_amount) }}</span>
+          <span class="font-weight-bold font-mono">{{ formatRupiah(item.total_amount) }}</span>
         </template>
 
         <template #item.payment_method="{ item }">
-          <span
-            class="text-capitalize font-weight-bold"
-            :class="item.payment_method === 'tempo' ? 'text-error' : ''"
-          >
-            {{ item.payment_method === 'transfer' ? 'Transfer Bank' : (item.payment_method === 'qris' ? 'QRIS' : (item.payment_method === 'tempo' ? 'Tempo (Utang)' : 'Tunai')) }}
-          </span>
+          <div class="d-flex flex-column gap-1">
+            <div class="d-flex align-center gap-1">
+              <VChip
+                size="x-small"
+                :color="item.payment_method === 'tempo' ? 'error' : (item.payment_method === 'cash' ? 'success' : (item.payment_method === 'qris' ? 'secondary' : 'primary'))"
+                variant="tonal"
+                class="font-weight-bold"
+              >
+                <VIcon
+                  :icon="item.payment_method === 'tempo' ? 'ri-time-line' : (item.payment_method === 'cash' ? 'ri-money-dollar-circle-line' : (item.payment_method === 'qris' ? 'ri-qr-code-line' : 'ri-bank-card-line'))"
+                  size="12"
+                  class="me-1"
+                />
+                {{ item.payment_method === 'transfer' ? 'Transfer Bank' : (item.payment_method === 'qris' ? 'QRIS' : (item.payment_method === 'tempo' ? 'Tempo (Utang)' : 'Tunai Kasir')) }}
+              </VChip>
+            </div>
+
+            <!-- Bank / Akun Penerima Detail -->
+            <div v-if="item.payment_method === 'transfer' || item.payment_method === 'qris'" class="d-flex align-center gap-1 flex-wrap">
+              <VChip
+                size="x-small"
+                color="info"
+                variant="flat"
+                class="font-weight-bold"
+              >
+                <VIcon icon="ri-bank-line" size="11" class="me-1" />
+                {{ item.bank_name || item.bank_account?.bank_name || 'BCA (Bank Central Asia)' }}
+              </VChip>
+              <span v-if="item.bank_account_number || item.bank_account?.account_number" class="text-caption font-mono text-medium-emphasis" style="font-size: 11px;">
+                {{ item.bank_account_number || item.bank_account?.account_number }}
+              </span>
+            </div>
+          </div>
         </template>
 
         <template #item.status="{ item }">

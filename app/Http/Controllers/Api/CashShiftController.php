@@ -57,6 +57,49 @@ class CashShiftController extends Controller
 
         $expectedCash = (float) $shift->start_cash + (float) $cashSales - (float) $expenses;
 
+        // Rincian Penerimaan SEMUA Rekening Bank & QRIS yang Terdaftar selama Shift Ini
+        $activeBanks = \App\Models\BankAccount::where('is_active', true)
+            ->where(function ($q) use ($shift) {
+                if ($shift->branch_id) {
+                    $q->where('branch_id', $shift->branch_id)->orWhereNull('branch_id');
+                }
+            })
+            ->orderBy('is_default', 'desc')
+            ->orderBy('bank_name', 'asc')
+            ->get();
+
+        $bankBreakdown = [];
+        $totalBankSales = 0;
+
+        foreach ($activeBanks as $bank) {
+            $bSales = (clone $salesQuery)
+                ->where(function ($q) use ($bank) {
+                    $q->where('bank_account_id', $bank->id)
+                      ->orWhere('bank_name', $bank->bank_name);
+                })
+                ->sum('total_amount');
+
+            $bCount = (clone $salesQuery)
+                ->where(function ($q) use ($bank) {
+                    $q->where('bank_account_id', $bank->id)
+                      ->orWhere('bank_name', $bank->bank_name);
+                })
+                ->count();
+
+            $totalBankSales += (float) $bSales;
+
+            $bankBreakdown[] = [
+                'bank_account_id'     => $bank->id,
+                'bank_name'           => $bank->bank_name,
+                'account_number'      => $bank->account_number,
+                'account_name'        => $bank->account_name,
+                'color'               => $bank->color ?: '#0066AE',
+                'type'                => $bank->type,
+                'count'               => $bCount,
+                'total'               => (float) $bSales,
+            ];
+        }
+
         return response()->json([
             'has_active_shift' => true,
             'shift' => $shift,
@@ -67,6 +110,7 @@ class CashShiftController extends Controller
                 'total_sales' => (float) $cashSales + (float) $nonCashSales,
                 'total_expenses' => (float) $expenses,
                 'expected_cash' => $expectedCash,
+                'bank_breakdown' => $bankBreakdown,
                 'opened_at' => $shift->opened_at ? $shift->opened_at->format('Y-m-d H:i:s') : date('Y-m-d H:i:s'),
             ],
         ]);
@@ -193,6 +237,45 @@ class CashShiftController extends Controller
             ]);
         }
 
+        // Rincian Penerimaan SEMUA Rekening Bank & QRIS yang Terdaftar selama Shift Ini
+        $activeBanks = \App\Models\BankAccount::where('is_active', true)
+            ->where(function ($q) use ($shift) {
+                if ($shift->branch_id) {
+                    $q->where('branch_id', $shift->branch_id)->orWhereNull('branch_id');
+                }
+            })
+            ->orderBy('is_default', 'desc')
+            ->orderBy('bank_name', 'asc')
+            ->get();
+
+        $bankBreakdown = [];
+        foreach ($activeBanks as $bank) {
+            $bSales = (clone $salesQuery)
+                ->where(function ($q) use ($bank) {
+                    $q->where('bank_account_id', $bank->id)
+                      ->orWhere('bank_name', $bank->bank_name);
+                })
+                ->sum('total_amount');
+
+            $bCount = (clone $salesQuery)
+                ->where(function ($q) use ($bank) {
+                    $q->where('bank_account_id', $bank->id)
+                      ->orWhere('bank_name', $bank->bank_name);
+                })
+                ->count();
+
+            $bankBreakdown[] = [
+                'bank_account_id' => $bank->id,
+                'bank_name'       => $bank->bank_name,
+                'account_number'  => $bank->account_number,
+                'account_name'    => $bank->account_name,
+                'color'           => $bank->color ?: '#0066AE',
+                'type'            => $bank->type,
+                'count'           => $bCount,
+                'total'           => (float) $bSales,
+            ];
+        }
+
         return response()->json([
             'message' => 'Shift kasir berhasil ditutup.',
             'shift' => $shift,
@@ -204,6 +287,7 @@ class CashShiftController extends Controller
                 'expected_cash' => $expectedCash,
                 'actual_cash' => $actualCash,
                 'difference' => $difference,
+                'bank_breakdown' => $bankBreakdown,
                 'opened_at' => $shift->opened_at->format('Y-m-d H:i:s'),
                 'closed_at' => $shift->closed_at->format('Y-m-d H:i:s'),
             ],
