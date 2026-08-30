@@ -515,12 +515,38 @@ const saveCustomer = async customerData => {
   }
 }
 
+const totalProducts = ref(0)
+const perPage = ref(6)
+const perPageOptions = [
+  { title: '6 / halaman', value: 6 },
+  { title: '12 / halaman', value: 12 },
+  { title: '24 / halaman', value: 24 },
+  { title: '48 / halaman', value: 48 },
+]
+const favoriteProductIds = ref(new Set())
+const showOnlyFavorites = ref(false)
+
+const toggleFavorite = (productId, event) => {
+  if (event) event.stopPropagation()
+  if (favoriteProductIds.value.has(productId)) {
+    favoriteProductIds.value.delete(productId)
+  } else {
+    favoriteProductIds.value.add(productId)
+  }
+}
+
+const clearCart = () => {
+  cart.value = []
+  discount.value = 0
+  snackbar.show('Keranjang berhasil dikosongkan', 'info')
+}
+
 const fetchProducts = async (branchId, resetPage = false) => {
   if (!branchId) return
   if (resetPage) page.value = 1
   isLoading.value = true
   try {
-    let url = `/apps/product-branches?branch_id=${branchId}&paginate=true&has_stock=true&per_page=9&page=${page.value}`
+    let url = `/apps/product-branches?branch_id=${branchId}&paginate=true&has_stock=true&per_page=${perPage.value}&page=${page.value}`
     if (search.value) url += `&search=${encodeURIComponent(search.value)}`
     if (selectedCategory.value) url += `&category_id=${selectedCategory.value}`
     
@@ -528,7 +554,8 @@ const fetchProducts = async (branchId, resetPage = false) => {
     const list = data.data || (Array.isArray(data) ? data : [])
 
     products.value = Array.isArray(list) ? list : []
-    totalPages.value = data.last_page || 1
+    totalProducts.value = Number(data.total) || (Array.isArray(list) ? list.length : 0)
+    totalPages.value = Number(data.last_page) || 1
   } catch (error) {
     console.error('Error fetching POS products:', error)
     snackbar.show('Gagal mengambil data produk', 'error')
@@ -537,35 +564,112 @@ const fetchProducts = async (branchId, resetPage = false) => {
   }
 }
 
+watch(perPage, () => {
+  fetchProducts(activeBranchId.value, true)
+})
+
 const searchInputRef = ref(null)
 
-const handleKeyDown = event => {
-  // F1 or F2: Search / Scan Product
-  if (event.key === 'F1' || event.key === 'F2') {
-    event.preventDefault()
-    if (searchInputRef.value) {
-      const inputEl = searchInputRef.value.$el?.querySelector('input') || searchInputRef.value
-      if (inputEl && inputEl.focus) {
-        inputEl.focus()
-        inputEl.select?.()
-      }
+const focusSearchInput = () => {
+  if (searchInputRef.value) {
+    const inputEl = searchInputRef.value.$el ? searchInputRef.value.$el.querySelector('input') : searchInputRef.value
+    if (inputEl && inputEl.focus) {
+      inputEl.focus()
+      inputEl.select?.()
     }
-  } 
-  // F3 or F4: Pilih / Tambah Pelanggan
-  else if (event.key === 'F3' || event.key === 'F4') {
+  }
+}
+
+const handleSearchEnter = async () => {
+  const query = (search.value || '').trim()
+  if (!query) return
+
+  // 1. If currently loaded products has an exact match by SKU, barcode, or name
+  if (products.value.length > 0) {
+    const exactMatch = products.value.find(p => 
+      (p.product?.sku && p.product.sku.toLowerCase() === query.toLowerCase()) ||
+      (p.product?.barcode && p.product.barcode.toLowerCase() === query.toLowerCase()) ||
+      (p.product?.name && p.product.name.toLowerCase() === query.toLowerCase())
+    ) || (products.value.length === 1 ? products.value[0] : null)
+
+    if (exactMatch) {
+      if (exactMatch.stock > 0) {
+        await handleProductClick(exactMatch)
+        search.value = ''
+        snackbar.show(`"${exactMatch.product?.name}" ditambahkan ke keranjang`, 'success')
+      } else {
+        snackbar.show(`Stok produk "${exactMatch.product?.name}" habis`, 'warning')
+      }
+      return
+    }
+  }
+
+  // 2. Query backend directly for barcode / SKU
+  try {
+    isLoading.value = true
+    const res = await $api(`/apps/product-branches?branch_id=${activeBranchId.value}&search=${encodeURIComponent(query)}&has_stock=true`)
+    const list = res.data || (Array.isArray(res) ? res : [])
+    if (list.length > 0) {
+      const match = list.find(p => 
+        (p.product?.sku && p.product.sku.toLowerCase() === query.toLowerCase()) ||
+        (p.product?.barcode && p.product.barcode.toLowerCase() === query.toLowerCase())
+      ) || list[0]
+
+      if (match && match.stock > 0) {
+        await handleProductClick(match)
+        search.value = ''
+        snackbar.show(`"${match.product?.name}" ditambahkan ke keranjang`, 'success')
+      } else {
+        snackbar.show('Stok produk tidak tersedia', 'warning')
+      }
+    } else {
+      snackbar.show('Produk tidak ditemukan', 'warning')
+    }
+  } catch (e) {
+    console.error(e)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const handleKeyDown = event => {
+  const isFunctionKey = ['F1', 'F2', 'F3', 'F4', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'Escape'].includes(event.key)
+  
+  if (isFunctionKey) {
     event.preventDefault()
+    event.stopPropagation()
+  }
+
+  // F11 / F10: Toggle Layar Penuh (Fullscreen)
+  if (event.key === 'F11' || event.key === 'F10') {
+    toggleFullscreen()
+  }
+  // F1 / F2: Cari Produk
+  else if (event.key === 'F1' || event.key === 'F2') {
+    focusSearchInput()
+  } 
+  // F4: Scan Barcode
+  else if (event.key === 'F4') {
+    search.value = ''
+    focusSearchInput()
+    snackbar.show('Silakan scan barcode atau masukkan SKU', 'info')
+  }
+  // F3: Pilih / Tambah Pelanggan
+  else if (event.key === 'F3') {
     isAddCustomerDrawerVisible.value = !isAddCustomerDrawerVisible.value
   } 
   // F6: Hold / Tahan Transaksi Saat Ini
   else if (event.key === 'F6') {
-    event.preventDefault()
-    if (cart.value.length > 0 && !isCheckoutDialogVisible.value && !isHoldingBill.value) {
-      holdCurrentBill()
+    if (cart.value.length > 0) {
+      if (!isCheckoutDialogVisible.value && !isHoldingBill.value) {
+        holdCurrentBill()
+      }
+    } else {
+      snackbar.show('Keranjang masih kosong untuk ditahan', 'warning')
     }
   }
   // F7: Buka / Lihat Daftar Transaksi Ditahan (Held Bills)
   else if (event.key === 'F7') {
-    event.preventDefault()
     isHeldBillsDialogOpen.value = !isHeldBillsDialogOpen.value
     if (isHeldBillsDialogOpen.value) {
       fetchHeldBills()
@@ -573,19 +677,21 @@ const handleKeyDown = event => {
   }
   // F8: Checkout / Bayar
   else if (event.key === 'F8') {
-    event.preventDefault()
-    if (cart.value.length > 0 && !isCheckoutDialogVisible.value) {
-      handleCheckoutClick()
+    if (cart.value.length > 0) {
+      if (!isCheckoutDialogVisible.value) {
+        handleCheckoutClick()
+      }
+    } else {
+      snackbar.show('Keranjang belanja masih kosong', 'warning')
     }
   } 
   // F9: Uang Pas
   else if (event.key === 'F9') {
-    event.preventDefault()
     if (isCheckoutDialogVisible.value) {
       setQuickCash('exact')
     }
   } 
-  // Escape: Batal / Tutup Dialog
+  // Escape: Batal / Tutup Dialog / Keluar
   else if (event.key === 'Escape') {
     if (isAddCustomerDrawerVisible.value) {
       isAddCustomerDrawerVisible.value = false
@@ -601,6 +707,10 @@ const handleKeyDown = event => {
       isErrorDialogVisible.value = false
     } else if (isCheckoutDialogVisible.value) {
       isCheckoutDialogVisible.value = false
+    } else if (cart.value.length > 0) {
+      clearCart()
+    } else {
+      router.push({ name: 'dashboards-analytics' })
     }
   } 
   // Enter: Konfirmasi Bayar saat modal checkout terbuka
@@ -625,10 +735,12 @@ const handleKeyDown = event => {
 onMounted(() => {
   fetchData()
   window.addEventListener('keydown', handleKeyDown)
+  document.addEventListener('fullscreenchange', onFullscreenChange)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
 })
 
 let searchTimeout
@@ -756,6 +868,22 @@ const subtotal = computed(() => {
   return cart.value.reduce((sum, item) => sum + (item.qty * item.price), 0)
 })
 
+const discountType = ref('rupiah') // 'rupiah' | 'percent'
+const discountPercentInput = ref(0)
+const discountRupiahInput = ref(0)
+
+const discountNominal = computed(() => {
+  if (discountType.value === 'percent') {
+    const p = Math.min(100, Math.max(0, Number(discountPercentInput.value) || 0))
+    return Math.round((subtotal.value * p) / 100)
+  }
+  return Math.min(subtotal.value, Number(discountRupiahInput.value) || 0)
+})
+
+watch(discountNominal, val => {
+  discount.value = val
+})
+
 const totalTaxExclude = computed(() => {
   return cart.value.reduce((sum, item) => {
     if (item.tax_type === 'Exclude PPN') {
@@ -782,8 +910,25 @@ const totalTax = computed(() => {
 })
 
 const totalAmount = computed(() => {
-  return Math.max(0, subtotal.value + totalTaxExclude.value - (Number(discount.value) || 0))
+  return Math.max(0, subtotal.value + totalTaxExclude.value - discountNominal.value)
 })
+
+// Fullscreen API Handling
+const isFullscreen = ref(false)
+
+const toggleFullscreen = () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(err => console.warn(err))
+    isFullscreen.value = true
+  } else {
+    if (document.exitFullscreen) document.exitFullscreen()
+    isFullscreen.value = false
+  }
+}
+
+const onFullscreenChange = () => {
+  isFullscreen.value = !!document.fullscreenElement
+}
 
 const handleCheckoutClick = () => {
   if (cart.value.length === 0) {
@@ -1038,61 +1183,64 @@ const startNewTransaction = () => {
 </script>
 
 <template>
-  <div class="d-flex flex-column pa-4 bg-background">
-    <div class="d-flex justify-space-between align-center mb-4">
+  <div class="pos-root-container">
+    <!-- Top Header Bar -->
+    <header class="pos-header-bar">
       <div class="d-flex align-center">
         <VAvatar
           color="primary"
-          variant="tonal"
-          rounded
-          class="me-3"
+          rounded="lg"
+          size="36"
+          class="me-2 shadow-xs"
         >
-          <VIcon icon="ri-store-3-line" />
+          <VIcon icon="ri-store-3-line" size="20" color="white" />
         </VAvatar>
-        <p class="text-2xl mb-0 font-weight-bold">
-          Kasir (Point of Sales) <span
-            v-if="userData?.fullName || userData?.name || userData?.username"
-            class="text-primary"
-          >- {{ userData?.fullName || userData?.name || userData?.username }}</span>
-        </p>
+        <div class="text-subtitle-1 font-weight-bold text-slate-800">
+          Kasir (POS) <span class="text-primary font-weight-medium">- {{ userData?.fullName || userData?.name || userData?.username || 'Developer' }}</span>
+        </div>
       </div>
       
-      <div class="d-flex align-center gap-3">
-        <!-- Held Bills Button -->
-        <VBtn
-          variant="tonal"
-          :color="heldBills.length > 0 ? 'warning' : 'secondary'"
-          density="compact"
-          prepend-icon="ri-pause-circle-line"
-          class="font-weight-bold shadow-sm"
-          @click="isHeldBillsDialogOpen = true"
-        >
-          Ditahan ({{ heldBills.length }})
-        </VBtn>
-
-        <!-- Cash Shift Button -->
-        <VBtn
+      <div class="d-flex align-center gap-2">
+        <!-- Status Shift Pill -->
+        <button
           v-if="hasActiveShift"
-          variant="tonal"
-          color="success"
-          density="compact"
-          prepend-icon="ri-time-line"
-          class="font-weight-bold"
+          type="button"
+          class="pos-top-pill pos-pill-success"
           @click="openCloseShiftDialog"
         >
-          Shift Kasir: Aktif
-        </VBtn>
-        <VBtn
+          <span class="status-dot-green"></span>
+          Shift: Aktif
+        </button>
+        <button
           v-else
-          variant="elevated"
-          color="error"
-          density="compact"
-          prepend-icon="ri-lock-unlock-line"
-          class="font-weight-bold"
+          type="button"
+          class="pos-top-pill pos-pill-error"
           @click="isStartShiftDialogOpen = true"
         >
-          Buka Shift Kasir
-        </VBtn>
+          <VIcon icon="ri-lock-unlock-line" size="14" class="me-1" />
+          Buka Shift
+        </button>
+
+        <!-- Held Bills Pill -->
+        <button
+          type="button"
+          class="pos-top-pill"
+          @click="isHeldBillsDialogOpen = true"
+        >
+          <VIcon icon="ri-time-line" size="15" class="me-1 text-slate-500" />
+          Ditahan ({{ heldBills.length }})
+        </button>
+
+        <!-- Fullscreen Button -->
+        <button
+          type="button"
+          class="pos-top-pill"
+          :title="isFullscreen ? 'Keluar Layar Penuh (F11)' : 'Layar Penuh (F11)'"
+          @click="toggleFullscreen"
+        >
+          <VIcon :icon="isFullscreen ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line'" size="16" class="text-primary" />
+          <span class="d-none d-md-inline">{{ isFullscreen ? 'Keluar Fullscreen' : 'Fullscreen' }}</span>
+        </button>
 
         <!-- Branch Selector -->
         <VAutocomplete
@@ -1101,21 +1249,25 @@ const startNewTransaction = () => {
           item-title="name"
           item-value="id"
           density="compact"
+          variant="outlined"
           hide-details
-          style="width: 220px;"
+          style="width: 190px;"
           prepend-inner-icon="ri-store-2-line"
           bg-color="surface"
+          class="pos-branch-select"
         />
 
+        <!-- Menu Action -->
         <VMenu>
           <template #activator="{ props }">
             <VBtn
               icon="ri-more-2-fill"
               variant="text"
+              size="small"
               v-bind="props"
             />
           </template>
-          <VList>
+          <VList density="compact">
             <VListItem
               prepend-icon="ri-qr-code-line"
               @click="showCatalogQR"
@@ -1142,87 +1294,67 @@ const startNewTransaction = () => {
           </VList>
         </VMenu>
       </div>
-    </div>
+    </header>
 
-    <VRow class="flex-grow-1 match-height m-0">
-      <!-- Kiri: Katalog Produk -->
-      <VCol
-        cols="12"
-        md="7"
-        lg="8"
-        class="d-flex flex-column"
-      >
-        <VCard class="flex-grow-1 d-flex flex-column">
-          <VCardText class="pb-3">
-            <VRow>
-              <VCol
-                cols="12"
-                sm="6"
-              >
-                <VTextField
+    <!-- Main Content Area -->
+    <main class="pos-main-content">
+      <!-- Left: Product Catalog -->
+      <section class="pos-catalog-section">
+        <div class="pos-catalog-box">
+          <!-- Search & Scan Bar -->
+          <div class="pos-catalog-header">
+            <div class="d-flex align-center gap-3 mb-2">
+              <div class="pos-search-wrapper flex-grow-1">
+                <VIcon icon="ri-search-line" size="18" class="pos-search-icon" />
+                <input
                   ref="searchInputRef"
                   v-model="search"
-                  placeholder="Cari nama produk, SKU, barcode (Tekan F1)..."
-                  density="compact"
-                  prepend-inner-icon="ri-search-line"
-                  hide-details
-                  clearable
+                  type="text"
+                  placeholder="Cari produk, SKU, barcode..."
+                  class="pos-search-input"
+                  @keydown.enter="handleSearchEnter"
                 />
-              </VCol>
-              <VCol
-                cols="12"
-                sm="6"
-              >
-                <VAutocomplete
-                  v-model="selectedCategory"
-                  :items="categories"
-                  item-title="name"
-                  item-value="id"
-                  placeholder="Pilih Kategori Produk"
-                  density="compact"
-                  clearable
-                  hide-details
-                />
-              </VCol>
-            </VRow>
+                <span class="pos-kbd-badge">F1</span>
+              </div>
 
-            <!-- Quick Category Filter with Left/Right Arrows (No Scrollbar) -->
-            <VSlideGroup
-              show-arrows
-              class="pt-2"
-            >
-              <VSlideGroupItem>
-                <VChip
-                  size="small"
-                  :color="!selectedCategory ? 'primary' : 'secondary'"
-                  :variant="!selectedCategory ? 'elevated' : 'tonal'"
-                  class="ma-1 cursor-pointer font-weight-bold"
-                  @click="selectedCategory = null"
-                >
-                  <VIcon icon="ri-apps-line" size="14" class="me-1" />
-                  Semua Kategori
-                </VChip>
-              </VSlideGroupItem>
-              <VSlideGroupItem
+              <button
+                type="button"
+                class="pos-scan-btn"
+                @click="focusSearchInput"
+              >
+                <VIcon icon="ri-qr-scan-2-line" size="18" class="me-1 text-primary" />
+                Scan Barcode
+                <span class="pos-kbd-badge ms-2">F4</span>
+              </button>
+            </div>
+
+            <!-- Category Pills Row -->
+            <div class="pos-category-row">
+              <button
+                type="button"
+                class="pos-cat-pill"
+                :class="{'pos-cat-pill-active': !selectedCategory}"
+                @click="selectedCategory = null"
+              >
+                <VIcon icon="ri-apps-line" size="14" class="me-1" />
+                Semua
+              </button>
+
+              <button
                 v-for="cat in categories"
                 :key="cat.id"
+                type="button"
+                class="pos-cat-pill"
+                :class="{'pos-cat-pill-active': selectedCategory === cat.id}"
+                @click="selectedCategory = selectedCategory === cat.id ? null : cat.id"
               >
-                <VChip
-                  size="small"
-                  :color="selectedCategory === cat.id ? 'primary' : 'secondary'"
-                  :variant="selectedCategory === cat.id ? 'elevated' : 'tonal'"
-                  class="ma-1 cursor-pointer font-weight-medium"
-                  @click="selectedCategory = selectedCategory === cat.id ? null : cat.id"
-                >
-                  {{ cat.name }}
-                </VChip>
-              </VSlideGroupItem>
-            </VSlideGroup>
-          </VCardText>
-          
-          <VDivider />
+                {{ cat.name }}
+              </button>
+            </div>
+          </div>
 
-          <VCardText class="flex-grow-1 bg-var-theme-background pa-3 d-flex flex-column justify-space-between">
+          <!-- Product Catalog Grid -->
+          <div class="pos-catalog-body">
             <div
               v-if="isLoading"
               class="d-flex justify-center align-center h-100 py-12"
@@ -1230,346 +1362,370 @@ const startNewTransaction = () => {
               <VProgressCircular
                 indeterminate
                 color="primary"
-                size="48"
+                size="40"
               />
             </div>
             
-            <div v-else-if="products.length > 0" class="d-flex flex-column flex-grow-1">
-              <!-- Scrollable Product Grid (6-9 Items per page) -->
-              <div class="product-scroll-area overflow-y-auto pe-1 flex-grow-1" style="max-height: calc(100vh - 320px); min-height: 380px;">
-                <VRow class="g-3">
-                  <VCol
-                    v-for="item in products"
-                    :key="item.id"
-                    cols="12"
-                    sm="6"
-                    md="6"
-                    lg="4"
+            <div
+              v-else-if="products.length > 0"
+              class="pos-product-grid"
+            >
+              <div
+                v-for="item in products"
+                :key="item.id"
+                class="pos-product-card"
+                :class="{'pos-card-disabled': item.stock <= 0}"
+                @click="item.stock > 0 ? handleProductClick(item) : null"
+              >
+                <!-- Card Top: Soft Image/Icon + Stock Method Badge (FIFO / LIFO / FEFO) -->
+                <div class="d-flex align-center justify-space-between w-100 mb-2">
+                  <div class="pos-card-icon-box">
+                    <img
+                      v-if="item.product?.image"
+                      :src="`/storage/${item.product.image}`"
+                      alt="Product"
+                      class="pos-card-img"
+                    />
+                    <VIcon
+                      v-else
+                      icon="ri-box-3-line"
+                      size="22"
+                      color="primary"
+                    />
+                  </div>
+
+                  <!-- Stock Method Badge from Database -->
+                  <span
+                    v-if="item.product?.stock_method"
+                    class="pos-method-badge"
+                    :class="(item.product.stock_method || '').toLowerCase()"
                   >
-                    <VCard 
-                      class="h-100 cursor-pointer product-card transition-all rounded-lg overflow-hidden position-relative"
-                      :class="{'opacity-50 pointer-events-none': item.stock <= 0}"
-                      elevation="2"
-                      hover
-                      @click="item.stock > 0 ? handleProductClick(item) : null"
-                    >
-                      <!-- Stock Method Badge Top Left -->
-                      <div class="position-absolute top-0 start-0 pa-2 z-index-1">
-                        <VChip
-                          v-if="item.product?.stock_method"
-                          size="x-small"
-                          :color="item.product.stock_method === 'FEFO' ? 'error' : (item.product.stock_method === 'LIFO' ? 'info' : 'primary')"
-                          variant="elevated"
-                          class="font-weight-bold shadow-sm"
-                        >
-                          {{ item.product.stock_method }}
-                        </VChip>
-                      </div>
+                    {{ item.product.stock_method }}
+                  </span>
+                  <span
+                    v-else
+                    class="pos-method-badge fifo"
+                  >
+                    FIFO
+                  </span>
+                </div>
 
-                      <!-- Product Image or Modern Placeholder -->
-                      <div
-                        class="d-flex justify-center align-center bg-primary-lighten-5 position-relative"
-                        style="height: 125px; overflow: hidden;"
-                      >
-                        <VImg
-                          v-if="item.product?.image"
-                          :src="`/storage/${item.product.image}`"
-                          cover
-                          height="125"
-                        />
-                        <div v-else class="text-center">
-                          <VAvatar color="primary" variant="tonal" size="52" rounded="lg">
-                            <VIcon
-                              icon="ri-box-3-line"
-                              size="30"
-                              color="primary"
-                            />
-                          </VAvatar>
-                        </div>
-                      </div>
+                <!-- Product Name & SKU -->
+                <div class="mb-2">
+                  <h4 class="pos-card-title text-truncate" :title="item.product?.name">
+                    {{ item.product?.name }}
+                  </h4>
+                  <div class="pos-card-sku text-truncate">
+                    {{ item.product?.sku || 'NO-SKU' }} <span v-if="item.product?.unit">• {{ item.product.unit }}</span>
+                  </div>
+                </div>
 
-                      <VCardText class="pa-3 text-center">
-                        <h6
-                          class="text-subtitle-2 font-weight-bold mb-1 text-truncate"
-                          :title="item.product?.name"
-                        >
-                          {{ item.product?.name }}
-                        </h6>
-                        
-                        <div class="d-flex justify-center align-center gap-1 text-caption text-disabled mb-2">
-                          <span>{{ item.product?.sku || 'NO-SKU' }}</span>
-                          <span v-if="item.product?.unit">• {{ item.product.unit }}</span>
-                        </div>
+                <!-- Price & Stock Badge -->
+                <div>
+                  <div class="pos-card-price mb-1">
+                    {{ formatRupiah(item.price) }}
+                  </div>
 
-                        <div class="text-primary font-weight-bold text-subtitle-1 mb-1">
-                          {{ formatRupiah(item.price) }}
-                        </div>
-
-                        <div
-                          v-if="item.min_nego_price > 0 && item.min_nego_price < item.price"
-                          class="text-caption text-warning mb-2"
-                        >
-                          Min. Nego: {{ formatRupiah(item.min_nego_price) }}
-                        </div>
-
-                        <VChip
-                          size="x-small"
-                          :color="item.stock > 3 ? 'success' : (item.stock > 0 ? 'warning' : 'error')"
-                          :variant="item.stock > 3 ? 'tonal' : 'elevated'"
-                          class="font-weight-bold"
-                        >
-                          <VIcon
-                            v-if="item.stock <= 3 && item.stock > 0"
-                            icon="ri-alert-line"
-                            size="12"
-                            class="me-1"
-                          />
-                          {{ item.stock > 3 ? `Stok: ${item.stock} ${item.product?.unit || ''}` : (item.stock > 0 ? `Sisa ${item.stock}` : 'Habis (0)') }}
-                        </VChip>
-                      </VCardText>
-                    </VCard>
-                  </VCol>
-                </VRow>
-              </div>
-
-              <!-- Pinned Bottom Pagination -->
-              <div class="d-flex justify-center pt-3 border-t mt-2" :class="{'mb-14': $vuetify.display.xs && cart.length > 0}">
-                <VPagination
-                  v-model="page"
-                  :length="totalPages"
-                  :total-visible="$vuetify.display.xs ? 3 : 5"
-                  rounded="circle"
-                />
+                  <div class="pos-stock-pill" :class="item.stock > 3 ? 'in-stock' : (item.stock > 0 ? 'low-stock' : 'out-of-stock')">
+                    {{ item.stock > 3 ? `Stok: ${item.stock}` : (item.stock > 0 ? `Sisa ${item.stock}` : 'Habis') }}
+                  </div>
+                </div>
               </div>
             </div>
             
             <div
               v-else
-              class="d-flex flex-column justify-center align-center h-100 text-disabled py-12"
+              class="d-flex flex-column justify-center align-center h-100 text-disabled py-8"
             >
               <VIcon
                 icon="ri-inbox-line"
-                size="48"
-                class="mb-2"
+                size="40"
+                class="mb-2 text-slate-300"
               />
-              <p>Tidak ada produk tersedia di cabang ini.</p>
+              <p class="mb-0 text-caption text-slate-500">Tidak ada produk tersedia di cabang ini.</p>
             </div>
-          </VCardText>
-        </VCard>
-      </VCol>
+          </div>
 
-      <!-- Kanan: Keranjang (Cart) Sticky di Layar Tablet & Desktop -->
-      <VCol
+          <!-- Catalog Footer Bar -->
+          <footer class="pos-catalog-footer">
+            <div class="pos-footer-info">
+              Menampilkan {{ products.length }} dari {{ totalProducts || products.length }} produk
+            </div>
+
+            <div class="pos-pagination-container">
+              <VPagination
+                v-model="page"
+                :length="totalPages"
+                :total-visible="$vuetify.display.xs ? 3 : 5"
+                density="compact"
+                size="small"
+                active-color="primary"
+                variant="flat"
+              />
+            </div>
+
+            <div class="pos-perpage-select">
+              <select v-model="perPage" class="pos-custom-select">
+                <option :value="6">6 / halaman</option>
+                <option :value="12">12 / halaman</option>
+                <option :value="24">24 / halaman</option>
+              </select>
+            </div>
+          </footer>
+        </div>
+      </section>
+
+      <!-- Right: Cart Section -->
+      <aside
         v-if="!$vuetify.display.xs"
-        cols="12"
-        md="5"
-        lg="4"
-        class="d-flex flex-column"
-        style="position: sticky; top: 16px; z-index: 10;"
+        class="pos-cart-section"
       >
-        <VCard class="d-flex flex-column rounded-lg overflow-hidden border elevation-2">
-          <VCardItem class="bg-primary text-white py-2 px-4">
-            <VCardTitle class="text-white d-flex align-center justify-space-between text-subtitle-1">
-              <div class="d-flex align-center font-weight-bold">
-                <VIcon
-                  icon="ri-shopping-cart-2-line"
-                  class="me-2"
-                />
-                Keranjang Belanja
-              </div>
-              <div class="d-flex align-center gap-2">
-                <VChip
-                  v-if="heldBills.length > 0"
-                  color="warning"
-                  size="x-small"
-                  variant="elevated"
-                  class="font-weight-bold cursor-pointer"
-                  title="Tekan F7 untuk membuka daftar antrean ditahan"
-                  @click="isHeldBillsDialogOpen = true"
-                >
-                  <VIcon icon="ri-pause-line" size="12" class="me-1" />
-                  {{ heldBills.length }} Ditahan (F7)
-                </VChip>
-                <VChip v-if="cart.length > 0" color="white" size="x-small" variant="elevated" class="text-primary font-weight-bold">
-                  {{ cart.length }} Item
-                </VChip>
-              </div>
-            </VCardTitle>
-          </VCardItem>
-
-          <!-- List Belanja Scrollable -->
-          <div
-            class="overflow-y-auto pa-0 bg-surface"
-            style="max-height: 230px; min-height: 120px;"
-          >
-            <VList
+        <div class="pos-cart-box">
+          <!-- Cart Header -->
+          <div class="pos-cart-header">
+            <div class="d-flex align-center">
+              <VIcon icon="ri-shopping-cart-2-line" size="18" class="me-2 text-white" />
+              <span class="font-weight-bold text-white text-subtitle-2 me-2">Keranjang Belanja</span>
+              <span class="pos-cart-count-badge">{{ cart.length }}</span>
+            </div>
+            <button
               v-if="cart.length > 0"
-              lines="two"
-              class="pa-0"
+              type="button"
+              class="pos-cart-clear-btn"
+              title="Kosongkan Keranjang"
+              @click="clearCart"
             >
-              <template
+              <VIcon icon="ri-delete-bin-line" size="17" color="white" />
+            </button>
+          </div>
+
+          <!-- Cart Items List Body -->
+          <div class="pos-cart-body">
+            <div v-if="cart.length > 0" class="pos-cart-items-list">
+              <div
                 v-for="(item, index) in cart"
                 :key="index"
+                class="pos-cart-item-row"
               >
-                <VListItem class="py-2 px-3">
-                  <div class="d-flex justify-space-between w-100 mb-1">
-                    <div
-                      class="font-weight-bold text-truncate pe-2 text-body-2"
-                      style="max-width: 75%;"
-                    >
-                      {{ item.name }}
-                    </div>
-                    <IconBtn
-                      size="x-small"
-                      color="error"
-                      @click="removeFromCart(index)"
-                    >
-                      <VIcon icon="ri-delete-bin-line" size="18" />
-                    </IconBtn>
+                <div class="pos-cart-item-thumb">
+                  <VIcon icon="ri-box-3-line" size="20" color="primary" />
+                </div>
+
+                <div class="flex-grow-1 overflow-hidden pe-2">
+                  <div class="font-weight-bold text-slate-800 text-truncate text-caption">
+                    {{ item.name }}
+                  </div>
+                  <div class="text-slate-400 text-xs text-truncate mb-1">
+                    {{ item.sku || 'SKU' }} • {{ item.unit || 'PCS' }}
                   </div>
                   
-                  <div class="d-flex align-center justify-space-between gap-2">
-                    <!-- Qty Control -->
-                    <div
-                      class="d-flex align-center border rounded pa-0"
-                      style="width: 88px; height: 32px;"
-                    >
-                      <VBtn
-                        size="x-small"
-                        variant="text"
-                        icon="ri-subtract-line"
+                  <div class="d-flex align-center gap-2 mt-1">
+                    <!-- Quantity Selector -->
+                    <div class="pos-qty-group">
+                      <button
+                        type="button"
+                        class="pos-qty-btn"
                         @click="item.qty > 1 ? item.qty-- : null"
-                      />
-                      <div class="text-center flex-grow-1 font-weight-bold text-caption">
-                        {{ item.qty }}
-                      </div>
-                      <VBtn
-                        size="x-small"
-                        variant="text"
-                        icon="ri-add-line"
+                      >
+                        <VIcon icon="ri-subtract-line" size="13" />
+                      </button>
+                      <span class="pos-qty-val">{{ item.qty }}</span>
+                      <button
+                        type="button"
+                        class="pos-qty-btn"
                         @click="item.qty < item.max_stock ? item.qty++ : null"
-                      />
+                      >
+                        <VIcon icon="ri-add-line" size="13" />
+                      </button>
                     </div>
-                    <!-- Price Input (Nego) -->
-                    <div class="flex-grow-1 ms-2">
-                      <VTextField
-                        :model-value="formatInputRupiah(item.price)"
+
+                    <!-- Editable Nego Price Input -->
+                    <div class="pos-cart-price-input-wrapper">
+                      <span class="pos-cart-price-prefix">Rp</span>
+                      <input
+                        :value="formatInputRupiah(item.price)"
                         type="text"
-                        density="compact"
-                        hide-details
-                        prefix="Rp"
-                        class="text-right"
-                        @update:model-value="val => item.price = parseInputRupiah(val)"
+                        class="pos-cart-price-input"
+                        placeholder="0"
+                        title="Edit harga nego item"
+                        @input="e => item.price = parseInputRupiah(e.target.value)"
                       />
                     </div>
                   </div>
-                  
-                  <!-- Warning if below nego limit -->
+
+                  <!-- Warning below minimum price limit -->
                   <div
                     v-if="Number(item.price) < Number(item.min_nego_price > 0 ? item.min_nego_price : item.original_price)"
-                    class="text-caption text-error mt-1 d-flex align-center"
-                    style="font-size: 11px;"
+                    class="text-caption text-error mt-1 d-flex align-center font-weight-medium"
+                    style="font-size: 10px;"
                   >
-                    <VIcon
-                      icon="ri-error-warning-line"
-                      size="12"
-                      class="me-1"
-                    />
+                    <VIcon icon="ri-error-warning-line" size="11" class="me-1" />
                     Di bawah batas nego ({{ formatRupiah(item.min_nego_price > 0 ? item.min_nego_price : item.original_price) }})!
                   </div>
-                </VListItem>
-                <VDivider v-if="index < cart.length - 1" />
-              </template>
-            </VList>
+                </div>
+
+                <div class="text-right d-flex flex-column justify-space-between align-end flex-shrink-0" style="min-height: 52px;">
+                  <button
+                    type="button"
+                    class="pos-item-del-btn"
+                    title="Hapus Item"
+                    @click="removeFromCart(index)"
+                  >
+                    <VIcon icon="ri-delete-bin-line" size="16" color="error" />
+                  </button>
+
+                  <div class="font-weight-bold text-slate-800 text-caption mt-auto">
+                    {{ formatRupiah(item.price * item.qty) }}
+                  </div>
+                </div>
+              </div>
+            </div>
             
             <div
               v-else
               class="d-flex flex-column justify-center align-center h-100 text-disabled pa-6"
-              style="min-height: 130px;"
             >
               <VIcon
                 icon="ri-shopping-bag-3-line"
-                size="40"
-                class="mb-2"
-                opacity="0.3"
+                size="44"
+                class="mb-2 text-slate-300"
               />
-              <p class="text-caption mb-0">Keranjang belanja kosong</p>
+              <p class="text-caption text-slate-400 mb-0 font-weight-medium">Keranjang belanja kosong</p>
             </div>
           </div>
 
-          <VDivider />
+          <!-- Checkout Summary & Action Buttons -->
+          <div class="pos-cart-footer">
+            <div class="d-flex justify-space-between align-center mb-1 text-caption text-slate-600">
+              <span>Subtotal</span>
+              <span class="font-weight-semibold text-slate-800">{{ formatRupiah(subtotal) }}</span>
+            </div>
 
-          <!-- Checkout Summary -->
-          <VCardText class="bg-var-theme-background pa-3">
-            <div class="d-flex justify-space-between mb-2">
-              <span class="text-body-1">Subtotal Barang</span>
-              <span class="font-weight-medium">{{ formatRupiah(subtotal) }}</span>
-            </div>
-            <div v-if="totalTaxExclude > 0" class="d-flex justify-space-between align-center mb-2 text-warning">
-              <span class="text-body-1">Pajak Tambahan (Exclude)</span>
-              <span class="font-weight-medium">+ {{ formatRupiah(totalTaxExclude) }}</span>
-            </div>
-            <div v-if="totalTaxInclude > 0" class="d-flex justify-space-between align-center mb-2 text-info">
-              <span class="text-caption"><i>(Pajak di dalam harga: {{ formatRupiah(totalTaxInclude) }})</i></span>
-            </div>
-            <div class="d-flex justify-space-between align-center mb-4">
-              <div class="d-flex flex-column">
-                <span class="text-body-1 font-weight-medium">Diskon Total</span>
-                <span class="text-caption text-medium-emphasis" style="font-size: 11px;">Potongan faktur bon</span>
+            <!-- Diskon with Type Toggle (Rp / %) -->
+            <div class="d-flex justify-space-between align-center mb-1 text-caption text-slate-600">
+              <div class="d-flex align-center">
+                <span>Diskon</span>
+                <div class="pos-discount-type-toggle ms-2">
+                  <button
+                    type="button"
+                    class="pos-disc-btn"
+                    :class="{'pos-disc-btn-active': discountType === 'rupiah'}"
+                    title="Diskon Nominal Rupiah"
+                    @click="discountType = 'rupiah'"
+                  >
+                    Rp
+                  </button>
+                  <button
+                    type="button"
+                    class="pos-disc-btn"
+                    :class="{'pos-disc-btn-active': discountType === 'percent'}"
+                    title="Diskon Persentase (%)"
+                    @click="discountType = 'percent'"
+                  >
+                    %
+                  </button>
+                </div>
               </div>
-              <div
-                class="flex-grow-1 ms-8"
-                style="max-width: 220px;"
-              >
-                <VTextField
-                  :model-value="formatInputRupiah(discount)"
-                  type="text"
-                  density="compact"
-                  hide-details
-                  prefix="Rp"
-                  placeholder="0"
-                  class="text-right"
-                  clearable
-                  @update:model-value="val => discount = parseInputRupiah(val)"
-                  @click:clear="discount = 0"
-                />
+
+              <div style="width: 140px;">
+                <div v-if="discountType === 'rupiah'" class="pos-diskon-input-wrapper">
+                  <span class="pos-diskon-prefix">Rp</span>
+                  <input
+                    :value="formatInputRupiah(discountRupiahInput)"
+                    type="text"
+                    placeholder="0"
+                    class="pos-diskon-input"
+                    @input="e => discountRupiahInput = parseInputRupiah(e.target.value)"
+                  />
+                </div>
+
+                <div v-else class="pos-diskon-input-wrapper">
+                  <input
+                    :value="discountPercentInput"
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="0"
+                    class="pos-diskon-input text-right"
+                    @input="e => discountPercentInput = Number(e.target.value) || 0"
+                  />
+                  <span class="pos-diskon-suffix">%</span>
+                </div>
               </div>
             </div>
-            <VDivider class="mb-4" />
-            <div class="d-flex justify-space-between align-center mb-6">
-              <span class="text-h6 font-weight-bold">TOTAL</span>
-              <span class="text-h5 font-weight-bold text-primary">{{ formatRupiah(totalAmount) }}</span>
+
+            <!-- Discount Nominal Preview if Percent -->
+            <div v-if="discountType === 'percent' && discountPercentInput > 0" class="text-right text-xs text-slate-500 mb-1" style="font-size: 10.5px;">
+              Potongan: -{{ formatRupiah(discountNominal) }}
             </div>
-            
+
+            <div class="pos-summary-divider my-2"></div>
+
+            <div class="d-flex justify-space-between align-center mb-3">
+              <span class="font-weight-bold text-slate-800 text-subtitle-2">TOTAL</span>
+              <span class="font-weight-bold text-primary text-h6">{{ formatRupiah(totalAmount) }}</span>
+            </div>
+
             <div class="d-flex gap-2">
-              <VBtn
-                variant="tonal"
-                color="warning"
-                size="large"
-                style="width: 40%;"
-                prepend-icon="ri-pause-line"
-                :disabled="cart.length === 0"
-                :loading="isHoldingBill"
-                class="font-weight-bold"
+              <button
+                type="button"
+                class="pos-btn-hold"
+                :disabled="cart.length === 0 || isHoldingBill"
                 @click="holdCurrentBill"
               >
+                <VIcon icon="ri-pause-circle-line" size="17" class="me-1 text-amber-600" />
                 Hold (F6)
-              </VBtn>
-              <VBtn
-                color="primary"
-                size="large"
-                class="flex-grow-1 font-weight-bold"
-                prepend-icon="ri-bank-card-line"
+              </button>
+
+              <button
+                type="button"
+                class="pos-btn-pay"
                 :disabled="cart.length === 0"
                 @click="handleCheckoutClick"
               >
+                <VIcon icon="ri-bank-card-line" size="17" class="me-1 text-white" />
                 Bayar (F8)
-              </VBtn>
+              </button>
             </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-    </VRow>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Bottom Shortcut Banner -->
+    <footer class="pos-bottom-banner">
+      <div class="d-flex align-center gap-2 me-4 text-slate-700 font-weight-bold text-xs">
+        <VIcon icon="ri-keyboard-line" size="16" class="text-primary" />
+        Shortcut Keyboard
+      </div>
+
+      <div class="d-flex align-center gap-3 overflow-x-auto">
+        <div class="pos-shortcut-badge cursor-pointer" title="Tekan F1 untuk cari produk" @click="focusSearchInput">
+          <span class="pos-kbd-key text-primary bg-primary-subtle">F1</span>
+          <span>Cari Produk</span>
+        </div>
+        <div class="pos-shortcut-badge cursor-pointer" title="Tekan F4 untuk scan barcode" @click="focusSearchInput">
+          <span class="pos-kbd-key text-primary bg-primary-subtle">F4</span>
+          <span>Scan Barcode</span>
+        </div>
+        <div class="pos-shortcut-badge cursor-pointer" title="Tekan F6 untuk tahan transaksi" @click="cart.length > 0 ? holdCurrentBill() : snackbar.show('Keranjang belanja kosong', 'warning')">
+          <span class="pos-kbd-key text-amber-600 bg-amber-subtle">F6</span>
+          <span>Hold Transaksi</span>
+        </div>
+        <div class="pos-shortcut-badge cursor-pointer" title="Tekan F8 untuk bayar" @click="cart.length > 0 ? handleCheckoutClick() : snackbar.show('Keranjang belanja kosong', 'warning')">
+          <span class="pos-kbd-key text-indigo-600 bg-indigo-subtle">F8</span>
+          <span>Bayar</span>
+        </div>
+        <div class="pos-shortcut-badge cursor-pointer" title="Tekan F11 untuk Layar Penuh" @click="toggleFullscreen">
+          <span class="pos-kbd-key text-teal-600 bg-teal-subtle">F11</span>
+          <span>Layar Penuh</span>
+        </div>
+        <div class="pos-shortcut-badge cursor-pointer" title="Tekan ESC untuk membatalkan" @click="cart.length > 0 ? clearCart() : router.push({ name: 'dashboards-analytics' })">
+          <span class="pos-kbd-key text-slate-600 bg-slate-subtle">ESC</span>
+          <span>Batal / Keluar</span>
+        </div>
+      </div>
+    </footer>
 
     <!-- Mobile Bottom Floating Cart Bar -->
     <div
@@ -2598,13 +2754,729 @@ const startNewTransaction = () => {
 </template>
 
 <style scoped>
-.product-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 5px 15px rgba(0,0,0,0.1) !important;
-  border-color: rgba(var(--v-theme-primary), 0.5);
+.pos-root-container {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8fafc;
+  padding: 10px 14px;
+  gap: 8px;
+  box-sizing: border-box;
+  z-index: 10;
 }
-.transition-all {
-  transition: all 0.3s ease;
+
+/* Header Bar */
+.pos-header-bar {
+  height: 42px;
+  min-height: 42px;
+  max-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.pos-top-pill {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.pos-top-pill:hover {
+  background: #f1f5f9;
+}
+
+.pos-pill-success {
+  color: #16a34a;
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+.pos-pill-error {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.status-dot-green {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  display: inline-block;
+}
+
+/* Main Content Area */
+.pos-main-content {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+  overflow: hidden;
+}
+
+/* Catalog Section */
+.pos-catalog-section {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pos-catalog-box {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.pos-catalog-header {
+  flex-shrink: 0;
+  background: #ffffff;
+  border-bottom: 1px solid #f1f5f9;
+  padding: 10px 14px 8px;
+}
+
+.pos-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0 10px;
+  height: 38px;
+}
+
+.pos-search-icon {
+  color: #94a3b8;
+  margin-right: 8px;
+}
+
+.pos-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: #1e293b;
+  background: transparent;
+}
+
+.pos-kbd-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.pos-scan-btn {
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pos-scan-btn:hover {
+  border-color: #3b82f6;
+  background: #f8fafc;
+}
+
+.pos-category-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-top: 4px;
+  padding-bottom: 2px;
+}
+.pos-category-row::-webkit-scrollbar {
+  height: 3px;
+}
+.pos-category-row::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.pos-cat-pill {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.pos-cat-pill:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+.pos-cat-pill-active {
+  background: #3b82f6 !important;
+  color: #ffffff !important;
+  border-color: #3b82f6 !important;
+}
+
+.pos-catalog-body {
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: #f8fafc;
+}
+.pos-catalog-body::-webkit-scrollbar {
+  width: 5px;
+}
+.pos-catalog-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+/* Product Card Grid */
+.pos-product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 1200px) {
+  .pos-product-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.pos-product-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  min-height: 145px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+.pos-product-card:hover {
+  transform: translateY(-2px);
+  border-color: #3b82f6;
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.1);
+}
+
+.pos-card-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.pos-card-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #eef2ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.pos-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pos-star-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+
+.pos-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 2px 0;
+  line-height: 1.3;
+}
+
+.pos-card-sku {
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.2;
+}
+
+.pos-card-price {
+  font-size: 14px;
+  font-weight: 800;
+  color: #3b82f6;
+  line-height: 1.2;
+}
+
+.pos-method-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  display: inline-block;
+}
+.pos-method-badge.fifo {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #dbeafe;
+}
+.pos-method-badge.lifo {
+  background: #f5f3ff;
+  color: #7c3aed;
+  border: 1px solid #ede9fe;
+}
+.pos-method-badge.fefo {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fee2e2;
+}
+
+.pos-stock-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+.pos-stock-pill.in-stock {
+  background: #ecfdf5;
+  color: #059669;
+}
+.pos-stock-pill.low-stock {
+  background: #fef3c7;
+  color: #d97706;
+}
+.pos-stock-pill.out-of-stock {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+/* Catalog Footer */
+.pos-catalog-footer {
+  height: 48px;
+  min-height: 48px;
+  max-height: 48px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-top: 1px solid #f1f5f9;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pos-footer-info {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.pos-custom-select {
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  font-size: 12px;
+  color: #475569;
+  padding: 0 8px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* Cart Section */
+.pos-cart-section {
+  width: 380px;
+  max-width: 40%;
+  min-width: 320px;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.pos-cart-box {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.pos-cart-header {
+  height: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  background: #3b82f6;
+  color: #ffffff;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pos-cart-count-badge {
+  background: #ffffff;
+  color: #3b82f6;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 12px;
+}
+
+.pos-cart-clear-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+.pos-cart-clear-btn:hover {
+  opacity: 1;
+}
+
+.pos-cart-body {
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  padding: 10px 12px;
+  background: #ffffff;
+}
+.pos-cart-body::-webkit-scrollbar {
+  width: 5px;
+}
+.pos-cart-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.pos-cart-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pos-cart-item-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid #f1f5f9;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.pos-cart-item-thumb {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: #eef2ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pos-qty-group {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #ffffff;
+  height: 26px;
+}
+
+.pos-qty-btn {
+  width: 24px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #64748b;
+}
+.pos-qty-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.pos-qty-val {
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e293b;
+  min-width: 18px;
+  text-align: center;
+}
+
+.pos-cart-price-input-wrapper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #ffffff;
+  height: 26px;
+  padding: 0 6px;
+  flex: 1;
+  max-width: 120px;
+  transition: all 0.15s;
+}
+.pos-cart-price-input-wrapper:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+.pos-cart-price-prefix {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+  margin-right: 3px;
+}
+.pos-cart-price-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #2563eb;
+  background: transparent;
+  text-align: right;
+  font-family: monospace;
+}
+
+.pos-item-del-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.pos-item-del-btn:hover {
+  opacity: 1;
+}
+
+.pos-cart-footer {
+  flex-shrink: 0;
+  background: #ffffff;
+  border-top: 1px solid #f1f5f9;
+  padding: 12px 14px;
+}
+
+.pos-discount-type-toggle {
+  display: inline-flex;
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 2px;
+}
+.pos-disc-btn {
+  border: none;
+  background: transparent;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.15s;
+}
+.pos-disc-btn-active {
+  background: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.2);
+}
+
+.pos-diskon-input-wrapper {
+  display: flex;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0 8px;
+  height: 30px;
+  background: #ffffff;
+  transition: all 0.15s;
+}
+.pos-diskon-input-wrapper:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+.pos-diskon-prefix,
+.pos-diskon-suffix {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+.pos-diskon-prefix {
+  margin-right: 4px;
+}
+.pos-diskon-suffix {
+  margin-left: 4px;
+}
+
+.pos-diskon-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+  background: transparent;
+  color: #1e293b;
+  font-family: monospace;
+}
+
+.pos-summary-divider {
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.pos-btn-hold {
+  flex: 1;
+  height: 40px;
+  border: 1px solid #fef3c7;
+  background: #fef3c7;
+  color: #d97706;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pos-btn-hold:hover:not(:disabled) {
+  background: #fde68a;
+}
+.pos-btn-hold:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pos-btn-pay {
+  flex: 1.5;
+  height: 40px;
+  border: none;
+  background: #3b82f6;
+  color: #ffffff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
+}
+.pos-btn-pay:hover:not(:disabled) {
+  background: #2563eb;
+}
+.pos-btn-pay:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Bottom Shortcut Banner */
+.pos-bottom-banner {
+  height: 38px;
+  min-height: 38px;
+  max-height: 38px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.pos-shortcut-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #475569;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pos-kbd-key {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.bg-primary-subtle {
+  background: #eff6ff;
+}
+.bg-amber-subtle {
+  background: #fffbeb;
+}
+.bg-indigo-subtle {
+  background: #eef2ff;
+}
+.bg-slate-subtle {
+  background: #f1f5f9;
+}
+.bg-teal-subtle {
+  background: #f0fdfa;
 }
 </style>
 

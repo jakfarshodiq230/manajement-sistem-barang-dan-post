@@ -68,107 +68,198 @@ const handleDrawerModelValueUpdate = val => {
     emit('cancel')
   }
 }
+const formatInputRupiah = value => {
+  if (value === null || value === undefined || value === '') return ''
+  const digits = String(value).replace(/\D/g, '')
+  if (!digits) return ''
+  return new Intl.NumberFormat('id-ID').format(digits)
+}
+
+const parseInputRupiah = value => {
+  if (value === null || value === undefined || value === '') return 0
+  const digits = String(value).replace(/\D/g, '')
+  return Number(digits) || 0
+}
+
+const projectedTotalStock = computed(() => {
+  const current = Number(props.selectedBranchProduct?.stock) || 0
+  const add = Number(quantity.value) || 0
+  return current + add
+})
 </script>
 
 <template>
   <VNavigationDrawer
     temporary
-    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '92vw' : 440)"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '92vw' : 480)"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
     @update:model-value="handleDrawerModelValueUpdate"
   >
     <!-- Header -->
-    <AppDrawerHeaderSection
-      title="Inbound Stok (Barang Masuk)"
-      @cancel="closeNavigationDrawer"
-    />
+    <div class="d-flex align-center justify-space-between px-6 py-5 border-b bg-gradient-header">
+      <div class="d-flex align-center gap-3">
+        <VAvatar
+          size="42"
+          color="primary"
+          variant="tonal"
+          class="rounded-lg"
+        >
+          <VIcon icon="ri-inbox-archive-line" size="24" />
+        </VAvatar>
+        <div>
+          <h5 class="text-h6 font-weight-bold mb-0">
+            Inbound Stok Barang Masuk
+          </h5>
+          <span class="text-caption text-medium-emphasis">
+            Pencatatan penambahan stok fisik cabang
+          </span>
+        </div>
+      </div>
+      <VBtn
+        icon="ri-close-line"
+        variant="tonal"
+        color="secondary"
+        size="small"
+        type="button"
+        @click.stop="closeNavigationDrawer"
+      />
+    </div>
 
-    <PerfectScrollbar :options="{ wheelPropagation: false }">
-      <VCard flat>
-        <VCardText>
-          <div
-            v-if="props.selectedBranchProduct"
-            class="mb-4"
-          >
-            <h6 class="text-h6 font-weight-medium mb-1">
-              {{ props.selectedBranchProduct.product?.name }}
-            </h6>
-            <div class="d-flex align-center gap-2">
-              <VChip
-                size="small"
-                color="primary"
-              >
-                Cabang: {{ props.selectedBranchProduct.branch?.name }}
-              </VChip>
-              <VChip
-                size="small"
-                color="success"
-              >
-                Stok Saat Ini: {{ props.selectedBranchProduct.stock }}
-              </VChip>
+    <PerfectScrollbar :options="{ wheelPropagation: false }" style="height: calc(100vh - 75px);">
+      <VCard flat class="pa-6">
+        <!-- Product & Branch Info Card -->
+        <div
+          v-if="props.selectedBranchProduct"
+          class="pa-4 mb-5 rounded-xl border bg-var-theme-surface shadow-xs"
+        >
+          <div class="d-flex align-center gap-3 mb-2">
+            <VAvatar
+              size="38"
+              color="primary"
+              variant="tonal"
+              rounded="lg"
+            >
+              <VIcon icon="ri-box-3-line" size="20" />
+            </VAvatar>
+            <div>
+              <div class="font-weight-bold text-body-1 text-high-emphasis">
+                {{ props.selectedBranchProduct.product?.name }}
+              </div>
+              <div class="text-caption font-mono text-medium-emphasis">
+                SKU: {{ props.selectedBranchProduct.product?.sku || '-' }} | Cabang: <strong>{{ props.selectedBranchProduct.branch?.name }}</strong>
+              </div>
             </div>
           </div>
-          <VDivider class="mb-4" />
 
-          <!-- Form -->
-          <VForm
-            ref="refForm"
-            v-model="isFormValid"
-            @submit.prevent="onSubmit"
-          >
-            <VRow>
-              <VCol cols="12">
-                <VTextField
-                  v-model="quantity"
-                  :rules="[v => !!v || 'Kuantitas wajib diisi', v => v > 0 || 'Kuantitas harus lebih dari 0']"
-                  label="Jumlah Barang Masuk (Qty)"
-                  type="number"
-                  placeholder="10"
-                />
-              </VCol>
+          <div class="d-flex align-center justify-space-between pt-2 border-t mt-2">
+            <span class="text-caption text-medium-emphasis">Stok Saat Ini:</span>
+            <VChip size="small" color="primary" variant="tonal" class="font-weight-bold">
+              {{ props.selectedBranchProduct.stock }} {{ props.selectedBranchProduct.product?.unit || 'Unit' }}
+            </VChip>
+          </div>
+        </div>
 
-              <VCol cols="12">
-                <VTextField
-                  v-model="unit_cost"
-                  label="Harga Modal Satuan (Rp)"
-                  type="number"
-                  placeholder="0"
-                  hint="Otomatis memperbarui harga modal dasar jika diisi"
-                  persistent-hint
-                />
-              </VCol>
+        <!-- Form -->
+        <VForm
+          ref="refForm"
+          v-model="isFormValid"
+          @submit.prevent="onSubmit"
+        >
+          <VRow dense>
+            <VCol cols="12" class="mb-2">
+              <VTextField
+                v-model.number="quantity"
+                :rules="[v => !!v || 'Jumlah kuantitas wajib diisi', v => v > 0 || 'Jumlah minimal 1']"
+                label="Jumlah Barang Masuk (Qty)"
+                type="number"
+                min="1"
+                placeholder="10"
+                density="comfortable"
+                variant="outlined"
+                prepend-inner-icon="ri-add-circle-line"
+                :suffix="props.selectedBranchProduct?.product?.unit || 'Pcs'"
+              />
+            </VCol>
 
-              <VCol cols="12">
-                <VTextarea
-                  v-model="notes"
-                  label="Catatan / Keterangan Pembelian"
-                  placeholder="Misal: Pembelian dari Supplier A (Nota #123)"
-                  rows="3"
-                />
-              </VCol>
+            <!-- Projected Stock Banner -->
+            <VCol cols="12" v-if="quantity > 0" class="mb-3">
+              <div class="pa-3 bg-primary-lighten-5 border border-primary-subtle rounded-lg d-flex align-center justify-space-between">
+                <span class="text-caption text-primary font-weight-medium">Estimasi Stok Akhir:</span>
+                <span class="text-subtitle-2 font-weight-bold text-primary">
+                  {{ projectedTotalStock }} {{ props.selectedBranchProduct?.product?.unit || 'Unit' }}
+                </span>
+              </div>
+            </VCol>
 
-              <VCol cols="12">
+            <VCol cols="12" class="mb-2">
+              <VTextField
+                :model-value="formatInputRupiah(unit_cost)"
+                label="Harga Modal Satuan Masuk (HPP) (Rp)"
+                type="text"
+                placeholder="0"
+                density="comfortable"
+                variant="outlined"
+                prepend-inner-icon="ri-money-dollar-circle-line"
+                prefix="Rp"
+                hint="Memperbarui harga modal dasar cabang jika diisi"
+                persistent-hint
+                @update:model-value="val => unit_cost = parseInputRupiah(val)"
+              />
+            </VCol>
+
+            <VCol cols="12" class="mb-4">
+              <VTextarea
+                v-model="notes"
+                label="Catatan / Nomor Dokumen Pembelian"
+                placeholder="Misal: Penerimaan tambahan dari Supplier A (Nota #123)"
+                rows="3"
+                density="comfortable"
+                variant="outlined"
+                prepend-inner-icon="ri-file-text-line"
+              />
+            </VCol>
+
+            <!-- Action Bar -->
+            <VCol cols="12">
+              <div class="d-flex align-center gap-3 pt-2">
                 <VBtn
                   type="submit"
-                  class="me-3"
+                  color="primary"
+                  size="large"
+                  prepend-icon="ri-download-2-line"
+                  class="font-weight-bold flex-grow-1 rounded-lg shadow-sm"
                 >
-                  Simpan Inbound
+                  Simpan Inbound Stok
                 </VBtn>
                 <VBtn
                   type="button"
                   variant="outlined"
-                  color="error"
-                  @click="closeNavigationDrawer"
+                  color="secondary"
+                  size="large"
+                  class="rounded-lg px-5"
+                  @click.stop="closeNavigationDrawer"
                 >
                   Batal
                 </VBtn>
-              </VCol>
-            </VRow>
-          </VForm>
-        </VCardText>
+              </div>
+            </VCol>
+          </VRow>
+        </VForm>
       </VCard>
     </PerfectScrollbar>
   </VNavigationDrawer>
 </template>
+
+<style scoped>
+.bg-gradient-header {
+  background: linear-gradient(135deg, rgba(var(--v-theme-primary), 0.05) 0%, rgba(var(--v-theme-surface), 1) 100%);
+}
+.bg-primary-lighten-5 {
+  background-color: rgba(var(--v-theme-primary), 0.06) !important;
+}
+.border-primary-subtle {
+  border-color: rgba(var(--v-theme-primary), 0.25) !important;
+}
+</style>

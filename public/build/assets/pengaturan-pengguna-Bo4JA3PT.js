@@ -1,0 +1,1 @@
+import{j as a,E as r,o as n,c as t,b as s,b0 as o}from"./main-9VHNyDsO.js";const c={class:"d-flex justify-center align-center py-16"},_={__name:"pengaturan-pengguna",setup(p){const e=a();return r(()=>{e.replace("/apps/pengaturan-pengguna")}),(u,i)=>(n(),t("div",c,[s(o,{indeterminate:"",color:"primary",size:"48"})]))}};export{_ as default};

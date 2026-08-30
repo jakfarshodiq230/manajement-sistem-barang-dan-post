@@ -15,6 +15,9 @@ const props = defineProps({
 
 const emit = defineEmits([
   'update:isDrawerOpen',
+  'update:is-drawer-open',
+  'close',
+  'cancel',
   'categoryData',
 ])
 
@@ -42,6 +45,9 @@ watch(
 
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
+  emit('update:is-drawer-open', false)
+  emit('close')
+  emit('cancel')
   resetForm()
 }
 
@@ -53,15 +59,19 @@ const onSubmit = () => {
         name: name.value,
         description: description.value,
       })
-      emit('update:isDrawerOpen', false)
-      resetForm()
+      closeNavigationDrawer()
     }
   })
 }
 
 const handleDrawerModelValueUpdate = val => {
   emit('update:isDrawerOpen', val)
-  if (!val) resetForm()
+  emit('update:is-drawer-open', val)
+  if (!val) {
+    emit('close')
+    emit('cancel')
+    resetForm()
+  }
 }
 
 function resetForm() {
@@ -76,64 +86,110 @@ function resetForm() {
 <template>
   <VNavigationDrawer
     temporary
-    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 400)"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '92vw' : 460)"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
     @update:model-value="handleDrawerModelValueUpdate"
   >
-    <AppDrawerHeaderSection
-      :title="isEditing ? 'Edit Kategori' : 'Tambah Kategori'"
-      @cancel="closeNavigationDrawer"
-    />
+    <!-- Header -->
+    <div class="d-flex align-center justify-space-between px-6 py-5 border-b bg-gradient-header">
+      <div class="d-flex align-center gap-3">
+        <VAvatar
+          size="42"
+          color="primary"
+          variant="tonal"
+          class="rounded-lg"
+        >
+          <VIcon
+            :icon="isEditing ? 'ri-folder-settings-line' : 'ri-folder-add-line'"
+            size="24"
+          />
+        </VAvatar>
+        <div>
+          <h5 class="text-h6 font-weight-bold mb-0">
+            {{ isEditing ? 'Edit Kategori Produk' : 'Tambah Kategori Baru' }}
+          </h5>
+          <span class="text-caption text-medium-emphasis">
+            Pengelompokan barang & klasifikasi inventori
+          </span>
+        </div>
+      </div>
+      <VBtn
+        icon="ri-close-line"
+        variant="tonal"
+        color="secondary"
+        size="small"
+        type="button"
+        @click.stop="closeNavigationDrawer"
+      />
+    </div>
 
-    <PerfectScrollbar :options="{ wheelPropagation: false }">
-      <VCard flat>
-        <VCardText>
-          <VForm
-            ref="refForm"
-            v-model="isFormValid"
-            @submit.prevent="onSubmit"
-          >
-            <VRow>
-              <VCol cols="12">
-                <VTextField
-                  v-model="name"
-                  :rules="[v => !!v || 'Nama kategori wajib diisi']"
-                  label="Nama Kategori"
-                  placeholder="Mis. Oli & Pelumas"
-                />
-              </VCol>
+    <PerfectScrollbar :options="{ wheelPropagation: false }" style="height: calc(100vh - 75px);">
+      <VCard flat class="pa-6">
+        <VForm
+          ref="refForm"
+          v-model="isFormValid"
+          @submit.prevent="onSubmit"
+        >
+          <VRow dense>
+            <VCol cols="12" class="mb-2">
+              <VTextField
+                v-model="name"
+                :rules="[v => !!v || 'Nama kategori wajib diisi']"
+                label="Nama Kategori Produk"
+                placeholder="Misal: Aki Basah / Aki Kering / Oli"
+                density="comfortable"
+                variant="outlined"
+                prepend-inner-icon="ri-folder-3-line"
+              />
+            </VCol>
 
-              <VCol cols="12">
-                <VTextarea
-                  v-model="description"
-                  label="Deskripsi"
-                  placeholder="Keterangan singkat tentang kategori ini"
-                  rows="3"
-                />
-              </VCol>
+            <VCol cols="12" class="mb-4">
+              <VTextarea
+                v-model="description"
+                label="Deskripsi & Keterangan Kategori"
+                placeholder="Tuliskan catatan klasifikasi barang..."
+                rows="3"
+                density="comfortable"
+                variant="outlined"
+                prepend-inner-icon="ri-file-text-line"
+              />
+            </VCol>
 
-              <VCol cols="12">
+            <!-- Action Bar -->
+            <VCol cols="12">
+              <div class="d-flex align-center gap-3 pt-2">
                 <VBtn
                   type="submit"
-                  class="me-3"
+                  color="primary"
+                  size="large"
+                  prepend-icon="ri-save-3-line"
+                  class="font-weight-bold flex-grow-1 rounded-lg shadow-sm"
                 >
-                  Simpan
+                  {{ isEditing ? 'Simpan Perubahan Kategori' : 'Daftarkan Kategori' }}
                 </VBtn>
                 <VBtn
                   type="button"
                   variant="outlined"
-                  color="error"
-                  @click="closeNavigationDrawer"
+                  color="secondary"
+                  size="large"
+                  class="rounded-lg px-5"
+                  @click.stop="closeNavigationDrawer"
                 >
                   Batal
                 </VBtn>
-              </VCol>
-            </VRow>
-          </VForm>
-        </VCardText>
+              </div>
+            </VCol>
+          </VRow>
+        </VForm>
       </VCard>
     </PerfectScrollbar>
   </VNavigationDrawer>
 </template>
+
+<style scoped>
+.bg-gradient-header {
+  background: linear-gradient(135deg, rgba(var(--v-theme-primary), 0.05) 0%, rgba(var(--v-theme-surface), 1) 100%);
+}
+</style>

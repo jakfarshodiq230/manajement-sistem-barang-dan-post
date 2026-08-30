@@ -20,6 +20,9 @@ const props = defineProps({
 
 const emit = defineEmits([
   'update:isDrawerOpen',
+  'update:is-drawer-open',
+  'close',
+  'cancel',
   'saveData',
 ])
 
@@ -29,6 +32,21 @@ const source_branch_id = ref(null)
 const destination_branch_id = ref(null)
 const notes = ref('')
 const snackbar = useSnackbarStore()
+const isSubmitting = ref(false)
+
+const closeNavigationDrawer = () => {
+  emit('update:isDrawerOpen', false)
+  emit('update:is-drawer-open', false)
+  emit('close')
+  emit('cancel')
+  nextTick(() => {
+    refForm.value?.resetValidation()
+    source_branch_id.value = null
+    destination_branch_id.value = null
+    notes.value = ''
+    items.value = [{ product_id: null, qty: 1 }]
+  })
+}
 
 // Dynamic Product Search
 const productOptions = ref([])
@@ -143,13 +161,6 @@ onMounted(() => {
   }
 })
 
-const closeNavigationDrawer = () => {
-  emit('update:isDrawerOpen', false)
-  nextTick(() => {
-    refForm.value?.resetValidation()
-    items.value = [{ product_id: null, qty: 1 }]
-  })
-}
 
 const addItem = () => {
   items.value.push({ product_id: null, qty: 1 })
@@ -160,8 +171,6 @@ const removeItem = index => {
     items.value.splice(index, 1)
   }
 }
-
-const isSubmitting = ref(false)
 
 const onSubmit = async () => {
   const result = await refForm.value?.validate()
@@ -203,48 +212,81 @@ const onSubmit = async () => {
 
 const handleDrawerModelValueUpdate = val => {
   emit('update:isDrawerOpen', val)
+  emit('update:is-drawer-open', val)
+  if (!val) {
+    emit('close')
+    emit('cancel')
+  }
 }
 </script>
 
 <template>
   <VNavigationDrawer
     temporary
-    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 720)"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '92vw' : 750)"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
     @update:model-value="handleDrawerModelValueUpdate"
   >
-    <AppDrawerHeaderSection
-      title="Buat Pengajuan Mutasi Stok"
-      @cancel="closeNavigationDrawer"
-    />
+    <!-- Header -->
+    <div class="d-flex align-center justify-space-between px-6 py-5 border-b bg-gradient-header">
+      <div class="d-flex align-center gap-3">
+        <VAvatar
+          size="42"
+          color="primary"
+          variant="tonal"
+          class="rounded-lg"
+        >
+          <VIcon icon="ri-arrow-left-right-line" size="24" />
+        </VAvatar>
+        <div>
+          <h5 class="text-h6 font-weight-bold mb-0">
+            Pengajuan Mutasi Antar Cabang
+          </h5>
+          <span class="text-caption text-medium-emphasis">
+            Transfer stok barang antar outlet & gudang pusat
+          </span>
+        </div>
+      </div>
+      <VBtn
+        icon="ri-close-line"
+        variant="tonal"
+        color="secondary"
+        size="small"
+        type="button"
+        @click.stop="closeNavigationDrawer"
+      />
+    </div>
 
-    <PerfectScrollbar :options="{ wheelPropagation: false }">
-      <VCard flat>
-        <VCardText>
-          <div class="mb-4 pa-3 bg-primary-lighten-5 rounded border border-primary">
-            <p class="text-caption text-primary mb-0 font-weight-medium">
-              <VIcon icon="ri-information-line" size="14" class="me-1" />
-              Permintaan barang dapat diajukan ke Gudang Pusat ataupun antar Cabang. Cari barang dengan mengetik Nama atau SKU pada kolom pencarian.
-            </p>
-          </div>
+    <PerfectScrollbar :options="{ wheelPropagation: false }" style="height: calc(100vh - 75px);">
+      <VCard flat class="pa-6">
+        <VForm
+          ref="refForm"
+          v-model="isFormValid"
+          @submit.prevent="onSubmit"
+        >
+          <!-- Section 1: Rute Mutasi -->
+          <div class="mb-5">
+            <div class="d-flex align-center gap-2 mb-3">
+              <VIcon icon="ri-route-line" color="primary" size="18" />
+              <span class="text-subtitle-2 font-weight-bold text-uppercase letter-spacing-1 text-primary">
+                1. Rute Asal & Tujuan Mutasi
+              </span>
+            </div>
 
-          <VForm
-            ref="refForm"
-            v-model="isFormValid"
-            @submit.prevent="onSubmit"
-          >
-            <VRow>
+            <VRow dense>
               <VCol cols="12" md="6">
                 <VAutocomplete
                   v-model="source_branch_id"
-                  :rules="[v => !!v || 'Cabang / Unit asal wajib dipilih']"
+                  :rules="[v => !!v || 'Cabang sumber asal wajib dipilih']"
                   :items="props.branches"
                   item-title="name"
                   item-value="id"
-                  label="Cabang / Gudang Asal (Sumber Barang)"
-                  placeholder="Pilih Pusat atau Cabang Asal"
+                  label="Cabang / Gudang Asal (Sumber)"
+                  placeholder="Pilih Gudang Pusat / Cabang"
+                  density="comfortable"
+                  variant="outlined"
                   prepend-inner-icon="ri-store-2-line"
                 />
               </VCol>
@@ -256,116 +298,138 @@ const handleDrawerModelValueUpdate = val => {
                   :items="props.branches"
                   item-title="name"
                   item-value="id"
-                  label="Cabang Pemohon (Tujuan Penerimaan)"
-                  placeholder="Pilih Cabang Pemohon"
+                  label="Cabang Tujuan (Pemohon)"
+                  placeholder="Pilih Cabang Penerima"
+                  density="comfortable"
+                  variant="outlined"
                   prepend-inner-icon="ri-store-3-line"
                 />
               </VCol>
 
-              <VCol cols="12">
+              <VCol cols="12" class="mt-2">
                 <VTextarea
                   v-model="notes"
-                  label="Catatan / Instruksi Permintaan"
+                  label="Catatan / Instruksi Permintaan Barang"
                   rows="2"
-                  placeholder="Contoh: Permintaan restock darurat, dijemput hari Kamis siang..."
+                  placeholder="Contoh: Permintaan restok darurat karena stok menipis..."
+                  density="comfortable"
+                  variant="outlined"
                   prepend-inner-icon="ri-file-text-line"
                 />
               </VCol>
-
-              <VCol cols="12">
-                <VDivider class="my-2" />
-                <div class="d-flex justify-space-between align-center my-3">
-                  <div>
-                    <h6 class="text-subtitle-1 font-weight-bold d-flex align-center gap-1">
-                      <VIcon icon="ri-box-3-line" size="18" color="primary" />
-                      Daftar Barang yang Diminta
-                    </h6>
-                    <span class="text-caption text-medium-emphasis">
-                      Ketik Nama atau SKU untuk mencari dari seluruh data barang
-                    </span>
-                  </div>
-                  <VBtn
-                    size="small"
-                    variant="tonal"
-                    prepend-icon="ri-add-line"
-                    @click="addItem"
-                  >
-                    Tambah Baris
-                  </VBtn>
-                </div>
-
-                <div
-                  v-for="(item, index) in items"
-                  :key="index"
-                  class="d-flex align-center gap-3 mb-3 pa-2 rounded bg-grey-50 border"
-                >
-                  <div class="flex-grow-1">
-                    <VAutocomplete
-                      v-model="item.product_id"
-                      :items="productOptions"
-                      :item-title="formatProductTitle"
-                      item-value="id"
-                      label="Cari Produk (Nama / SKU)"
-                      placeholder="Ketik untuk mencari barang..."
-                      density="compact"
-                      clearable
-                      :loading="isSearchingProduct"
-                      :rules="[v => !!v || 'Pilih produk']"
-                      @update:search="onProductSearchInput"
-                    >
-                      <template #no-data>
-                        <div class="pa-2 text-caption text-medium-emphasis">
-                          {{ isSearchingProduct ? 'Mencari data barang...' : 'Ketik nama barang / SKU untuk mencari...' }}
-                        </div>
-                      </template>
-                    </VAutocomplete>
-                  </div>
-                  <div style="width: 130px;">
-                    <VTextField
-                      v-model.number="item.qty"
-                      type="number"
-                      label="Qty Diminta"
-                      density="compact"
-                      min="1"
-                      :rules="[v => v > 0 || 'Min. 1']"
-                    />
-                  </div>
-                  <div>
-                    <IconBtn
-                      size="small"
-                      color="error"
-                      variant="text"
-                      :disabled="items.length === 1"
-                      @click="removeItem(index)"
-                    >
-                      <VIcon icon="ri-delete-bin-line" />
-                    </IconBtn>
-                  </div>
-                </div>
-              </VCol>
-
-              <VCol cols="12" class="mt-4 d-flex gap-2">
-                <VBtn
-                  type="submit"
-                  color="primary"
-                  prepend-icon="ri-send-plane-line"
-                  :loading="isSubmitting"
-                >
-                  Kirim Pengajuan Mutasi
-                </VBtn>
-                <VBtn
-                  type="button"
-                  variant="outlined"
-                  color="secondary"
-                  @click="closeNavigationDrawer"
-                >
-                  Batal
-                </VBtn>
-              </VCol>
             </VRow>
-          </VForm>
-        </VCardText>
+          </div>
+
+          <VDivider class="my-5" />
+
+          <!-- Section 2: Daftar Barang -->
+          <div class="mb-6">
+            <div class="d-flex justify-space-between align-center mb-3">
+              <div class="d-flex align-center gap-2">
+                <VIcon icon="ri-box-3-line" color="success" size="18" />
+                <span class="text-subtitle-2 font-weight-bold text-uppercase letter-spacing-1 text-success">
+                  2. Rincian Barang yang Diminta
+                </span>
+              </div>
+              <VBtn
+                size="small"
+                variant="tonal"
+                color="primary"
+                prepend-icon="ri-add-line"
+                class="rounded-lg"
+                @click="addItem"
+              >
+                Tambah Baris Barang
+              </VBtn>
+            </div>
+
+            <div
+              v-for="(item, index) in items"
+              :key="index"
+              class="d-flex align-center gap-3 mb-3 pa-3 rounded-xl border bg-var-theme-surface shadow-xs"
+            >
+              <div class="flex-grow-1">
+                <VAutocomplete
+                  v-model="item.product_id"
+                  :items="productOptions"
+                  :item-title="formatProductTitle"
+                  item-value="id"
+                  label="Pilih Produk (Ketik Nama / SKU)"
+                  placeholder="Ketik untuk mencari..."
+                  density="comfortable"
+                  variant="outlined"
+                  clearable
+                  hide-details
+                  :loading="isSearchingProduct"
+                  :rules="[v => !!v || 'Pilih produk']"
+                  @update:search="onProductSearchInput"
+                >
+                  <template #no-data>
+                    <div class="pa-2 text-caption text-medium-emphasis">
+                      {{ isSearchingProduct ? 'Mencari data barang...' : 'Ketik nama barang / SKU untuk mencari...' }}
+                    </div>
+                  </template>
+                </VAutocomplete>
+              </div>
+              <div style="width: 140px;">
+                <VTextField
+                  v-model.number="item.qty"
+                  type="number"
+                  label="Qty Diminta"
+                  density="comfortable"
+                  variant="outlined"
+                  min="1"
+                  hide-details
+                  :rules="[v => v > 0 || 'Min. 1']"
+                />
+              </div>
+              <div>
+                <VBtn
+                  icon="ri-delete-bin-line"
+                  variant="text"
+                  color="error"
+                  size="small"
+                  :disabled="items.length === 1"
+                  @click="removeItem(index)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Sticky Action Bar -->
+          <div class="d-flex align-center gap-3 pt-2">
+            <VBtn
+              type="submit"
+              color="primary"
+              size="large"
+              prepend-icon="ri-send-plane-2-line"
+              :loading="isSubmitting"
+              class="font-weight-bold flex-grow-1 rounded-lg shadow-sm"
+            >
+              Kirim Pengajuan Mutasi
+            </VBtn>
+            <VBtn
+              type="button"
+              variant="outlined"
+              color="secondary"
+              size="large"
+              class="rounded-lg px-5"
+              @click.stop="closeNavigationDrawer"
+            >
+              Batal
+            </VBtn>
+          </div>
+        </VForm>
       </VCard>
     </PerfectScrollbar>
   </VNavigationDrawer>
 </template>
+
+<style scoped>
+.bg-gradient-header {
+  background: linear-gradient(135deg, rgba(var(--v-theme-primary), 0.05) 0%, rgba(var(--v-theme-surface), 1) 100%);
+}
+.letter-spacing-1 {
+  letter-spacing: 0.5px;
+}
+</style>

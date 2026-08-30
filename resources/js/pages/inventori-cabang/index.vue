@@ -20,13 +20,29 @@ const isPrintLabelDialogVisible = ref(false)
 const isManageBatchesDialogVisible = ref(false)
 const selectedProductBranch = ref(null)
 const fileInput = ref(null)
-const isPriceGuideVisible = ref(true)
+const isPriceGuideVisible = ref(false)
 
 // Pagination
 const page = ref(1)
 const itemsPerPage = ref(10)
 const totalItems = ref(0)
 let searchTimeout = null
+
+// Computed statistics for ERP cards
+const totalStockCount = computed(() => {
+  return productBranches.value.reduce((acc, item) => acc + (Number(item.stock) || 0), 0)
+})
+
+const totalStockValuation = computed(() => {
+  return productBranches.value.reduce((acc, item) => {
+    const cost = item.active_batch?.cost_price || item.cost_price || 0
+    return acc + ((Number(item.stock) || 0) * (Number(cost) || 0))
+  }, 0)
+})
+
+const lowStockCount = computed(() => {
+  return productBranches.value.filter(item => (Number(item.stock) || 0) <= (Number(item.product?.min_stock) || 5)).length
+})
 
 // For formatting
 const formatRupiah = value => {
@@ -35,7 +51,7 @@ const formatRupiah = value => {
     currency: 'IDR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(value)
+  }).format(value || 0)
 }
 
 const snackbar = useSnackbarStore()
@@ -347,20 +363,87 @@ const confirmDelete = async id => {
       </div>
     </div>
 
-    <!-- Price Structure & Tax Policy Guide Banner -->
-    <VCard class="mb-5 border border-primary border-opacity-25 bg-primary-lighten-5 rounded-xl">
+    <!-- Stat Summary Cards -->
+    <VRow class="mb-4" dense>
+      <VCol cols="12" sm="6" md="3">
+        <VCard class="pa-4 rounded-xl border shadow-xs">
+          <div class="d-flex align-center gap-3">
+            <VAvatar color="primary" variant="tonal" size="44" rounded="lg">
+              <VIcon icon="ri-box-3-line" size="24" />
+            </VAvatar>
+            <div>
+              <div class="text-caption text-medium-emphasis">Total Varian Produk</div>
+              <h4 class="text-h6 font-weight-bold text-high-emphasis mb-0">
+                {{ totalItems }} Item
+              </h4>
+            </div>
+          </div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3">
+        <VCard class="pa-4 rounded-xl border shadow-xs">
+          <div class="d-flex align-center gap-3">
+            <VAvatar color="success" variant="tonal" size="44" rounded="lg">
+              <VIcon icon="ri-archive-line" size="24" />
+            </VAvatar>
+            <div>
+              <div class="text-caption text-medium-emphasis">Total Fisik Stok</div>
+              <h4 class="text-h6 font-weight-bold text-success mb-0">
+                {{ totalStockCount }} Unit
+              </h4>
+            </div>
+          </div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3">
+        <VCard class="pa-4 rounded-xl border shadow-xs">
+          <div class="d-flex align-center gap-3">
+            <VAvatar color="info" variant="tonal" size="44" rounded="lg">
+              <VIcon icon="ri-money-dollar-circle-line" size="24" />
+            </VAvatar>
+            <div>
+              <div class="text-caption text-medium-emphasis">Nilai Aset Modal</div>
+              <h4 class="text-h6 font-weight-bold text-info mb-0">
+                {{ formatRupiah(totalStockValuation) }}
+              </h4>
+            </div>
+          </div>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6" md="3">
+        <VCard class="pa-4 rounded-xl border shadow-xs">
+          <div class="d-flex align-center gap-3">
+            <VAvatar color="warning" variant="tonal" size="44" rounded="lg">
+              <VIcon icon="ri-alert-line" size="24" />
+            </VAvatar>
+            <div>
+              <div class="text-caption text-medium-emphasis">Perlu Restok</div>
+              <h4 class="text-h6 font-weight-bold text-warning mb-0">
+                {{ lowStockCount }} Produk
+              </h4>
+            </div>
+          </div>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- Price Structure & Tax Policy Guide Banner (Collapsible) -->
+    <VCard class="mb-5 border border-primary-subtle bg-primary-lighten-5 rounded-xl">
       <VCardItem class="pa-4">
         <div class="d-flex align-center justify-space-between flex-wrap gap-2">
           <div class="d-flex align-center gap-3">
-            <VAvatar color="primary" variant="tonal" size="44" rounded="lg">
-              <VIcon icon="ri-price-tag-3-line" size="24" />
+            <VAvatar color="primary" variant="tonal" size="40" rounded="lg">
+              <VIcon icon="ri-price-tag-3-line" size="22" />
             </VAvatar>
             <div>
-              <h4 class="text-subtitle-1 font-weight-bold text-primary mb-0">
-                Panduan Struktur Harga Modal (HPP), Harga Jual, Harga Nego & Pajak Kasir POS
+              <h4 class="text-subtitle-2 font-weight-bold text-primary mb-0">
+                Panduan Struktur Harga Modal (HPP), Harga Jual, Nego & Pajak Kasir POS
               </h4>
               <p class="text-caption text-medium-emphasis mb-0">
-                Ketentuan perhitungan 3 tingkatan harga dan perlakuan PPN Masukan Supplier vs PPN Keluaran Kasir POS.
+                Ketentuan perhitungan 3 tingkatan harga dan perlakuan PPN Masukan vs PPN Keluaran Kasir.
               </p>
             </div>
           </div>
@@ -368,10 +451,11 @@ const confirmDelete = async id => {
             size="small"
             variant="tonal"
             color="primary"
+            class="rounded-lg"
             :prepend-icon="isPriceGuideVisible ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'"
             @click="isPriceGuideVisible = !isPriceGuideVisible"
           >
-            {{ isPriceGuideVisible ? 'Tutup Catatan Ketentuan' : 'Buka Catatan Ketentuan' }}
+            {{ isPriceGuideVisible ? 'Tutup Catatan' : 'Buka Catatan' }}
           </VBtn>
         </div>
 
@@ -654,56 +738,59 @@ const confirmDelete = async id => {
         </template>
 
         <template #item.actions="{ item }">
-          <div class="d-flex align-center flex-wrap gap-1 py-1" style="min-width: 260px;">
+          <div class="d-flex align-center gap-1 py-1">
             <VBtn
               v-if="$can('write', 'Inventori Cabang')"
-              size="x-small"
+              size="small"
               color="primary"
               variant="tonal"
-              prepend-icon="ri-inbox-archive-line"
-              class="font-weight-medium"
-              @click="addStock(item)"
-            >
-              Inbound
-            </VBtn>
-            <VBtn
-              v-if="$can('read', 'Inventori Cabang')"
-              size="x-small"
-              color="info"
-              variant="tonal"
-              prepend-icon="ri-printer-line"
-              class="font-weight-medium"
-              @click="printLabel(item)"
-            >
-              Label
-            </VBtn>
-            <VBtn
-              v-if="$can('write', 'Inventori Cabang')"
-              size="x-small"
-              color="secondary"
-              variant="tonal"
               prepend-icon="ri-qr-code-line"
-              class="font-weight-medium"
+              class="font-weight-medium rounded-lg px-3"
               @click="manageBatches(item)"
             >
-              Batch & SCC
+              Kelola Batch
             </VBtn>
-            <VBtn
-              v-if="$can('write', 'Inventori Cabang')"
-              icon="ri-pencil-line"
-              variant="text"
-              size="x-small"
-              color="secondary"
-              @click="editItem(item)"
-            />
-            <VBtn
-              v-if="$can('delete', 'Inventori Cabang')"
-              icon="ri-delete-bin-line"
-              variant="text"
-              size="x-small"
-              color="error"
-              @click="confirmDelete(item.id)"
-            />
+
+            <VMenu location="bottom end">
+              <template #activator="{ props: menuProps }">
+                <VBtn
+                  v-bind="menuProps"
+                  icon="ri-more-2-line"
+                  variant="text"
+                  size="small"
+                  color="secondary"
+                  class="rounded-lg"
+                />
+              </template>
+              <VList density="compact" class="py-1 shadow-sm rounded-lg" min-width="175">
+                <VListItem
+                  v-if="$can('write', 'Inventori Cabang')"
+                  prepend-icon="ri-download-2-line"
+                  title="Inbound Stok"
+                  @click="addStock(item)"
+                />
+                <VListItem
+                  v-if="$can('read', 'Inventori Cabang')"
+                  prepend-icon="ri-printer-line"
+                  title="Cetak Label QR"
+                  @click="printLabel(item)"
+                />
+                <VListItem
+                  v-if="$can('write', 'Inventori Cabang')"
+                  prepend-icon="ri-pencil-line"
+                  title="Edit Harga & Pajak"
+                  @click="editItem(item)"
+                />
+                <VDivider v-if="$can('delete', 'Inventori Cabang')" class="my-1" />
+                <VListItem
+                  v-if="$can('delete', 'Inventori Cabang')"
+                  prepend-icon="ri-delete-bin-line"
+                  title="Hapus dari Cabang"
+                  class="text-error"
+                  @click="confirmDelete(item.id)"
+                />
+              </VList>
+            </VMenu>
           </div>
         </template>
       </VDataTableServer>

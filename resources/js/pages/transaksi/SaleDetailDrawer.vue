@@ -13,7 +13,13 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['update:isDrawerOpen', 'void-sale'])
+const emit = defineEmits([
+  'update:isDrawerOpen',
+  'update:is-drawer-open',
+  'close',
+  'cancel',
+  'void-sale',
+])
 
 // Format currency
 const formatRupiah = value => {
@@ -22,35 +28,67 @@ const formatRupiah = value => {
     currency: 'IDR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(value)
+  }).format(value || 0)
 }
 
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
+  emit('update:is-drawer-open', false)
+  emit('close')
+  emit('cancel')
 }
 
 const handleDrawerModelValueUpdate = val => {
   emit('update:isDrawerOpen', val)
+  emit('update:is-drawer-open', val)
+  if (!val) {
+    emit('close')
+    emit('cancel')
+  }
 }
 </script>
 
 <template>
   <VNavigationDrawer
     temporary
-    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 500)"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '92vw' : 560)"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
     @update:model-value="handleDrawerModelValueUpdate"
   >
-    <AppDrawerHeaderSection
-      title="Detail Transaksi"
-      @cancel="closeNavigationDrawer"
-    />
+    <!-- Header -->
+    <div class="d-flex align-center justify-space-between px-6 py-5 border-b bg-gradient-header">
+      <div class="d-flex align-center gap-3">
+        <VAvatar
+          size="42"
+          color="primary"
+          variant="tonal"
+          class="rounded-lg"
+        >
+          <VIcon icon="ri-receipt-line" size="24" />
+        </VAvatar>
+        <div>
+          <h5 class="text-h6 font-weight-bold mb-0">
+            Rincian Faktur Transaksi
+          </h5>
+          <span class="text-caption text-medium-emphasis">
+            Struk kasir POS & status pelunasan
+          </span>
+        </div>
+      </div>
+      <VBtn
+        icon="ri-close-line"
+        variant="tonal"
+        color="secondary"
+        size="small"
+        type="button"
+        @click.stop="closeNavigationDrawer"
+      />
+    </div>
 
-    <PerfectScrollbar :options="{ wheelPropagation: false }">
-      <VCard flat>
-        <VCardText>
+    <PerfectScrollbar :options="{ wheelPropagation: false }" style="height: calc(100vh - 75px);">
+      <VCard flat class="pa-6">
           <div class="d-flex justify-space-between align-center mb-6">
             <div>
               <h6 class="text-h6 font-weight-bold">
@@ -398,8 +436,13 @@ const handleDrawerModelValueUpdate = val => {
           >
             Batalkan Transaksi (Void)
           </VBtn>
-        </VCardText>
       </VCard>
     </PerfectScrollbar>
   </VNavigationDrawer>
 </template>
+
+<style scoped>
+.bg-gradient-header {
+  background: linear-gradient(135deg, rgba(var(--v-theme-primary), 0.05) 0%, rgba(var(--v-theme-surface), 1) 100%);
+}
+</style>

@@ -17,6 +17,9 @@ const props = defineProps({
 
 const emit = defineEmits([
   'update:isDrawerOpen',
+  'update:is-drawer-open',
+  'close',
+  'cancel',
   'returnData',
 ])
 
@@ -59,90 +62,85 @@ const extractArray = val => {
 
 const fetchTransactions = async () => {
   if (!branchId.value) return
-  
   isLoading.value = true
   try {
-    let endpoint = referenceType.value === 'sale' ? '/apps/sales?itemsPerPage=-1' : '/apps/purchase-orders?itemsPerPage=-1'
-    const res = await $api(`${endpoint}&branch_id=${branchId.value}`)
-    const list = extractArray(res)
-    
-    // Filter completed transactions
-    if (referenceType.value === 'sale') {
-      availableTransactions.value = list
-    } else {
-      availableTransactions.value = list.filter(po => po.status === 'completed' || po.approval_status === 'approved')
-    }
-  } catch (err) {
-    console.error(err)
+    const endpoint = referenceType.value === 'sale' ? '/apps/transactions' : '/apps/purchase-orders'
+    const res = await $api(endpoint, {
+      query: {
+        branch_id: branchId.value,
+        itemsPerPage: -1,
+      },
+    })
+    availableTransactions.value = extractArray(res)
+  } catch (error) {
+    console.error(error)
+    snackbar.show('Gagal memuat transaksi referensi', 'error')
   } finally {
     isLoading.value = false
   }
 }
 
 watch(referenceId, async newVal => {
-  transactionItems.value = []
-  if (!newVal) return
-
+  if (!newVal) {
+    transactionItems.value = []
+    return
+  }
+  
   isLoading.value = true
   try {
-    let endpoint = referenceType.value === 'sale' ? `/apps/sales/${newVal}` : `/apps/purchase-orders/${newVal}`
-    const data = await $api(endpoint)
-    
-    if (data && data.items) {
-      transactionItems.value = await Promise.all(data.items.map(async item => {
-        const p_branch_id = item.product_branch_id || (item.product_id ? await getProductBranchId(item.product_id) : null)
-        const product_obj = item.product_branch?.product || item.product || {}
-        
-        return {
-          product_branch_id: p_branch_id,
-          name: product_obj.name || 'Unknown',
-          unit_price: item.price || item.unit_cost,
-          max_qty: item.qty,
-          qty: 1,
-          selected: false,
-          is_returnable: product_obj.is_returnable ?? true,
-        }
-      }))
-    }
-  } catch (err) {
-    console.error(err)
+    const endpoint = referenceType.value === 'sale' ? `/apps/transactions/${newVal}` : `/apps/purchase-orders/${newVal}`
+    const res = await $api(endpoint)
+    const data = res.data || res
+
+    const rawItems = data.items || data.details || []
+    transactionItems.value = rawItems.map(item => {
+      const p = item.product || item.product_branch?.product || {}
+      return {
+        product_id: p.id || item.product_id,
+        product_branch_id: item.product_branch_id || p.id,
+        name: p.name || item.product_name || 'Produk',
+        product_name: p.name || item.product_name || 'Produk',
+        sku: p.sku || '',
+        unit_price: item.price || item.unit_price || item.unit_cost || 0,
+        max_qty: item.quantity || item.qty || 1,
+        qty: 1,
+        selected: false,
+        is_returnable: p.is_returnable ?? true,
+        condition: 'good',
+        reason: '',
+      }
+    })
+  } catch (error) {
+    console.error(error)
+    snackbar.show('Gagal memuat detail item transaksi', 'error')
   } finally {
     isLoading.value = false
   }
 })
 
-// Helper if purchase order items only have product_id, we need to map to product_branch_id
-const getProductBranchId = async productId => {
-  try {
-    const res = await $api(`/apps/product-branches?branch_id=${branchId.value}&itemsPerPage=-1`)
-    const items = res.data || res || []
-    const pb = items.find(p => p.product_id === productId)
-    
-    return pb ? pb.id : null
-  } catch(e) {
-    return null
-  }
-}
-
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
+  emit('update:is-drawer-open', false)
+  emit('close')
+  emit('cancel')
   resetForm()
 }
 
 const onSubmit = () => {
   refForm.value?.validate().then(({ valid }) => {
     if (valid) {
-      const itemsToReturn = transactionItems.value
+      const selectedItems = transactionItems.value
         .filter(i => i.selected && i.qty > 0)
         .map(i => ({
+          product_id: i.product_id,
           product_branch_id: i.product_branch_id,
           qty: Number(i.qty),
           unit_price: Number(i.unit_price),
+          reason: i.reason || '',
         }))
 
-      if (itemsToReturn.length === 0) {
-        snackbar.show('Pilih minimal 1 barang untuk diretur', 'warning')
-        
+      if (selectedItems.length === 0) {
+        snackbar.show('Pilih minimal 1 barang yang dicentang untuk diretur', 'warning')
         return
       }
 
@@ -152,19 +150,27 @@ const onSubmit = () => {
         reference_id: referenceId.value,
         return_type: returnType.value,
         notes: notes.value,
-        items: itemsToReturn,
+        items: selectedItems,
       })
+      closeNavigationDrawer()
     }
   })
 }
 
 const handleDrawerModelValueUpdate = val => {
   emit('update:isDrawerOpen', val)
-  if (!val) resetForm()
+  emit('update:is-drawer-open', val)
+  if (!val) {
+    emit('close')
+    emit('cancel')
+    resetForm()
+  }
 }
 
 function resetForm() {
   branchId.value = null
+  referenceType.value = 'sale'
+  returnType.value = 'pengembalian_uang'
   referenceId.value = null
   notes.value = ''
   transactionItems.value = []
@@ -177,16 +183,41 @@ function resetForm() {
 <template>
   <VNavigationDrawer
     temporary
-    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 550)"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '92vw' : 620)"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
     @update:model-value="handleDrawerModelValueUpdate"
   >
-    <AppDrawerHeaderSection
-      title="Buat Retur Baru"
-      @cancel="closeNavigationDrawer"
-    />
+    <!-- Header -->
+    <div class="d-flex align-center justify-space-between px-6 py-5 border-b bg-gradient-header">
+      <div class="d-flex align-center gap-3">
+        <VAvatar
+          size="42"
+          color="primary"
+          variant="tonal"
+          class="rounded-lg"
+        >
+          <VIcon icon="ri-refund-2-line" size="24" />
+        </VAvatar>
+        <div>
+          <h5 class="text-h6 font-weight-bold mb-0">
+            Buat Dokumen Retur Barang
+          </h5>
+          <span class="text-caption text-medium-emphasis">
+            Pengembalian retur penjualan customer / pembelian supplier
+          </span>
+        </div>
+      </div>
+      <VBtn
+        icon="ri-close-line"
+        variant="tonal"
+        color="secondary"
+        size="small"
+        type="button"
+        @click.stop="closeNavigationDrawer"
+      />
+    </div>
 
     <PerfectScrollbar :options="{ wheelPropagation: false }">
       <VCard flat>
