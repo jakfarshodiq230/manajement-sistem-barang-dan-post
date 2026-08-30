@@ -77,6 +77,13 @@ const formatCurrency = val => {
   }).format(val || 0)
 }
 
+const setDueDateOffset = days => {
+  const base = received_date.value ? new Date(received_date.value) : new Date()
+  if (isNaN(base.getTime())) return
+  base.setDate(base.getDate() + days)
+  due_date.value = base.toISOString().substr(0, 10)
+}
+
 // Generate previews when photos change
 watch(() => photos.value, newPhotos => {
   photoPreviews.value.forEach(p => URL.revokeObjectURL(p))
@@ -691,8 +698,15 @@ const displayPo = computed(() => isEditMode.value ? props.selectedGr?.purchase_o
                   density="comfortable"
                   variant="outlined"
                   persistent-hint
-                  hint="Termin kredit supplier"
+                  hint="Termin kredit supplier (masuk Buku Hutang)"
                 />
+                <div class="d-flex gap-1 mt-1 flex-wrap">
+                  <VChip size="x-small" variant="tonal" color="secondary" class="cursor-pointer" @click="setDueDateOffset(0)">Cash</VChip>
+                  <VChip size="x-small" variant="tonal" color="primary" class="cursor-pointer" @click="setDueDateOffset(14)">+14h</VChip>
+                  <VChip size="x-small" variant="tonal" color="primary" class="cursor-pointer" @click="setDueDateOffset(30)">+30h</VChip>
+                  <VChip size="x-small" variant="tonal" color="primary" class="cursor-pointer" @click="setDueDateOffset(45)">+45h</VChip>
+                  <VChip size="x-small" variant="tonal" color="primary" class="cursor-pointer" @click="setDueDateOffset(60)">+60h</VChip>
+                </div>
               </VCol>
 
               <!-- Foto Faktur / Surat Jalan Fisik -->

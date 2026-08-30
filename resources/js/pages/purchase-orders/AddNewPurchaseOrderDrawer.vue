@@ -422,14 +422,13 @@ const handleDrawerModelValueUpdate = val => {
 
               <VCol v-if="payment_method === 'credit'" cols="12" sm="6" class="mt-2">
                 <VTextField
-                  v-model="due_date"
-                  type="date"
+                  :model-value="due_date ? String(due_date).substring(0, 10) : 'Diisi saat Penerimaan Gudang'"
+                  readonly
                   label="Tanggal Jatuh Tempo Pembayaran"
-                  placeholder="Pilih tanggal jatuh tempo"
                   prepend-inner-icon="ri-time-line"
                   density="comfortable"
                   variant="outlined"
-                  hint="Tanggal maksimal pelunasan tagihan ke supplier"
+                  hint="Tanggal jatuh tempo faktur resmi diisi saat fisik barang diterima di Penerimaan Gudang"
                   persistent-hint
                 />
               </VCol>
