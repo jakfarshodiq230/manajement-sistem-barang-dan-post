@@ -30,6 +30,10 @@ export const getI18n = () => {
       messages,
       missingWarn: false,
       fallbackWarn: false,
+      silentTranslationWarn: true,
+      silentFallbackWarn: true,
+      warnHtmlMessage: false,
+      missing: (locale, key) => key,
     })
   }
   

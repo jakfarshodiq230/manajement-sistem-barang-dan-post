@@ -40,14 +40,22 @@ const fetchAnalytics = async () => {
   isLoading.value = true
   try {
     const res = await $api(`/apps/dashboards/sales-analytics?period=${period.value}&branch_id=${selectedBranch.value}`)
-    if (res.summary) {
-      analyticsData.value = {
-        summary: res.summary,
-        chart: res.chart || [],
-        payment_breakdown: res.payment_breakdown || [],
-        top_products: res.top_products || [],
-        recent_transactions: res.recent_transactions || [],
-      }
+    const payload = res.data?.summary ? res.data : (res.summary ? res : (res.data || res))
+    const summary = payload.summary || (payload.kpi ? {
+      sales: { value: payload.kpi.orders_count || 0, growth: payload.kpi.orders_growth || 0 },
+      revenue: { value: payload.kpi.revenue || 0, growth: payload.kpi.revenue_growth || 0 },
+      profit: { value: payload.kpi.profit || 0, growth: payload.kpi.profit_growth || 0 },
+      aov: { value: payload.kpi.aov || 0 },
+      discount: { value: payload.kpi.total_discount || 0 },
+      margin: payload.kpi.revenue > 0 ? Math.round((payload.kpi.profit / payload.kpi.revenue) * 100) : 0,
+    } : analyticsData.value.summary)
+
+    analyticsData.value = {
+      summary: summary,
+      chart: payload.chart || [],
+      payment_breakdown: payload.payment_breakdown || [],
+      top_products: payload.top_products || [],
+      recent_transactions: payload.recent_transactions || [],
     }
   } catch (error) {
     console.error('Error fetching sales analytics:', error)

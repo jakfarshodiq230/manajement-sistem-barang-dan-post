@@ -113,6 +113,7 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 5000,
+    emptyOutDir: false,
   },
   server: {
     host: '127.0.0.1',

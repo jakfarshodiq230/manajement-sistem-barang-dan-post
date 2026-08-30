@@ -318,8 +318,24 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
+        $margin = $curRevenue > 0 ? round(($curProfit / $curRevenue) * 100, 1) : 0;
+        $summary = [
+            'sales' => ['value' => $curCount, 'growth' => $calcGrowth($curCount, $pastCount)],
+            'revenue' => ['value' => (float)$curRevenue, 'growth' => $calcGrowth($curRevenue, $pastRevenue)],
+            'profit' => ['value' => (float)$curProfit, 'growth' => $calcGrowth($curProfit, $pastProfit)],
+            'aov' => ['value' => (float)$aov],
+            'discount' => ['value' => (float)$totalDiscount],
+            'margin' => $margin,
+        ];
+
         return response()->json([
             'success' => true,
+            'summary' => $summary,
+            'chart' => $chartData,
+            'payment_breakdown' => $paymentBreakdown,
+            'bank_breakdown' => $bankBreakdown,
+            'top_products' => $topProducts,
+            'recent_transactions' => $recentTransactions,
             'data' => [
                 'kpi' => [
                     'revenue' => (float)$curRevenue,
@@ -331,6 +347,7 @@ class DashboardController extends Controller
                     'aov' => $aov,
                     'total_discount' => (float)$totalDiscount
                 ],
+                'summary' => $summary,
                 'chart' => $chartData,
                 'payment_breakdown' => $paymentBreakdown,
                 'bank_breakdown' => $bankBreakdown,
