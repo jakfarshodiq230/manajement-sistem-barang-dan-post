@@ -1,0 +1,12 @@
+---
+deployment:
+  tasks:
+    # Set jalur folder target
+    - export DEPLOYPATH_CORE=/home/shoa3397/ms_pos/
+    - export DEPLOYPATH_PUBLIC=/home/shoa3397/public_html/public_pos/
+
+    # 1. Kirim semua file aplikasi ke folder ms_pos (di luar public_html)
+    - /bin/rsync -rav --exclude='.git' --exclude='public' * $DEPLOYPATH_CORE
+
+    # 2. Kirim isi dari folder public/ ke public_html/public_pos
+    - /bin/rsync -rav public/ $DEPLOYPATH_PUBLIC
