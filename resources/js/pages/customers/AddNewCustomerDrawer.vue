@@ -83,9 +83,15 @@ const onSubmit = () => {
         {{ props.selectedCustomer ? 'Edit Pelanggan' : 'Tambah Pelanggan Baru' }}
       </h6>
       <VSpacer />
-      <IconBtn @click="emit('update:isDrawerOpen', false)">
+      <VBtn
+        icon
+        variant="tonal"
+        color="secondary"
+        size="small"
+        @click="emit('update:isDrawerOpen', false)"
+      >
         <VIcon icon="ri-close-line" />
-      </IconBtn>
+      </VBtn>
     </div>
     <VDivider />
 

@@ -60,6 +60,7 @@ const formatDate = dateStr => {
 <template>
   <VDialog
     :model-value="props.isDialogVisible"
+    :fullscreen="$vuetify.display.xs"
     max-width="500"
     @update:model-value="val => emit('update:isDialogVisible', val)"
   >

@@ -177,7 +177,7 @@ function resetForm() {
 <template>
   <VNavigationDrawer
     temporary
-    :width="500"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 550)"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
@@ -315,7 +315,7 @@ function resetForm() {
                   Ajukan Retur
                 </VBtn>
                 <VBtn
-                  type="reset"
+                  type="button"
                   variant="outlined"
                   color="error"
                   @click="closeNavigationDrawer"

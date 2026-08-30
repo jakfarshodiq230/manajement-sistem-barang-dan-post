@@ -549,19 +549,20 @@ onUnmounted(() => {
       <VProgressLinear v-if="isLoading" indeterminate color="primary" height="2" />
 
       <!-- Table Body -->
-      <VTable class="text-no-wrap" hover>
-        <thead>
-          <tr>
-            <th class="text-uppercase font-weight-bold">Waktu</th>
-            <th class="text-uppercase font-weight-bold">Tingkat Risiko</th>
-            <th class="text-uppercase font-weight-bold">Alamat IP & Perangkat</th>
-            <th class="text-uppercase font-weight-bold">Pengguna</th>
-            <th class="text-uppercase font-weight-bold">Aktivitas / Event</th>
-            <th class="text-uppercase font-weight-bold">Endpoint / URL</th>
-            <th class="text-uppercase font-weight-bold text-center">Status</th>
-            <th class="text-uppercase font-weight-bold text-center">Aksi</th>
-          </tr>
-        </thead>
+      <div class="table-responsive">
+        <VTable class="text-no-wrap" hover>
+          <thead>
+            <tr>
+              <th class="text-uppercase font-weight-bold">Waktu</th>
+              <th class="text-uppercase font-weight-bold">Tingkat Risiko</th>
+              <th class="text-uppercase font-weight-bold">Alamat IP & Perangkat</th>
+              <th class="text-uppercase font-weight-bold">Pengguna</th>
+              <th class="text-uppercase font-weight-bold">Aktivitas / Event</th>
+              <th class="text-uppercase font-weight-bold">Endpoint / URL</th>
+              <th class="text-uppercase font-weight-bold text-center">Status</th>
+              <th class="text-uppercase font-weight-bold text-center">Aksi</th>
+            </tr>
+          </thead>
 
         <tbody>
           <tr v-if="!isLoading && logs.length === 0">
@@ -699,6 +700,7 @@ onUnmounted(() => {
           </tr>
         </tbody>
       </VTable>
+    </div>
 
       <!-- Pagination -->
       <VCardText class="d-flex align-center justify-space-between pa-4 border-t">
@@ -716,35 +718,49 @@ onUnmounted(() => {
     </VCard>
 
     <!-- MODAL 1: DETAIL FORENSIK LOG AKSES -->
-    <VDialog v-model="isDetailDialogVisible" max-width="650">
+    <VDialog
+      v-model="isDetailDialogVisible"
+      :fullscreen="$vuetify.display.xs"
+      max-width="650"
+    >
       <VCard class="pa-4 rounded-xl">
         <div class="d-flex align-center justify-space-between mb-3 border-b pb-3">
           <div class="d-flex align-center gap-2">
             <VAvatar :color="getRiskColor(selectedLog?.risk_level)" variant="tonal" size="36">
-              <VIcon :icon="getEventIcon(selectedLog?.event_type)" size="20" />
+              <VIcon icon="ri-shield-keyhole-line" size="20" />
             </VAvatar>
             <div>
-              <span class="text-subtitle-1 font-weight-bold d-block">Detail Forensik Akses & Header</span>
-              <span class="text-caption text-medium-emphasis">ID Log: #{{ selectedLog?.id }} • {{ formatDateTime(selectedLog?.created_at) }}</span>
+              <span class="text-subtitle-1 font-weight-bold d-block">Detail Forensik Log #{{ selectedLog?.id }}</span>
+              <span class="text-caption text-medium-emphasis">{{ formatDateTime(selectedLog?.created_at) }}</span>
             </div>
           </div>
           <VBtn icon="ri-close-line" variant="text" density="compact" @click="isDetailDialogVisible = false" />
         </div>
 
         <div v-if="selectedLog">
-          <!-- Summary Banner -->
-          <div class="d-flex align-center justify-space-between pa-3 rounded-lg bg-var-theme-background mb-3">
-            <div>
-              <span class="text-caption text-medium-emphasis d-block">Alamat IP Penyerang / Client</span>
-              <span class="text-h6 font-weight-bold text-primary">{{ selectedLog.ip_address }}</span>
+          <!-- Risk Banner -->
+          <div :class="['d-flex align-center justify-space-between pa-3 rounded-lg mb-3', 'bg-' + getRiskColor(selectedLog.risk_level) + '-subtle']">
+            <div class="d-flex align-center gap-2">
+              <VChip :color="getRiskColor(selectedLog.risk_level)" size="small" variant="elevated" class="font-weight-bold">
+                {{ getRiskLabel(selectedLog.risk_level) }}
+              </VChip>
+              <span class="font-weight-medium text-body-2">{{ selectedLog.message }}</span>
             </div>
-            <VChip :color="getRiskColor(selectedLog.risk_level)" variant="elevated" class="font-weight-bold">
-              {{ getRiskLabel(selectedLog.risk_level) }}
+            <VChip v-if="selectedLog.is_threat" color="error" size="x-small" variant="flat" class="font-weight-bold">
+              THREAT
             </VChip>
           </div>
 
-          <!-- Metadata Grid -->
+          <!-- Forensic Key-Value Grid -->
           <VRow class="mb-3 text-body-2">
+            <VCol cols="6" class="py-1">
+              <span class="text-medium-emphasis d-block">Alamat IP:</span>
+              <strong class="font-mono">{{ selectedLog.ip_address }}</strong>
+            </VCol>
+            <VCol cols="6" class="py-1">
+              <span class="text-medium-emphasis d-block">Tipe Aktivitas / Event:</span>
+              <strong>{{ selectedLog.event_type }}</strong>
+            </VCol>
             <VCol cols="6" class="py-1">
               <span class="text-medium-emphasis d-block">Pengguna:</span>
               <strong>{{ selectedLog.user?.name || 'Tamu (Unauthenticated)' }}</strong>
@@ -806,7 +822,11 @@ onUnmounted(() => {
     </VDialog>
 
     <!-- MODAL 2: KONFIRMASI BLOKIR / BAN IP -->
-    <VDialog v-model="isBlockDialogVisible" max-width="500">
+    <VDialog
+      v-model="isBlockDialogVisible"
+      :fullscreen="$vuetify.display.xs"
+      max-width="500"
+    >
       <VCard class="pa-4 rounded-xl">
         <div class="d-flex align-center gap-2 mb-3">
           <VAvatar color="error" variant="tonal" size="36">
@@ -852,7 +872,11 @@ onUnmounted(() => {
     </VDialog>
 
     <!-- MODAL 3: DAFTAR IP DIBLOKIR (BLACKLIST MANAGER) -->
-    <VDialog v-model="isBlacklistModalVisible" max-width="700">
+    <VDialog
+      v-model="isBlacklistModalVisible"
+      :fullscreen="$vuetify.display.xs"
+      max-width="700"
+    >
       <VCard class="pa-4 rounded-xl">
         <div class="d-flex align-center justify-space-between mb-3 border-b pb-3">
           <div class="d-flex align-center gap-2">
@@ -879,45 +903,47 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <VTable class="text-no-wrap mb-4" hover>
-          <thead>
-            <tr>
-              <th class="text-uppercase font-weight-bold">Alamat IP</th>
-              <th class="text-uppercase font-weight-bold">Alasan Blokir</th>
-              <th class="text-uppercase font-weight-bold text-center">Percobaan Dicekal</th>
-              <th class="text-uppercase font-weight-bold">Waktu Diblokir</th>
-              <th class="text-uppercase font-weight-bold text-center">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="blockedIps.length === 0">
-              <td colspan="5" class="text-center pa-4 text-medium-emphasis">
-                Belum ada alamat IP yang diblokir saat ini.
-              </td>
-            </tr>
-            <tr v-for="b in blockedIps" :key="b.id">
-              <td class="font-weight-bold text-error">{{ b.ip_address }}</td>
-              <td class="text-caption" style="max-width: 200px;">{{ b.reason }}</td>
-              <td class="text-center">
-                <VChip size="x-small" color="error" variant="tonal" class="font-weight-bold">
-                  {{ b.attempts_count }}x ditolak
-                </VChip>
-              </td>
-              <td class="text-caption">{{ formatDateTime(b.created_at) }}</td>
-              <td class="text-center">
-                <VBtn
-                  size="x-small"
-                  color="success"
-                  variant="tonal"
-                  class="font-weight-bold"
-                  @click="handleUnblockIp(b.ip_address)"
-                >
-                  Buka Blokir (Unban)
-                </VBtn>
-              </td>
-            </tr>
-          </tbody>
-        </VTable>
+        <div class="table-responsive">
+          <VTable class="text-no-wrap mb-4" hover>
+            <thead>
+              <tr>
+                <th class="text-uppercase font-weight-bold">Alamat IP</th>
+                <th class="text-uppercase font-weight-bold">Alasan Blokir</th>
+                <th class="text-uppercase font-weight-bold text-center">Percobaan Dicekal</th>
+                <th class="text-uppercase font-weight-bold">Waktu Diblokir</th>
+                <th class="text-uppercase font-weight-bold text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="blockedIps.length === 0">
+                <td colspan="5" class="text-center pa-4 text-medium-emphasis">
+                  Belum ada alamat IP yang diblokir saat ini.
+                </td>
+              </tr>
+              <tr v-for="b in blockedIps" :key="b.id">
+                <td class="font-weight-bold text-error">{{ b.ip_address }}</td>
+                <td class="text-caption" style="max-width: 200px;">{{ b.reason }}</td>
+                <td class="text-center">
+                  <VChip size="x-small" color="error" variant="tonal" class="font-weight-bold">
+                    {{ b.attempts_count }}x ditolak
+                  </VChip>
+                </td>
+                <td class="text-caption">{{ formatDateTime(b.created_at) }}</td>
+                <td class="text-center">
+                  <VBtn
+                    size="x-small"
+                    color="success"
+                    variant="tonal"
+                    class="font-weight-bold"
+                    @click="handleUnblockIp(b.ip_address)"
+                  >
+                    Buka Blokir (Unban)
+                  </VBtn>
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+        </div>
 
         <div class="d-flex justify-end">
           <VBtn variant="outlined" color="secondary" @click="isBlacklistModalVisible = false">
@@ -928,7 +954,11 @@ onUnmounted(() => {
     </VDialog>
 
     <!-- MODAL 4: KONFIRMASI BERSIHKAN LOG LAMA -->
-    <VDialog v-model="isClearLogsDialogVisible" max-width="450">
+    <VDialog
+      v-model="isClearLogsDialogVisible"
+      :fullscreen="$vuetify.display.xs"
+      max-width="450"
+    >
       <VCard class="pa-4 rounded-xl">
         <div class="d-flex align-center gap-2 mb-3">
           <VAvatar color="warning" variant="tonal" size="36">

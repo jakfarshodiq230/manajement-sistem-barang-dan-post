@@ -452,12 +452,12 @@ const confirmDelete = async id => {
 
     <VCard>
       <VCardItem class="pa-4 pb-0">
-        <div class="d-flex align-center justify-space-between w-100">
+        <div class="d-flex flex-wrap align-center justify-space-between gap-3 w-100">
           <VCardTitle class="px-0">
             Daftar Inventori
           </VCardTitle>
-          <div class="d-flex align-center gap-3">
-            <div style="width: 220px;">
+          <div class="d-flex flex-wrap align-center gap-3">
+            <div style="min-width: 180px; flex-grow: 1;">
               <VAutocomplete
                 v-model="selectedBranch"
                 :items="branches"
@@ -472,7 +472,7 @@ const confirmDelete = async id => {
                 @update:model-value="fetchData"
               />
             </div>
-            <div style="width: 280px;">
+            <div style="min-width: 220px; flex-grow: 1;">
               <VTextField
                 v-model="search"
                 placeholder="Cari nama barang / SKU..."

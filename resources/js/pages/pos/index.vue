@@ -36,6 +36,7 @@ const discount = ref(0)
 const isApprovalDialogVisible = ref(false)
 const isCheckoutDialogVisible = ref(false)
 const isConfirmDialogVisible = ref(false)
+const isMobileCartDrawerVisible = ref(false)
 const pendingCheckoutData = ref(null)
 
 const isSuccessDialogVisible = ref(false)
@@ -1147,7 +1148,8 @@ const startNewTransaction = () => {
       <!-- Kiri: Katalog Produk -->
       <VCol
         cols="12"
-        md="8"
+        md="7"
+        lg="8"
         class="d-flex flex-column"
       >
         <VCard class="flex-grow-1 d-flex flex-column">
@@ -1233,15 +1235,16 @@ const startNewTransaction = () => {
             </div>
             
             <div v-else-if="products.length > 0" class="d-flex flex-column flex-grow-1">
-              <!-- Scrollable Product Grid (6 Items per page) -->
-              <div class="product-scroll-area overflow-y-auto pe-1 flex-grow-1" style="max-height: calc(100vh - 320px); min-height: 400px;">
+              <!-- Scrollable Product Grid (6-9 Items per page) -->
+              <div class="product-scroll-area overflow-y-auto pe-1 flex-grow-1" style="max-height: calc(100vh - 320px); min-height: 380px;">
                 <VRow class="g-3">
                   <VCol
                     v-for="item in products"
                     :key="item.id"
                     cols="12"
                     sm="6"
-                    md="4"
+                    md="6"
+                    lg="4"
                   >
                     <VCard 
                       class="h-100 cursor-pointer product-card transition-all rounded-lg overflow-hidden position-relative"
@@ -1330,11 +1333,11 @@ const startNewTransaction = () => {
               </div>
 
               <!-- Pinned Bottom Pagination -->
-              <div class="d-flex justify-center pt-3 border-t mt-2">
+              <div class="d-flex justify-center pt-3 border-t mt-2" :class="{'mb-14': $vuetify.display.xs && cart.length > 0}">
                 <VPagination
                   v-model="page"
                   :length="totalPages"
-                  :total-visible="5"
+                  :total-visible="$vuetify.display.xs ? 3 : 5"
                   rounded="circle"
                 />
               </div>
@@ -1355,10 +1358,12 @@ const startNewTransaction = () => {
         </VCard>
       </VCol>
 
-      <!-- Kanan: Keranjang (Cart) Sticky & Compact -->
+      <!-- Kanan: Keranjang (Cart) Sticky di Layar Tablet & Desktop -->
       <VCol
+        v-if="!$vuetify.display.xs"
         cols="12"
-        md="4"
+        md="5"
+        lg="4"
         class="d-flex flex-column"
         style="position: sticky; top: 16px; z-index: 10;"
       >
@@ -1392,7 +1397,7 @@ const startNewTransaction = () => {
             </VCardTitle>
           </VCardItem>
 
-          <!-- List Belanja Scrollable (Internal Scroll - Tidak Memanjang ke Bawah) -->
+          <!-- List Belanja Scrollable -->
           <div
             class="overflow-y-auto pa-0 bg-surface"
             style="max-height: 230px; min-height: 120px;"
@@ -1566,9 +1571,115 @@ const startNewTransaction = () => {
       </VCol>
     </VRow>
 
+    <!-- Mobile Bottom Floating Cart Bar -->
+    <div
+      v-if="$vuetify.display.xs && cart.length > 0"
+      class="pos-mobile-cart-bar d-flex align-center justify-space-between"
+    >
+      <div>
+        <div class="text-caption text-medium-emphasis">{{ cart.reduce((acc, it) => acc + (it.qty || 1), 0) }} Item dalam Keranjang</div>
+        <div class="font-weight-bold text-primary text-subtitle-1">{{ formatRupiah(totalAmount) }}</div>
+      </div>
+      <VBtn
+        color="primary"
+        class="font-weight-bold shadow-md"
+        prepend-icon="ri-shopping-cart-2-line"
+        @click="isMobileCartDrawerVisible = true"
+      >
+        Keranjang & Bayar
+      </VBtn>
+    </div>
+
+    <!-- Mobile Cart Bottom Sheet Drawer -->
+    <VNavigationDrawer
+      v-if="$vuetify.display.xs"
+      v-model="isMobileCartDrawerVisible"
+      temporary
+      location="bottom"
+      style="height: 82vh; max-height: 82vh;"
+      class="rounded-t-xl"
+    >
+      <div class="pa-4 bg-primary text-white d-flex align-center justify-space-between">
+        <div class="d-flex align-center gap-2 font-weight-bold text-subtitle-1">
+          <VIcon icon="ri-shopping-cart-2-line" />
+          <span>Keranjang Belanja ({{ cart.length }})</span>
+        </div>
+        <VBtn
+          icon="ri-close-line"
+          variant="text"
+          color="white"
+          size="small"
+          @click="isMobileCartDrawerVisible = false"
+        />
+      </div>
+
+      <div class="pa-3 overflow-y-auto" style="max-height: calc(82vh - 230px);">
+        <VList lines="two" class="pa-0">
+          <template v-for="(item, index) in cart" :key="index">
+            <VListItem class="py-2 px-1">
+              <div class="d-flex justify-space-between w-100 mb-1">
+                <div class="font-weight-bold text-truncate pe-2 text-body-2" style="max-width: 75%;">
+                  {{ item.name }}
+                </div>
+                <IconBtn size="x-small" color="error" @click="removeFromCart(index)">
+                  <VIcon icon="ri-delete-bin-line" size="18" />
+                </IconBtn>
+              </div>
+              <div class="d-flex align-center justify-space-between gap-2">
+                <div class="d-flex align-center border rounded" style="width: 88px; height: 32px;">
+                  <VBtn size="x-small" variant="text" icon="ri-subtract-line" @click="item.qty > 1 ? item.qty-- : null" />
+                  <div class="text-center flex-grow-1 font-weight-bold text-caption">{{ item.qty }}</div>
+                  <VBtn size="x-small" variant="text" icon="ri-add-line" @click="item.qty < item.max_stock ? item.qty++ : null" />
+                </div>
+                <div class="flex-grow-1 ms-2">
+                  <VTextField
+                    :model-value="formatInputRupiah(item.price)"
+                    type="text"
+                    density="compact"
+                    hide-details
+                    prefix="Rp"
+                    class="text-right"
+                    @update:model-value="val => item.price = parseInputRupiah(val)"
+                  />
+                </div>
+              </div>
+            </VListItem>
+            <VDivider v-if="index < cart.length - 1" />
+          </template>
+        </VList>
+      </div>
+
+      <div class="pa-3 border-t bg-var-theme-background">
+        <div class="d-flex justify-space-between align-center mb-3">
+          <span class="text-subtitle-1 font-weight-bold">TOTAL BAYAR</span>
+          <span class="text-h6 font-weight-bold text-primary">{{ formatRupiah(totalAmount) }}</span>
+        </div>
+        <div class="d-flex gap-2">
+          <VBtn
+            variant="tonal"
+            color="warning"
+            class="font-weight-bold"
+            style="width: 35%;"
+            @click="holdCurrentBill(); isMobileCartDrawerVisible = false"
+          >
+            Hold
+          </VBtn>
+          <VBtn
+            color="primary"
+            class="flex-grow-1 font-weight-bold"
+            prepend-icon="ri-bank-card-line"
+            @click="isMobileCartDrawerVisible = false; handleCheckoutClick()"
+          >
+            Proses Bayar
+          </VBtn>
+        </div>
+      </div>
+    </VNavigationDrawer>
+
     <!-- Checkout Dialog -->
     <VDialog
       v-model="isCheckoutDialogVisible"
+      :fullscreen="$vuetify.display.xs"
       max-width="550"
     >
       <VCard>
@@ -1944,6 +2055,7 @@ const startNewTransaction = () => {
     <!-- Confirm Dialog -->
     <VDialog
       v-model="isConfirmDialogVisible"
+      :fullscreen="$vuetify.display.xs"
       max-width="400"
     >
       <VCard title="Konfirmasi Pembayaran">
@@ -1973,6 +2085,7 @@ const startNewTransaction = () => {
     <!-- Success Dialog -->
     <VDialog
       v-model="isSuccessDialogVisible"
+      :fullscreen="$vuetify.display.xs"
       max-width="400"
       persistent
     >
@@ -2047,6 +2160,7 @@ const startNewTransaction = () => {
     <!-- QR Catalog Dialog -->
     <VDialog
       v-model="isQrDialogVisible"
+      :fullscreen="$vuetify.display.xs"
       max-width="400"
     >
       <VCard>
@@ -2101,6 +2215,7 @@ const startNewTransaction = () => {
     <!-- Error Dialog -->
     <VDialog
       v-model="isErrorDialogVisible"
+      :fullscreen="$vuetify.display.xs"
       max-width="500"
     >
       <VCard title="Transaksi Ditolak">
@@ -2128,6 +2243,7 @@ const startNewTransaction = () => {
     <!-- Select Batch Dialog -->
     <VDialog
       v-model="isBatchDialogVisible"
+      :fullscreen="$vuetify.display.xs"
       max-width="600"
     >
       <VCard title="Pilih Batch Barang">
@@ -2184,6 +2300,7 @@ const startNewTransaction = () => {
     <!-- ================= 1. DIALOG BUKA SHIFT KASIR ================= -->
     <VDialog
       v-model="isStartShiftDialogOpen"
+      :fullscreen="$vuetify.display.xs"
       max-width="450"
       :persistent="!hasActiveShift"
     >
@@ -2242,6 +2359,7 @@ const startNewTransaction = () => {
     <!-- ================= 2. DIALOG TUTUP SHIFT KASIR ================= -->
     <VDialog
       v-model="isCloseShiftDialogOpen"
+      :fullscreen="$vuetify.display.xs"
       max-width="500"
     >
       <VCard>
@@ -2398,6 +2516,7 @@ const startNewTransaction = () => {
     <!-- ================= 3. DIALOG TRANSAKSI DITAHAN (HELD BILLS) ================= -->
     <VDialog
       v-model="isHeldBillsDialogOpen"
+      :fullscreen="$vuetify.display.xs"
       max-width="650"
     >
       <VCard>

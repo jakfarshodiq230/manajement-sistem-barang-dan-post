@@ -104,7 +104,6 @@ watch(image, newVal => {
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
   nextTick(() => {
-    refForm.value?.reset()
     refForm.value?.resetValidation()
     image.value = null
   })
@@ -141,7 +140,7 @@ const onSubmit = () => {
 <template>
   <VNavigationDrawer
     temporary
-    :width="600"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 650)"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
@@ -152,9 +151,15 @@ const onSubmit = () => {
         {{ id ? 'Edit Produk' : 'Tambah Produk' }}
       </h6>
       <VSpacer />
-      <IconBtn @click="closeNavigationDrawer">
+      <VBtn
+        icon
+        variant="tonal"
+        color="secondary"
+        size="small"
+        @click="closeNavigationDrawer"
+      >
         <VIcon icon="ri-close-line" />
-      </IconBtn>
+      </VBtn>
     </div>
 
     <PerfectScrollbar :options="{ wheelPropagation: false }">
@@ -348,7 +353,7 @@ const onSubmit = () => {
                   Simpan
                 </VBtn>
                 <VBtn
-                  type="reset"
+                  type="button"
                   variant="outlined"
                   color="error"
                   @click="closeNavigationDrawer"

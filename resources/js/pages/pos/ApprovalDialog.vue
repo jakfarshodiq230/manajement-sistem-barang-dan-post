@@ -82,6 +82,7 @@ const submitApproval = async () => {
 }
 
 const handleCancel = () => {
+  emit('update:isDialogVisible', false)
   emit('cancel')
 }
 </script>
@@ -89,8 +90,9 @@ const handleCancel = () => {
 <template>
   <VDialog
     :model-value="props.isDialogVisible"
+    :fullscreen="$vuetify.display.xs"
     max-width="400"
-    persistent
+    @update:model-value="val => emit('update:isDialogVisible', val)"
   >
     <VCard>
       <VCardItem class="bg-error text-white pa-4">

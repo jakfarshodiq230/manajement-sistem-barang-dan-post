@@ -169,6 +169,7 @@ const closeDialog = () => {
 <template>
   <VDialog
     :model-value="props.isDialogVisible"
+    :fullscreen="$vuetify.display.xs"
     max-width="960"
     scrollable
     @update:model-value="(val) => emit('update:isDialogVisible', val)"

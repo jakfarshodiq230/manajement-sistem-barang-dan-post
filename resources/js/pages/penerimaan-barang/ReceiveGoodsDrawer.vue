@@ -22,6 +22,9 @@ const props = defineProps({
 
 const emit = defineEmits([
   'update:isDrawerOpen',
+  'update:is-drawer-open',
+  'close',
+  'cancel',
   'saveData',
 ])
 
@@ -107,8 +110,10 @@ watch(() => photos.value, newPhotos => {
 
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
+  emit('update:is-drawer-open', false)
+  emit('close')
+  emit('cancel')
   nextTick(() => {
-    refForm.value?.reset()
     refForm.value?.resetValidation()
     invoice_number_supplier.value = ''
     items.value = []
@@ -577,6 +582,11 @@ const onSubmit = () => {
 
 const handleDrawerModelValueUpdate = val => {
   emit('update:isDrawerOpen', val)
+  emit('update:is-drawer-open', val)
+  if (!val) {
+    emit('close')
+    emit('cancel')
+  }
 }
 
 const displayPo = computed(() => isEditMode.value ? props.selectedGr?.purchase_order : props.selectedPo)
@@ -585,7 +595,7 @@ const displayPo = computed(() => isEditMode.value ? props.selectedGr?.purchase_o
 <template>
   <VNavigationDrawer
     temporary
-    :width="1160"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '92vw' : 1160)"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
@@ -605,14 +615,13 @@ const displayPo = computed(() => isEditMode.value ? props.selectedGr?.purchase_o
         </span>
       </div>
       <VBtn
-        icon
+        icon="ri-close-line"
         variant="tonal"
         color="secondary"
         size="small"
-        @click="closeNavigationDrawer"
-      >
-        <VIcon icon="ri-close-line" />
-      </VBtn>
+        type="button"
+        @click.stop="closeNavigationDrawer"
+      />
     </div>
 
     <PerfectScrollbar :options="{ wheelPropagation: false }">
@@ -1355,7 +1364,8 @@ const displayPo = computed(() => isEditMode.value ? props.selectedGr?.purchase_o
               color="secondary"
               size="large"
               class="rounded-lg px-5"
-              @click="closeNavigationDrawer"
+              type="button"
+              @click.stop="closeNavigationDrawer"
             >
               Batal
             </VBtn>

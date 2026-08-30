@@ -658,10 +658,15 @@ const executeDeletePO = async () => {
 
     <AddNewPurchaseOrderDrawer
       v-model:is-drawer-open="isAddNewDrawerVisible"
+      :is-drawer-open="isAddNewDrawerVisible"
       :selected-po="selectedPO"
       :branches="branches"
       :suppliers="suppliers"
       :master-products="masterProducts"
+      @update:is-drawer-open="val => isAddNewDrawerVisible = val"
+      @update:isDrawerOpen="val => isAddNewDrawerVisible = val"
+      @close="isAddNewDrawerVisible = false"
+      @cancel="isAddNewDrawerVisible = false"
       @save-data="savePurchaseOrder"
     />
 

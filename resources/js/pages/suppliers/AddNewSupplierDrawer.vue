@@ -31,7 +31,6 @@ const is_active = ref(true)
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
   nextTick(() => {
-    refForm.value?.reset()
     refForm.value?.resetValidation()
   })
 }
@@ -159,7 +158,7 @@ const handleDrawerModelValueUpdate = val => {
                   Simpan
                 </VBtn>
                 <VBtn
-                  type="reset"
+                  type="button"
                   variant="outlined"
                   color="error"
                   @click="closeNavigationDrawer"

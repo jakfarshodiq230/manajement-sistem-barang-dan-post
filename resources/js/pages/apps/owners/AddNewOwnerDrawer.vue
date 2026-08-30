@@ -105,7 +105,6 @@ watch(qrisImage, newVal => {
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
   nextTick(() => {
-    refForm.value?.reset()
     refForm.value?.resetValidation()
     logo.value = null
     qrisImage.value = null
@@ -149,9 +148,15 @@ const onSubmit = () => {
 
       <VSpacer />
 
-      <IconBtn @click="closeNavigationDrawer">
+      <VBtn
+        icon
+        variant="tonal"
+        color="secondary"
+        size="small"
+        @click="closeNavigationDrawer"
+      >
         <VIcon icon="ri-close-line" />
-      </IconBtn>
+      </VBtn>
     </div>
 
     <PerfectScrollbar :options="{ wheelPropagation: false }">
@@ -282,7 +287,7 @@ const onSubmit = () => {
                   Simpan
                 </VBtn>
                 <VBtn
-                  type="reset"
+                  type="button"
                   variant="outlined"
                   color="error"
                   @click="closeNavigationDrawer"

@@ -328,7 +328,7 @@ const onSubmit = () => {
                   Simpan
                 </VBtn>
                 <VBtn
-                  type="reset"
+                  type="button"
                   variant="outlined"
                   color="error"
                   @click="closeNavigationDrawer"

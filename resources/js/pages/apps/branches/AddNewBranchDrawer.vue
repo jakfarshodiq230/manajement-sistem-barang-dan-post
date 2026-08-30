@@ -76,7 +76,6 @@ watch(logo, newVal => {
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
   nextTick(() => {
-    refForm.value?.reset()
     refForm.value?.resetValidation()
     logo.value = null
   })
@@ -237,7 +236,7 @@ const onSubmit = () => {
                   Simpan
                 </VBtn>
                 <VBtn
-                  type="reset"
+                  type="button"
                   variant="outlined"
                   color="error"
                   @click="closeNavigationDrawer"

@@ -463,6 +463,7 @@ const confirmDelete = async () => {
     <!-- Dialog Add/Edit Petty Cash -->
     <VDialog
       v-model="isAddEditDialogVisible"
+      :fullscreen="$vuetify.display.xs"
       max-width="500"
     >
       <VCard>
@@ -567,6 +568,7 @@ const confirmDelete = async () => {
     <!-- Confirm Delete Dialog -->
     <VDialog
       v-model="isDeleteDialogOpen"
+      :fullscreen="$vuetify.display.xs"
       max-width="400"
     >
       <VCard title="Hapus Catatan Kas Kecil">

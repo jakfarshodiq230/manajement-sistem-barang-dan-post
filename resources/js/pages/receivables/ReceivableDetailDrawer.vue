@@ -249,7 +249,7 @@ const printReceipt = () => {
     :model-value="props.isDrawerOpen"
     temporary
     location="end"
-    width="500"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 550)"
     @update:model-value="emit('update:isDrawerOpen', $event)"
   >
     <!-- Header -->
@@ -258,9 +258,15 @@ const printReceipt = () => {
         Detail Piutang
       </h6>
       <VSpacer />
-      <IconBtn @click="emit('update:isDrawerOpen', false)">
+      <VBtn
+        icon
+        variant="tonal"
+        color="secondary"
+        size="small"
+        @click="emit('update:isDrawerOpen', false)"
+      >
         <VIcon icon="ri-close-line" />
-      </IconBtn>
+      </VBtn>
     </div>
     <VDivider />
 

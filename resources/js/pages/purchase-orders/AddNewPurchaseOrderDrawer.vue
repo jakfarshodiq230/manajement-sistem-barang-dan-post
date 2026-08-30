@@ -30,6 +30,9 @@ const props = defineProps({
 
 const emit = defineEmits([
   'update:isDrawerOpen',
+  'update:is-drawer-open',
+  'close',
+  'cancel',
   'saveData',
 ])
 
@@ -184,10 +187,11 @@ watch(supplier_id, async newId => {
 
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
+  emit('update:is-drawer-open', false)
+  emit('close')
+  emit('cancel')
   nextTick(() => {
-    refForm.value?.reset()
     refForm.value?.resetValidation()
-    items.value = [defaultItem()]
   })
 }
 
@@ -293,13 +297,18 @@ const onSubmit = () => {
 
 const handleDrawerModelValueUpdate = val => {
   emit('update:isDrawerOpen', val)
+  emit('update:is-drawer-open', val)
+  if (!val) {
+    emit('close')
+    emit('cancel')
+  }
 }
 </script>
 
 <template>
   <VNavigationDrawer
     temporary
-    :width="820"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '92vw' : 820)"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
@@ -328,13 +337,14 @@ const handleDrawerModelValueUpdate = val => {
           </span>
         </div>
       </div>
-      <IconBtn
-        variant="text"
+      <VBtn
+        icon="ri-close-line"
+        variant="tonal"
         color="secondary"
-        @click="closeNavigationDrawer"
-      >
-        <VIcon icon="ri-close-line" size="22" />
-      </IconBtn>
+        size="small"
+        type="button"
+        @click.stop="closeNavigationDrawer"
+      />
     </div>
 
     <PerfectScrollbar :options="{ wheelPropagation: false }" style="height: calc(100vh - 80px);">

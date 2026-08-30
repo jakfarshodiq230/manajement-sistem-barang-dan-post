@@ -37,7 +37,7 @@ const handleDrawerModelValueUpdate = val => {
 <template>
   <VNavigationDrawer
     temporary
-    :width="500"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 500)"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"

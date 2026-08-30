@@ -1267,8 +1267,13 @@ const executeDeleteGR = async () => {
     <ReceiveGoodsDrawer
       v-if="selectedPO"
       v-model:is-drawer-open="isDrawerVisible"
+      :is-drawer-open="isDrawerVisible"
       :selected-po="selectedPO"
       :selected-gr="selectedGR"
+      @update:is-drawer-open="val => isDrawerVisible = val"
+      @update:isDrawerOpen="val => isDrawerVisible = val"
+      @close="isDrawerVisible = false"
+      @cancel="isDrawerVisible = false"
       @save-data="saveGoodsReceipt"
     />
 

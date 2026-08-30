@@ -63,7 +63,6 @@ watch(
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
   nextTick(() => {
-    refForm.value?.reset()
     refForm.value?.resetValidation()
   })
 }
@@ -81,7 +80,6 @@ const onSubmit = () => {
       })
       emit('update:isDrawerOpen', false)
       nextTick(() => {
-        refForm.value?.reset()
         refForm.value?.resetValidation()
       })
     }
@@ -180,7 +178,7 @@ const handleDrawerModelValueUpdate = val => {
                   Submit
                 </VBtn>
                 <VBtn
-                  type="reset"
+                  type="button"
                   variant="outlined"
                   color="secondary"
                   @click="closeNavigationDrawer"

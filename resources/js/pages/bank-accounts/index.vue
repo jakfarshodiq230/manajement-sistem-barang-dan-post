@@ -842,7 +842,7 @@ onMounted(() => {
       v-model="isDrawerOpen"
       location="end"
       temporary
-      width="500"
+      :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 500)"
     >
       <div class="d-flex flex-column h-100">
         <div class="pa-5 border-b bg-gradient-header d-flex justify-space-between align-center">
@@ -1052,7 +1052,11 @@ onMounted(() => {
     </VNavigationDrawer>
 
     <!-- QRIS Preview Modal -->
-    <VDialog v-model="isQrisModalOpen" max-width="400">
+    <VDialog
+      v-model="isQrisModalOpen"
+      :fullscreen="$vuetify.display.xs"
+      max-width="400"
+    >
       <VCard class="pa-4 text-center rounded-xl">
         <VCardTitle class="font-weight-bold text-h6 pb-1">
           QRIS {{ selectedQrisBankName }}
@@ -1077,7 +1081,11 @@ onMounted(() => {
     </VDialog>
 
     <!-- Recent Sales History Modal -->
-    <VDialog v-model="isRecentSalesModalOpen" max-width="850">
+    <VDialog
+      v-model="isRecentSalesModalOpen"
+      :fullscreen="$vuetify.display.xs"
+      max-width="850"
+    >
       <VCard v-if="selectedBankForSales" class="rounded-xl overflow-hidden shadow-lg">
         <VCardTitle class="pa-5 bg-gradient-header d-flex justify-space-between align-center">
           <div class="d-flex align-center gap-3">

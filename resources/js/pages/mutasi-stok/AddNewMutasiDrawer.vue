@@ -146,7 +146,6 @@ onMounted(() => {
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
   nextTick(() => {
-    refForm.value?.reset()
     refForm.value?.resetValidation()
     items.value = [{ product_id: null, qty: 1 }]
   })
@@ -210,7 +209,7 @@ const handleDrawerModelValueUpdate = val => {
 <template>
   <VNavigationDrawer
     temporary
-    :width="720"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 720)"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
@@ -355,7 +354,7 @@ const handleDrawerModelValueUpdate = val => {
                   Kirim Pengajuan Mutasi
                 </VBtn>
                 <VBtn
-                  type="reset"
+                  type="button"
                   variant="outlined"
                   color="secondary"
                   @click="closeNavigationDrawer"

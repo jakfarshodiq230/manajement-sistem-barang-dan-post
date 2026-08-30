@@ -40,7 +40,6 @@ const other_fees = ref(0)
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
   nextTick(() => {
-    refForm.value?.reset()
     refForm.value?.resetValidation()
   })
 }
@@ -122,7 +121,7 @@ const handleDrawerModelValueUpdate = val => {
 <template>
   <VNavigationDrawer
     temporary
-    :width="460"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 480)"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
@@ -251,7 +250,7 @@ const handleDrawerModelValueUpdate = val => {
                   Simpan
                 </VBtn>
                 <VBtn
-                  type="reset"
+                  type="button"
                   variant="outlined"
                   color="error"
                   @click="closeNavigationDrawer"

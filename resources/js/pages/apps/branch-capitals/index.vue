@@ -1000,189 +1000,206 @@ onMounted(async () => {
       <VProgressLinear v-if="isLoading" indeterminate color="primary" height="2" />
 
       <!-- Table Body -->
-      <VTable class="text-no-wrap" hover>
-        <thead>
-          <tr>
-            <th class="text-uppercase font-weight-bold">No. Referensi</th>
-            <th class="text-uppercase font-weight-bold">Tanggal</th>
-            <th class="text-uppercase font-weight-bold">Cabang</th>
-            <th class="text-uppercase font-weight-bold">Jenis & Kategori</th>
-            <th class="text-uppercase font-weight-bold text-end">Nominal (Rp)</th>
-            <th class="text-uppercase font-weight-bold">Metode & Rekening</th>
-            <th class="text-uppercase font-weight-bold text-center">Bukti / PDF</th>
-            <th class="text-uppercase font-weight-bold text-center">Status</th>
-            <th class="text-uppercase font-weight-bold text-center" style="min-width: 140px;">Aksi</th>
-          </tr>
-        </thead>
+      <div class="table-responsive">
+        <VTable class="text-no-wrap" hover>
+          <thead>
+            <tr>
+              <th class="text-uppercase font-weight-bold">No. Referensi</th>
+              <th class="text-uppercase font-weight-bold">Tanggal</th>
+              <th class="text-uppercase font-weight-bold">Cabang</th>
+              <th class="text-uppercase font-weight-bold">Jenis & Kategori</th>
+              <th class="text-uppercase font-weight-bold text-end">Nominal (Rp)</th>
+              <th class="text-uppercase font-weight-bold">Metode & Rekening</th>
+              <th class="text-uppercase font-weight-bold text-center">Bukti / PDF</th>
+              <th class="text-uppercase font-weight-bold text-center">Status</th>
+              <th class="text-uppercase font-weight-bold text-center" style="min-width: 140px;">Aksi</th>
+            </tr>
+          </thead>
 
-        <tbody>
-          <tr v-if="isLoading">
-            <td colspan="9" class="text-center pa-6 text-medium-emphasis">
-              <VProgressCircular indeterminate color="primary" size="28" class="me-2" />
-              <span>Memuat riwayat transaksi modal...</span>
-            </td>
-          </tr>
+          <tbody>
+            <tr v-if="isLoading">
+              <td colspan="9" class="text-center pa-6 text-medium-emphasis">
+                <VProgressCircular indeterminate color="primary" size="28" class="me-2" />
+                <span>Memuat riwayat transaksi modal...</span>
+              </td>
+            </tr>
 
-          <tr v-else-if="transactions.length === 0">
-            <td colspan="9" class="text-center pa-6 text-medium-emphasis">
-              <VIcon icon="ri-inbox-line" size="36" class="d-block mx-auto mb-2 opacity-50" />
-              <span>Belum ada riwayat transaksi modal cabang.</span>
-            </td>
-          </tr>
+            <tr v-else-if="transactions.length === 0">
+              <td colspan="9" class="text-center pa-6 text-medium-emphasis">
+                <VIcon icon="ri-inbox-line" size="36" class="d-block mx-auto mb-2 opacity-50" />
+                <span>Belum ada riwayat transaksi modal cabang.</span>
+              </td>
+            </tr>
 
-          <tr v-for="item in transactions" :key="item.id">
-            <!-- No Ref -->
-            <td>
-              <span class="font-weight-medium text-body-2 cursor-pointer text-primary" @click="showDetail(item)">
-                {{ item.reference_no }}
-              </span>
-              <div v-if="item.cash_shift_id" class="text-caption text-secondary">
-                Shift Kasir #{{ item.cash_shift_id }}
-              </div>
-            </td>
+            <tr v-for="item in transactions" :key="item.id">
+              <!-- No Ref -->
+              <td>
+                <span class="font-weight-medium text-body-2 cursor-pointer text-primary" @click="showDetail(item)">
+                  {{ item.reference_no }}
+                </span>
+                <div v-if="item.cash_shift_id" class="text-caption text-secondary">
+                  Shift Kasir #{{ item.cash_shift_id }}
+                </div>
+              </td>
 
-            <!-- Date -->
-            <td>{{ formatDate(item.date) }}</td>
+              <!-- Date -->
+              <td>{{ formatDate(item.date) }}</td>
 
-            <!-- Branch -->
-            <td>
-              <span class="font-weight-medium">{{ item.branch?.name || '-' }}</span>
-            </td>
+              <!-- Branch -->
+              <td>
+                <span class="font-weight-medium">{{ item.branch?.name || '-' }}</span>
+              </td>
 
-            <!-- Type & Category -->
-            <td>
-              <div class="d-flex align-center gap-1">
+              <!-- Type & Category -->
+              <td>
+                <div class="d-flex align-center gap-1">
+                  <VChip
+                    size="x-small"
+                    :color="item.type === 'injection' ? 'primary' : 'success'"
+                    variant="tonal"
+                    class="font-weight-bold"
+                  >
+                    {{ item.type === 'injection' ? 'Injeksi' : 'Pengembalian' }}
+                  </VChip>
+                  <span class="text-caption font-weight-medium">{{ item.category }}</span>
+                </div>
+              </td>
+
+              <!-- Amount -->
+              <td class="text-end">
+                <span :class="['font-weight-bold font-mono', item.type === 'injection' ? 'text-primary' : 'text-success']">
+                  {{ item.type === 'injection' ? '+' : '-' }} {{ formatCurrency(item.amount) }}
+                </span>
+              </td>
+
+              <!-- Method & Bank -->
+              <td>
+                <div class="d-flex align-center gap-1 text-body-2">
+                  <VIcon :icon="item.payment_method === 'Kas Tunai' ? 'ri-money-dollar-circle-line' : 'ri-bank-card-line'" size="16" />
+                  <span>{{ item.payment_method }}</span>
+                </div>
+                <div v-if="item.bank_name" class="text-caption text-medium-emphasis">
+                  {{ item.bank_name }} - {{ item.account_number || '-' }}
+                </div>
+              </td>
+
+              <!-- Proof / PDF -->
+              <td class="text-center">
+                <template v-if="item.proof_file">
+                  <VBtn
+                    v-if="item.proof_file.toLowerCase().endsWith('.pdf')"
+                    size="x-small"
+                    color="error"
+                    variant="tonal"
+                    prepend-icon="ri-file-pdf-2-line"
+                    :href="'/storage/' + item.proof_file"
+                    target="_blank"
+                  >
+                    PDF
+                  </VBtn>
+                  <VAvatar
+                    v-else
+                    size="32"
+                    rounded
+                    class="cursor-pointer border"
+                    @click="openPreview('/storage/' + item.proof_file)"
+                  >
+                    <VImg :src="'/storage/' + item.proof_file" cover />
+                  </VAvatar>
+                </template>
+                <span v-else class="text-caption text-disabled">-</span>
+              </td>
+
+              <!-- Status -->
+              <td class="text-center">
                 <VChip
-                  size="x-small"
-                  :color="item.type === 'injection' ? (item.status === 'pending' ? 'warning' : 'primary') : 'success'"
+                  size="small"
+                  :color="item.status === 'approved' ? 'success' : (item.status === 'pending' ? (item.type === 'injection' ? 'warning' : 'amber') : 'error')"
                   variant="tonal"
                   class="font-weight-bold"
                 >
-                  <VIcon :icon="item.type === 'injection' ? (item.status === 'pending' ? 'ri-time-line' : 'ri-download-2-line') : 'ri-upload-2-line'" size="12" class="me-1" />
-                  {{ item.type === 'injection' ? (item.status === 'pending' ? 'Permintaan Modal' : 'Injeksi Modal') : 'Setor Modal' }}
+                  {{ item.status === 'approved' ? 'Disetujui' : (item.status === 'pending' ? (item.type === 'injection' ? 'Menunggu Injeksi' : 'Menunggu Setoran') : 'Ditolak / Batal') }}
                 </VChip>
-                <span class="text-caption text-medium-emphasis">{{ item.category }}</span>
-              </div>
-            </td>
+                <div v-if="item.approved_by && item.status === 'approved'" class="text-caption text-medium-emphasis">
+                  Oleh: {{ item.approved_by?.name }}
+                </div>
+              </td>
 
-            <!-- Amount -->
-            <td class="text-end">
-              <span :class="['font-weight-bold', item.type === 'injection' ? 'text-primary' : 'text-success']">
-                {{ item.type === 'injection' ? '+' : '-' }} {{ formatCurrency(item.amount) }}
-              </span>
-            </td>
+              <!-- Actions -->
+              <td class="text-center">
+                <div class="d-flex align-center justify-center gap-1">
+                  <!-- Detail (Eye icon) -->
+                  <IconBtn
+                    v-if="$can('read', 'Modal & ROI Cabang') || $can('manage', 'all')"
+                    size="small"
+                    color="info"
+                    title="Lihat Detail Transaksi & Audit"
+                    @click="showDetail(item)"
+                  >
+                    <VIcon icon="ri-eye-line" />
+                  </IconBtn>
 
-            <!-- Payment & Bank -->
-            <td>
-              <div class="text-body-2 font-weight-medium">{{ item.payment_method }}</div>
-              <div v-if="item.bank_name" class="text-caption text-medium-emphasis">
-                {{ item.bank_name }} - {{ item.account_number || '-' }} ({{ item.account_name || '-' }})
-              </div>
-            </td>
+                  <!-- Approve Button (If pending) -->
+                  <VBtn
+                    v-if="item.status === 'pending' && ($can('approve', 'Modal & ROI Cabang') || $can('manage', 'all'))"
+                    size="x-small"
+                    color="success"
+                    class="px-2 font-weight-bold"
+                    @click="confirmApprove(item)"
+                  >
+                    Approve
+                  </VBtn>
 
-            <!-- Proof File / PDF Proposal -->
-            <td class="text-center">
-              <VBtn
-                v-if="item.proof_file"
-                :icon="item.proof_file.toLowerCase().endsWith('.pdf') ? 'ri-file-pdf-2-line' : 'ri-image-line'"
-                size="x-small"
-                variant="tonal"
-                :color="item.proof_file.toLowerCase().endsWith('.pdf') ? 'error' : 'info'"
-                :title="item.proof_file.toLowerCase().endsWith('.pdf') ? 'Buka Dokumen PDF (Proposal/Lampiran)' : 'Pratinjau Gambar'"
-                @click="previewProof(item)"
-              />
-              <span v-else class="text-caption text-medium-emphasis">-</span>
-            </td>
+                  <!-- Reject Button (If pending) -->
+                  <VBtn
+                    v-if="item.status === 'pending' && ($can('approve', 'Modal & ROI Cabang') || $can('manage', 'all'))"
+                    size="x-small"
+                    color="error"
+                    variant="tonal"
+                    class="px-2"
+                    @click="confirmReject(item)"
+                  >
+                    Tolak
+                  </VBtn>
 
-            <!-- Status -->
-            <td class="text-center">
-              <VChip
-                size="small"
-                :color="item.status === 'approved' ? 'success' : (item.status === 'pending' ? (item.type === 'injection' ? 'warning' : 'amber') : 'error')"
-                variant="tonal"
-                class="font-weight-bold"
-              >
-                {{ item.status === 'approved' ? 'Disetujui' : (item.status === 'pending' ? (item.type === 'injection' ? 'Menunggu Injeksi' : 'Menunggu Setoran') : 'Ditolak / Batal') }}
-              </VChip>
-              <div v-if="item.approved_by && item.status === 'approved'" class="text-caption text-medium-emphasis">
-                Oleh: {{ item.approved_by?.name }}
-              </div>
-            </td>
+                  <!-- Edit Button -->
+                  <IconBtn
+                    v-if="$can('write', 'Modal & ROI Cabang') || $can('manage', 'all')"
+                    size="small"
+                    color="primary"
+                    title="Edit Transaksi"
+                    @click="openEditDrawer(item)"
+                  >
+                    <VIcon icon="ri-edit-box-line" />
+                  </IconBtn>
 
-            <!-- Actions -->
-            <td class="text-center">
-              <div class="d-flex align-center justify-center gap-1">
-                <!-- Detail (Eye icon) -->
-                <IconBtn
-                  v-if="$can('read', 'Modal & ROI Cabang') || $can('manage', 'all')"
-                  size="small"
-                  color="info"
-                  title="Lihat Detail Transaksi & Audit"
-                  @click="showDetail(item)"
-                >
-                  <VIcon icon="ri-eye-line" />
-                </IconBtn>
+                  <!-- Void Button (If approved) -->
+                  <IconBtn
+                    v-if="item.status === 'approved' && ($can('approve', 'Modal & ROI Cabang') || $can('write', 'Modal & ROI Cabang') || $can('manage', 'all'))"
+                    size="small"
+                    color="warning"
+                    title="Batalkan Persetujuan (Void)"
+                    @click="confirmVoid(item)"
+                  >
+                    <VIcon icon="ri-arrow-go-forward-line" />
+                  </IconBtn>
 
-                <!-- Approve Button (If pending) -->
-                <VBtn
-                  v-if="item.status === 'pending' && ($can('approve', 'Modal & ROI Cabang') || $can('manage', 'all'))"
-                  size="x-small"
-                  color="success"
-                  class="px-2 font-weight-bold"
-                  @click="confirmApprove(item)"
-                >
-                  Approve
-                </VBtn>
-
-                <!-- Reject Button (If pending) -->
-                <VBtn
-                  v-if="item.status === 'pending' && ($can('approve', 'Modal & ROI Cabang') || $can('manage', 'all'))"
-                  size="x-small"
-                  color="error"
-                  variant="tonal"
-                  class="px-2"
-                  @click="confirmReject(item)"
-                >
-                  Tolak
-                </VBtn>
-
-                <!-- Edit Button -->
-                <IconBtn
-                  v-if="$can('write', 'Modal & ROI Cabang') || $can('manage', 'all')"
-                  size="small"
-                  color="primary"
-                  title="Edit Transaksi"
-                  @click="openEditDrawer(item)"
-                >
-                  <VIcon icon="ri-edit-box-line" />
-                </IconBtn>
-
-                <!-- Void Button (If approved) -->
-                <IconBtn
-                  v-if="item.status === 'approved' && ($can('approve', 'Modal & ROI Cabang') || $can('write', 'Modal & ROI Cabang') || $can('manage', 'all'))"
-                  size="small"
-                  color="warning"
-                  title="Batalkan Persetujuan (Void)"
-                  @click="confirmVoid(item)"
-                >
-                  <VIcon icon="ri-arrow-go-forward-line" />
-                </IconBtn>
-
-                <!-- Delete Button -->
-                <IconBtn
-                  v-if="$can('delete', 'Modal & ROI Cabang') || $can('manage', 'all')"
-                  size="small"
-                  color="error"
-                  title="Hapus Transaksi"
-                  @click="confirmDelete(item)"
-                >
-                  <VIcon icon="ri-delete-bin-line" />
-                </IconBtn>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </VTable>
+                  <!-- Delete Button -->
+                  <IconBtn
+                    v-if="$can('delete', 'Modal & ROI Cabang') || $can('manage', 'all')"
+                    size="small"
+                    color="error"
+                    title="Hapus Transaksi"
+                    @click="confirmDelete(item)"
+                  >
+                    <VIcon icon="ri-delete-bin-line" />
+                  </IconBtn>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </VTable>
+      </div>
 
       <!-- Pagination -->
       <VCardText class="d-flex align-center justify-space-between pa-4 border-t">
@@ -1204,7 +1221,7 @@ onMounted(async () => {
       v-model="isInflowDrawerOpen"
       temporary
       location="end"
-      width="450"
+      :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 480)"
       class="scrollable-content"
     >
       <div class="pa-4 border-b d-flex align-center justify-space-between bg-var-theme-surface">
@@ -1393,7 +1410,7 @@ onMounted(async () => {
       v-model="isRequestDrawerOpen"
       temporary
       location="end"
-      width="450"
+      :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 480)"
       class="scrollable-content"
     >
       <div class="pa-4 border-b d-flex align-center justify-space-between bg-var-theme-surface">
@@ -1492,37 +1509,37 @@ onMounted(async () => {
               <VCol cols="12">
                 <VTextField
                   v-model="requestForm.date"
-                  label="Tanggal Pengajuan *"
+                  label="Tanggal Dibutuhkan *"
                   type="date"
                   density="compact"
                   variant="outlined"
                 />
               </VCol>
 
-              <!-- Upload Proposal / Surat Permohonan (PDF / Gambar) -->
+              <!-- Proposal File (PDF / Gambar) -->
               <VCol cols="12">
                 <VFileInput
                   v-model="requestForm.proof_file"
-                  label="Upload Proposal / Surat Permohonan (PDF / Gambar)"
+                  label="Lampirkan Proposal / Rincian Kebutuhan"
                   density="compact"
                   variant="outlined"
                   prepend-icon=""
-                  prepend-inner-icon="ri-file-pdf-line"
-                  accept="application/pdf,image/*"
-                  hint="Opsional: Upload dokumen PDF Proposal/RAB atau foto surat resmi"
+                  prepend-inner-icon="ri-file-pdf-2-line"
+                  accept="image/*,application/pdf"
+                  hint="Format PDF atau Foto Gambar (Maks 5MB)"
                   persistent-hint
                 />
               </VCol>
 
-              <!-- Justifikasi Kebutuhan -->
+              <!-- Catatan -->
               <VCol cols="12">
                 <VTextarea
                   v-model="requestForm.notes"
-                  label="Alasan / Justifikasi Kebutuhan Modal *"
-                  placeholder="Jelaskan secara detail peruntukan dana modal tambahan ini (contoh: restock 50 unit barang X menjelang promo bulanan)..."
+                  label="Uraian Rencana Penggunaan Dana *"
+                  placeholder="Jelaskan kebutuhan pengadaan stok, perbaikan peralatan, atau kebutuhan modal kerja..."
                   density="compact"
                   variant="outlined"
-                  rows="4"
+                  rows="3"
                 />
               </VCol>
 
@@ -1532,7 +1549,7 @@ onMounted(async () => {
                   Batal
                 </VBtn>
                 <VBtn color="warning" type="submit" :loading="isSubmitting">
-                  Ajukan ke Owner
+                  Kirim Permintaan Modal
                 </VBtn>
               </VCol>
             </VRow>
@@ -1546,7 +1563,7 @@ onMounted(async () => {
       v-model="isOutflowDrawerOpen"
       temporary
       location="end"
-      width="450"
+      :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 480)"
       class="scrollable-content"
     >
       <div class="pa-4 border-b d-flex align-center justify-space-between bg-var-theme-surface">
@@ -1735,7 +1752,7 @@ onMounted(async () => {
       v-model="isEditDrawerOpen"
       temporary
       location="end"
-      width="450"
+      :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 480)"
       class="scrollable-content"
     >
       <div class="pa-4 border-b d-flex align-center justify-space-between bg-var-theme-surface">
@@ -1891,7 +1908,11 @@ onMounted(async () => {
     </VNavigationDrawer>
 
     <!-- DIALOG 1: APPROVAL MODAL (RETURN / INJEKSI DENGAN BUKTI DANA) -->
-    <VDialog v-model="isApproveDialogVisible" max-width="500">
+    <VDialog
+      v-model="isApproveDialogVisible"
+      :fullscreen="$vuetify.display.xs"
+      max-width="500"
+    >
       <VCard class="pa-4 rounded-xl">
         <div class="d-flex align-center gap-2 mb-3">
           <VAvatar color="success" variant="tonal" size="36">
@@ -1964,7 +1985,11 @@ onMounted(async () => {
     </VDialog>
 
     <!-- DIALOG 2: TOLAK TRANSAKSI MODAL -->
-    <VDialog v-model="isRejectDialogVisible" max-width="500">
+    <VDialog
+      v-model="isRejectDialogVisible"
+      :fullscreen="$vuetify.display.xs"
+      max-width="500"
+    >
       <VCard class="pa-4 rounded-xl">
         <div class="d-flex align-center gap-2 mb-3">
           <VAvatar color="error" variant="tonal" size="36">
@@ -1999,7 +2024,11 @@ onMounted(async () => {
     </VDialog>
 
     <!-- DIALOG 3: VOID / BATALKAN PERSETUJUAN (APPROVED -> VOID) -->
-    <VDialog v-model="isVoidDialogVisible" max-width="500">
+    <VDialog
+      v-model="isVoidDialogVisible"
+      :fullscreen="$vuetify.display.xs"
+      max-width="500"
+    >
       <VCard class="pa-4 rounded-xl">
         <div class="d-flex align-center gap-2 mb-3">
           <VAvatar color="warning" variant="tonal" size="36">
@@ -2045,7 +2074,11 @@ onMounted(async () => {
     </VDialog>
 
     <!-- DIALOG 4: KONFIRMASI HAPUS TRANSAKSI -->
-    <VDialog v-model="isDeleteDialogVisible" max-width="450">
+    <VDialog
+      v-model="isDeleteDialogVisible"
+      :fullscreen="$vuetify.display.xs"
+      max-width="450"
+    >
       <VCard class="pa-4 rounded-xl">
         <div class="d-flex align-center gap-2 mb-3">
           <VAvatar color="error" variant="tonal" size="36">
@@ -2070,7 +2103,11 @@ onMounted(async () => {
     </VDialog>
 
     <!-- DIALOG 5: DETAIL TRANSAKSI & AUDIT LOG -->
-    <VDialog v-model="isDetailDialogVisible" max-width="600">
+    <VDialog
+      v-model="isDetailDialogVisible"
+      :fullscreen="$vuetify.display.xs"
+      max-width="600"
+    >
       <VCard class="pa-4 rounded-xl">
         <div class="d-flex align-center justify-space-between mb-3 border-b pb-3">
           <div class="d-flex align-center gap-2">
@@ -2279,7 +2316,11 @@ onMounted(async () => {
     </VDialog>
 
     <!-- DIALOG KIRIM EMAIL REKAP MODAL & ROI KE OWNER -->
-    <VDialog v-model="isSendSummaryEmailDialogVisible" max-width="480">
+    <VDialog
+      v-model="isSendSummaryEmailDialogVisible"
+      :fullscreen="$vuetify.display.xs"
+      max-width="480"
+    >
       <VCard>
         <VCardTitle class="bg-primary text-white pa-4 d-flex align-center justify-space-between">
           <div class="d-flex align-center gap-2">
@@ -2339,7 +2380,11 @@ onMounted(async () => {
     </VDialog>
 
     <!-- DIALOG KIRIM BUKTI SETORAN MODAL KE EMAIL -->
-    <VDialog v-model="isSendCapitalEmailDialogVisible" max-width="480">
+    <VDialog
+      v-model="isSendCapitalEmailDialogVisible"
+      :fullscreen="$vuetify.display.xs"
+      max-width="480"
+    >
       <VCard>
         <VCardTitle class="bg-success text-white pa-4 d-flex align-center justify-space-between">
           <div class="d-flex align-center gap-2">
@@ -2399,7 +2444,11 @@ onMounted(async () => {
     </VDialog>
 
     <!-- PREVIEW BUKTI TRANSFER DIALOG -->
-    <VDialog v-model="isPreviewDialogVisible" max-width="550">
+    <VDialog
+      v-model="isPreviewDialogVisible"
+      :fullscreen="$vuetify.display.xs"
+      max-width="550"
+    >
       <VCard class="pa-4 rounded-xl">
         <div class="d-flex align-center justify-space-between mb-3">
           <span class="text-subtitle-1 font-weight-bold">Lampiran Bukti Transaksi</span>
