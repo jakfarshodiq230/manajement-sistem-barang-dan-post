@@ -15,6 +15,9 @@ const props = defineProps({
 
 const emit = defineEmits([
   'update:isDrawerOpen',
+  'update:is-drawer-open',
+  'close',
+  'cancel',
   'saveMovement',
 ])
 
@@ -26,6 +29,9 @@ const notes = ref('')
 
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
+  emit('update:is-drawer-open', false)
+  emit('close')
+  emit('cancel')
   nextTick(() => {
     refForm.value?.resetValidation()
     quantity.value = 1
@@ -56,13 +62,18 @@ const onSubmit = () => {
 
 const handleDrawerModelValueUpdate = val => {
   emit('update:isDrawerOpen', val)
+  emit('update:is-drawer-open', val)
+  if (!val) {
+    emit('close')
+    emit('cancel')
+  }
 }
 </script>
 
 <template>
   <VNavigationDrawer
     temporary
-    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 440)"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '92vw' : 440)"
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"

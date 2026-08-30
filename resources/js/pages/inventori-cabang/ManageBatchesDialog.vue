@@ -242,9 +242,9 @@ const closeDialog = () => {
         
         <div
           v-else-if="batches.length > 0"
-          class="border rounded-xl overflow-hidden"
+          class="border rounded-xl overflow-x-auto shadow-xs"
         >
-          <table class="w-100 table-receipt">
+          <table class="w-100 table-receipt" style="min-width: 780px;">
             <thead>
               <tr class="bg-grey-100 text-left">
                 <th class="pa-3 text-xs text-center" style="width: 40px;">NO</th>

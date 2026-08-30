@@ -282,17 +282,17 @@ const confirmDelete = async id => {
 <template>
   <section>
     <!-- Page Header -->
-    <div class="d-flex align-center justify-space-between mb-4">
+    <div class="d-flex flex-column flex-md-row align-start align-md-center justify-space-between gap-4 mb-4">
       <div>
-        <h2 class="text-h4 mb-0">
+        <h2 class="text-h5 text-md-h4 font-weight-bold mb-1">
           Inventori & Harga Cabang
         </h2>
-        <p class="text-body-1 mb-0 text-disabled mt-1">
+        <p class="text-body-2 text-md-body-1 mb-0 text-medium-emphasis">
           Atur harga modal, harga jual, dan stok masuk untuk masing-masing cabang.
         </p>
       </div>
       
-      <div class="d-flex gap-4">
+      <div class="d-flex flex-wrap align-center gap-2 w-100 w-md-auto">
         <input 
           ref="fileInput" 
           type="file" 
@@ -304,7 +304,9 @@ const confirmDelete = async id => {
           v-if="$can('import', 'Inventori Cabang')"
           color="info"
           variant="tonal"
+          size="small"
           prepend-icon="ri-download-cloud-line"
+          class="flex-grow-1 flex-sm-grow-0"
           @click="downloadTemplate"
         >
           Template
@@ -313,8 +315,10 @@ const confirmDelete = async id => {
           v-if="$can('import', 'Inventori Cabang')"
           color="warning"
           variant="tonal"
+          size="small"
           prepend-icon="ri-upload-cloud-line"
           :loading="isLoading"
+          class="flex-grow-1 flex-sm-grow-0"
           @click="triggerFileInput"
         >
           Import
@@ -323,7 +327,9 @@ const confirmDelete = async id => {
           v-if="$can('export', 'Inventori Cabang')"
           color="success"
           variant="tonal"
+          size="small"
           prepend-icon="ri-file-excel-2-line"
+          class="flex-grow-1 flex-sm-grow-0"
           @click="exportExcel"
         >
           Export
@@ -331,7 +337,9 @@ const confirmDelete = async id => {
         <VBtn
           v-if="$can('create', 'Inventori Cabang')"
           color="primary"
+          size="small"
           prepend-icon="ri-add-line"
+          class="flex-grow-1 flex-sm-grow-0 font-weight-semibold shadow-xs"
           @click="() => { selectedProductBranch = null; isAddNewDrawerVisible = true }"
         >
           Daftarkan Produk ke Cabang
@@ -450,14 +458,14 @@ const confirmDelete = async id => {
       </VCardItem>
     </VCard>
 
-    <VCard>
-      <VCardItem class="pa-4 pb-0">
-        <div class="d-flex flex-wrap align-center justify-space-between gap-3 w-100">
-          <VCardTitle class="px-0">
+    <VCard class="rounded-xl shadow-xs">
+      <VCardItem class="pa-4 pb-2">
+        <div class="d-flex flex-column flex-sm-row align-start align-sm-center justify-space-between gap-3 w-100">
+          <VCardTitle class="px-0 text-h6 font-weight-bold">
             Daftar Inventori
           </VCardTitle>
-          <div class="d-flex flex-wrap align-center gap-3">
-            <div style="min-width: 180px; flex-grow: 1;">
+          <div class="d-flex flex-column flex-sm-row align-stretch align-sm-center gap-3 w-100 w-sm-auto">
+            <div style="min-width: 180px;" class="w-100 w-sm-auto">
               <VAutocomplete
                 v-model="selectedBranch"
                 :items="branches"
@@ -472,7 +480,7 @@ const confirmDelete = async id => {
                 @update:model-value="fetchData"
               />
             </div>
-            <div style="min-width: 220px; flex-grow: 1;">
+            <div style="min-width: 220px;" class="w-100 w-sm-auto">
               <VTextField
                 v-model="search"
                 placeholder="Cari nama barang / SKU..."
@@ -488,7 +496,7 @@ const confirmDelete = async id => {
         </div>
       </VCardItem>
 
-      <VCardText class="pa-0 mt-3">
+      <VCardText class="pa-0 mt-2">
         <VDataTableServer
           v-model:items-per-page="itemsPerPage"
           v-model:page="page"
@@ -646,52 +654,57 @@ const confirmDelete = async id => {
         </template>
 
         <template #item.actions="{ item }">
-          <VBtn
-            v-if="$can('write', 'Inventori Cabang')"
-            size="small"
-            color="primary"
-            variant="tonal"
-            class="mr-2"
-            @click="addStock(item)"
-          >
-            Inbound Stok
-          </VBtn>
-          <VBtn
-            v-if="$can('read', 'Inventori Cabang')"
-            size="small"
-            color="info"
-            variant="tonal"
-            class="mr-2"
-            @click="printLabel(item)"
-          >
-            Cetak Label
-          </VBtn>
-          <VBtn
-            v-if="$can('write', 'Inventori Cabang')"
-            size="small"
-            color="secondary"
-            variant="tonal"
-            prepend-icon="ri-qr-code-line"
-            class="mr-2"
-            @click="manageBatches(item)"
-          >
-            Kelola Batch & SCC
-          </VBtn>
-          <IconBtn
-            v-if="$can('write', 'Inventori Cabang')"
-            size="small"
-            @click="editItem(item)"
-          >
-            <VIcon icon="ri-pencil-line" />
-          </IconBtn>
-          <IconBtn
-            v-if="$can('delete', 'Inventori Cabang')"
-            size="small"
-            color="error"
-            @click="confirmDelete(item.id)"
-          >
-            <VIcon icon="ri-delete-bin-line" />
-          </IconBtn>
+          <div class="d-flex align-center flex-wrap gap-1 py-1" style="min-width: 260px;">
+            <VBtn
+              v-if="$can('write', 'Inventori Cabang')"
+              size="x-small"
+              color="primary"
+              variant="tonal"
+              prepend-icon="ri-inbox-archive-line"
+              class="font-weight-medium"
+              @click="addStock(item)"
+            >
+              Inbound
+            </VBtn>
+            <VBtn
+              v-if="$can('read', 'Inventori Cabang')"
+              size="x-small"
+              color="info"
+              variant="tonal"
+              prepend-icon="ri-printer-line"
+              class="font-weight-medium"
+              @click="printLabel(item)"
+            >
+              Label
+            </VBtn>
+            <VBtn
+              v-if="$can('write', 'Inventori Cabang')"
+              size="x-small"
+              color="secondary"
+              variant="tonal"
+              prepend-icon="ri-qr-code-line"
+              class="font-weight-medium"
+              @click="manageBatches(item)"
+            >
+              Batch & SCC
+            </VBtn>
+            <VBtn
+              v-if="$can('write', 'Inventori Cabang')"
+              icon="ri-pencil-line"
+              variant="text"
+              size="x-small"
+              color="secondary"
+              @click="editItem(item)"
+            />
+            <VBtn
+              v-if="$can('delete', 'Inventori Cabang')"
+              icon="ri-delete-bin-line"
+              variant="text"
+              size="x-small"
+              color="error"
+              @click="confirmDelete(item.id)"
+            />
+          </div>
         </template>
       </VDataTableServer>
     </VCardText>
@@ -699,27 +712,41 @@ const confirmDelete = async id => {
 
     <AddNewProductBranchDrawer
       v-model:is-drawer-open="isAddNewDrawerVisible"
+      :is-drawer-open="isAddNewDrawerVisible"
       :selected-data="selectedProductBranch"
       :master-products="masterProducts"
       :branches-list="branches"
+      @update:is-drawer-open="val => isAddNewDrawerVisible = val"
+      @update:isDrawerOpen="val => isAddNewDrawerVisible = val"
+      @close="isAddNewDrawerVisible = false"
+      @cancel="isAddNewDrawerVisible = false"
       @save-data="saveProductBranch"
     />
 
     <StockInboundDrawer
       v-model:is-drawer-open="isStockDrawerVisible"
+      :is-drawer-open="isStockDrawerVisible"
       :selected-branch-product="selectedProductBranch"
+      @update:is-drawer-open="val => isStockDrawerVisible = val"
+      @update:isDrawerOpen="val => isStockDrawerVisible = val"
+      @close="isStockDrawerVisible = false"
+      @cancel="isStockDrawerVisible = false"
       @save-movement="saveStockMovement"
     />
 
     <ManageBatchesDialog
       v-model:is-dialog-visible="isManageBatchesDialogVisible"
+      :is-dialog-visible="isManageBatchesDialogVisible"
       :selected-data="selectedProductBranch"
+      @update:is-dialog-visible="val => isManageBatchesDialogVisible = val"
       @refresh-data="fetchData"
     />
 
     <PrintLabelDialog
       v-model:is-dialog-visible="isPrintLabelDialogVisible"
+      :is-dialog-visible="isPrintLabelDialogVisible"
       :selected-data="selectedProductBranch"
+      @update:is-dialog-visible="val => isPrintLabelDialogVisible = val"
     />
   </section>
 </template>
