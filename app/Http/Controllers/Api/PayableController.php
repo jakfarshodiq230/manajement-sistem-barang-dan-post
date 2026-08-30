@@ -161,7 +161,9 @@ class PayableController extends Controller
             'supplier',
             'branch',
             'payables.purchaseOrder.items.product',
+            'payables.goodsReceipt.purchaseOrder',
             'payables.goodsReceipt.items.productBranch.product',
+            'payables.goodsReceipt.items.purchaseOrderItem.product',
             'payables.goodsReceipt.items.paymentAllocations',
             'payments.paymentItems.goodsReceiptItem',
             'payments.creator',
@@ -173,8 +175,32 @@ class PayableController extends Controller
 
         // Calculate and append item-level details
         foreach ($statement->payables as $payable) {
+            $po = $payable->purchaseOrder ?: ($payable->goodsReceipt ? $payable->goodsReceipt->purchaseOrder : null);
+            $poNumber = $po ? $po->po_number : '-';
+
+            if (!$payable->purchase_order_id && $po) {
+                $payable->purchase_order_id = $po->id;
+                $payable->saveQuietly();
+            }
+
             if ($payable->goodsReceipt && $payable->goodsReceipt->items) {
                 foreach ($payable->goodsReceipt->items as $item) {
+                    $product = null;
+                    if ($item->productBranch && $item->productBranch->product) {
+                        $product = $item->productBranch->product;
+                    } elseif ($item->purchaseOrderItem && $item->purchaseOrderItem->product) {
+                        $product = $item->purchaseOrderItem->product;
+                    } elseif ($po && $po->items) {
+                        $matchingPoItem = $po->items->firstWhere('id', $item->purchase_order_item_id);
+                        if ($matchingPoItem && $matchingPoItem->product) {
+                            $product = $matchingPoItem->product;
+                        }
+                    }
+
+                    $item->product_name = $product ? $product->name : ($item->name ?: 'Produk #' . $item->id);
+                    $item->sku = $product ? $product->sku : '-';
+                    $item->po_number = $poNumber;
+
                     $qty = (float) ($item->qty_received ?: ($item->qty ?: 1));
                     $unitPrice = (float) ($item->net_unit_price ?: ($item->unit_cost ?: ($item->gross_price ?: 0)));
                     $subtotal = $qty * $unitPrice;
@@ -625,19 +651,26 @@ class PayableController extends Controller
             ]);
         }
 
-        // 2. Link all unassigned Payables to their respective PayableStatement
-        $unlinkedPayables = Payable::whereNull('payable_statement_id')->get();
+        // 2. Link all unassigned Payables to their respective PayableStatement & backfill purchase_order_id
+        $unlinkedPayables = Payable::with('goodsReceipt')->where(function($q) {
+            $q->whereNull('payable_statement_id')->orWhereNull('purchase_order_id');
+        })->get();
         $affectedStatementIds = [];
 
         foreach ($unlinkedPayables as $payable) {
-            $invoiceDate = $payable->invoice_date ?: ($payable->created_at ? $payable->created_at->toDateString() : now()->toDateString());
-            $statement = self::getOrCreateStatementForSupplier($payable->supplier_id, $payable->branch_id, $invoiceDate, $payable->created_by);
-
-            $payable->update([
-                'payable_statement_id' => $statement->id,
-            ]);
-
-            $affectedStatementIds[$statement->id] = true;
+            $updates = [];
+            if (!$payable->purchase_order_id && $payable->goodsReceipt && $payable->goodsReceipt->purchase_order_id) {
+                $updates['purchase_order_id'] = $payable->goodsReceipt->purchase_order_id;
+            }
+            if (!$payable->payable_statement_id) {
+                $invoiceDate = $payable->invoice_date ?: ($payable->created_at ? $payable->created_at->toDateString() : now()->toDateString());
+                $statement = self::getOrCreateStatementForSupplier($payable->supplier_id, $payable->branch_id, $invoiceDate, $payable->created_by);
+                $updates['payable_statement_id'] = $statement->id;
+                $affectedStatementIds[$statement->id] = true;
+            }
+            if (!empty($updates)) {
+                $payable->update($updates);
+            }
         }
 
         // 3. Migrate any legacy payments that had payable_id to payable_statement_id if needed

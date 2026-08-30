@@ -164,11 +164,12 @@ const savePurchaseOrder = async data => {
 
 const tableHeaders = [
   { title: 'NO. PO & FAKTUR', key: 'po_number' },
-  { title: 'TANGGAL PESAN & TEMPO', key: 'date' },
+  { title: 'TANGGAL & TEMPO', key: 'date' },
   { title: 'CABANG TUJUAN', key: 'branch.name' },
   { title: 'SUPPLIER', key: 'supplier.name' },
   { title: 'TOTAL BIAYA', key: 'total_amount' },
   { title: 'STATUS ALUR SOP', key: 'status_sop', align: 'center' },
+  { title: 'STATUS PEMBAYARAN', key: 'payment_status', align: 'center' },
   { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
 ]
 
@@ -553,6 +554,50 @@ const executeDeletePO = async () => {
           </VChip>
         </template>
 
+        <!-- Status Pembayaran Hutang Supplier (Hutang / Lunas) -->
+        <template #item.payment_status="{ item }">
+          <div v-if="item.status === 'completed' || item.goods_receipt?.approval_status === 'approved' || item.payable || item.goods_receipt?.payable">
+            <VChip
+              v-if="item.payable?.status === 'paid' || item.goods_receipt?.payable?.status === 'paid' || ((item.payable?.remaining_amount !== undefined && Number(item.payable?.remaining_amount) <= 0) || (item.goods_receipt?.payable?.remaining_amount !== undefined && Number(item.goods_receipt?.payable?.remaining_amount) <= 0))"
+              color="success"
+              size="small"
+              variant="flat"
+              class="font-weight-bold"
+            >
+              <VIcon icon="ri-checkbox-circle-fill" size="13" class="me-1" />
+              Lunas
+            </VChip>
+            <VChip
+              v-else-if="(Number(item.payable?.paid_amount) > 0) || (Number(item.goods_receipt?.payable?.paid_amount) > 0)"
+              color="warning"
+              size="small"
+              variant="flat"
+              class="font-weight-bold"
+            >
+              <VIcon icon="ri-time-fill" size="13" class="me-1" />
+              Dicicil
+            </VChip>
+            <VChip
+              v-else
+              color="error"
+              size="small"
+              variant="flat"
+              class="font-weight-bold"
+            >
+              <VIcon icon="ri-error-warning-fill" size="13" class="me-1" />
+              Hutang
+            </VChip>
+            <div v-if="(Number(item.payable?.remaining_amount || item.goods_receipt?.payable?.remaining_amount || (item.goods_receipt?.total_amount || item.total_amount))) > 0" class="text-caption text-error font-mono font-weight-medium mt-0.5">
+              Sisa: {{ formatRupiah(item.payable?.remaining_amount !== undefined ? item.payable?.remaining_amount : (item.goods_receipt?.payable?.remaining_amount !== undefined ? item.goods_receipt?.payable?.remaining_amount : (item.goods_receipt?.total_amount || item.total_amount))) }}
+            </div>
+          </div>
+          <div v-else class="text-caption text-medium-emphasis">
+            <VChip size="small" variant="tonal" color="secondary">
+              Belum Ditagihkan
+            </VChip>
+          </div>
+        </template>
+
         <!-- Actions -->
         <template #item.actions="{ item }">
           <div class="d-flex align-center justify-center gap-1">
@@ -736,6 +781,79 @@ const executeDeletePO = async () => {
                     class="rounded-lg border cursor-pointer hover-elevation"
                     @click="openPhotoZoom(photo.startsWith('http') || photo.startsWith('/storage') ? photo : ('/storage/' + photo))"
                   />
+                </div>
+              </VCol>
+            </VRow>
+          </div>
+
+          <!-- Section: Status & Rincian Pembayaran Hutang Supplier (Hutang / Lunas) -->
+          <div
+            v-if="trackingPO.status === 'completed' || trackingPO.goods_receipt?.approval_status === 'approved' || trackingPO.payable || trackingPO.goods_receipt?.payable"
+            class="pa-4 rounded-xl border mb-5 shadow-xs"
+            :class="(trackingPO.payable?.status === 'paid' || trackingPO.goods_receipt?.payable?.status === 'paid' || (trackingPO.payable?.remaining_amount !== undefined && Number(trackingPO.payable?.remaining_amount) <= 0) || (trackingPO.goods_receipt?.payable?.remaining_amount !== undefined && Number(trackingPO.goods_receipt?.payable?.remaining_amount) <= 0)) ? 'bg-success-lighten-5 border-success' : 'bg-var-theme-surface border-warning'"
+          >
+            <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-3">
+              <h6 class="text-subtitle-2 font-weight-bold text-uppercase letter-spacing-1 d-flex align-center gap-2 mb-0" :class="(trackingPO.payable?.status === 'paid' || trackingPO.goods_receipt?.payable?.status === 'paid' || (trackingPO.payable?.remaining_amount !== undefined && Number(trackingPO.payable?.remaining_amount) <= 0) || (trackingPO.goods_receipt?.payable?.remaining_amount !== undefined && Number(trackingPO.goods_receipt?.payable?.remaining_amount) <= 0)) ? 'text-success' : 'text-warning-darken-1'">
+                <VIcon icon="ri-wallet-3-line" size="18" />
+                Status & Informasi Pembayaran Hutang Supplier
+              </h6>
+              
+              <!-- Status Badge -->
+              <VChip
+                v-if="trackingPO.payable?.status === 'paid' || trackingPO.goods_receipt?.payable?.status === 'paid' || (trackingPO.payable?.remaining_amount !== undefined && Number(trackingPO.payable?.remaining_amount) <= 0) || (trackingPO.goods_receipt?.payable?.remaining_amount !== undefined && Number(trackingPO.goods_receipt?.payable?.remaining_amount) <= 0)"
+                color="success"
+                size="small"
+                variant="flat"
+                class="font-weight-bold"
+              >
+                <VIcon icon="ri-checkbox-circle-fill" size="14" class="me-1" />
+                LUNAS
+              </VChip>
+              <VChip
+                v-else-if="(Number(trackingPO.payable?.paid_amount) > 0) || (Number(trackingPO.goods_receipt?.payable?.paid_amount) > 0)"
+                color="warning"
+                size="small"
+                variant="flat"
+                class="font-weight-bold"
+              >
+                <VIcon icon="ri-time-fill" size="14" class="me-1" />
+                DIBAYAR SEBAGIAN (DICICIL)
+              </VChip>
+              <VChip
+                v-else
+                color="error"
+                size="small"
+                variant="flat"
+                class="font-weight-bold"
+              >
+                <VIcon icon="ri-error-warning-fill" size="14" class="me-1" />
+                BELUM LUNAS (HUTANG)
+              </VChip>
+            </div>
+
+            <VRow dense>
+              <VCol cols="12" sm="3">
+                <div class="text-caption text-medium-emphasis">No. Tagihan Hutang (AP):</div>
+                <div class="font-weight-bold font-mono text-primary">
+                  {{ trackingPO.payable?.payable_number || trackingPO.goods_receipt?.payable?.payable_number || ('AP-' + (trackingPO.po_number || '-')) }}
+                </div>
+              </VCol>
+              <VCol cols="12" sm="3">
+                <div class="text-caption text-medium-emphasis">Total Tagihan Faktur:</div>
+                <div class="font-weight-bold font-mono">
+                  {{ formatRupiah(trackingPO.payable?.total_amount || trackingPO.goods_receipt?.payable?.total_amount || trackingPO.goods_receipt?.total_amount || trackingPO.total_amount) }}
+                </div>
+              </VCol>
+              <VCol cols="12" sm="3">
+                <div class="text-caption text-medium-emphasis">Sudah Dibayar:</div>
+                <div class="font-weight-bold font-mono text-success">
+                  {{ formatRupiah(trackingPO.payable?.paid_amount || trackingPO.goods_receipt?.payable?.paid_amount || 0) }}
+                </div>
+              </VCol>
+              <VCol cols="12" sm="3">
+                <div class="text-caption text-medium-emphasis">Sisa Hutang:</div>
+                <div class="font-weight-bold font-mono" :class="(Number(trackingPO.payable?.remaining_amount !== undefined ? trackingPO.payable?.remaining_amount : (trackingPO.goods_receipt?.payable?.remaining_amount !== undefined ? trackingPO.goods_receipt?.payable?.remaining_amount : (trackingPO.goods_receipt?.total_amount || trackingPO.total_amount)))) > 0 ? 'text-error font-weight-black' : 'text-success'">
+                  {{ formatRupiah(trackingPO.payable?.remaining_amount !== undefined ? trackingPO.payable?.remaining_amount : (trackingPO.goods_receipt?.payable?.remaining_amount !== undefined ? trackingPO.goods_receipt?.payable?.remaining_amount : (trackingPO.goods_receipt?.total_amount || trackingPO.total_amount))) }}
                 </div>
               </VCol>
             </VRow>

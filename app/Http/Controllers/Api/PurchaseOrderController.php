@@ -19,7 +19,9 @@ class PurchaseOrderController extends Controller
             'items.product',
             'goodsReceipt.validator',
             'goodsReceipt.approver',
-            'goodsReceipt.items.productBranch.product'
+            'goodsReceipt.payable',
+            'goodsReceipt.items.productBranch.product',
+            'payable',
         ]);
         
         $search = $request->query('search');

@@ -89,7 +89,9 @@ const allStatementItems = computed(() => {
   if (!statement.value?.payables) return []
   const list = []
   statement.value.payables.forEach(payable => {
-    const grItems = payable.goods_receipt?.items || []
+    const grItems = payable.goods_receipt?.items || payable.goodsReceipt?.items || []
+    const poNum = payable.purchase_order?.po_number || payable.purchaseOrder?.po_number || payable.goods_receipt?.purchase_order?.po_number || payable.goodsReceipt?.purchaseOrder?.po_number || '-'
+
     if (grItems.length > 0) {
       grItems.forEach(item => {
         const qty = Number(item.qty_received || item.qty || 1)
@@ -99,14 +101,17 @@ const allStatementItems = computed(() => {
         const remaining = item.remaining_amount !== undefined ? Number(item.remaining_amount) : Math.max(0, subtotal - paid)
         const isPaid = (remaining <= 0 && subtotal > 0) || item.payment_status === 'paid'
 
+        const prodName = item.product_name || item.productBranch?.product?.name || item.product_branch?.product?.name || item.purchaseOrderItem?.product?.name || item.purchase_order_item?.product?.name || item.product?.name || (payable.purchaseOrder?.items?.[0]?.product?.name) || (payable.purchase_order?.items?.[0]?.product?.name) || 'Produk'
+        const skuVal = item.sku || item.productBranch?.product?.sku || item.product_branch?.product?.sku || item.purchaseOrderItem?.product?.sku || item.purchase_order_item?.product?.sku || item.product?.sku || (payable.purchaseOrder?.items?.[0]?.product?.sku) || (payable.purchase_order?.items?.[0]?.product?.sku) || '-'
+
         list.push({
           id: item.id,
           payable_id: payable.id,
           invoice_number_supplier: payable.invoice_number_supplier || payable.payable_number,
           invoice_date: payable.invoice_date,
-          po_number: payable.purchase_order?.po_number || '-',
-          product_name: item.product?.name || item.product_branch?.product?.name || 'Produk',
-          sku: item.product?.sku || item.product_branch?.product?.sku || '-',
+          po_number: item.po_number && item.po_number !== '-' ? item.po_number : poNum,
+          product_name: prodName,
+          sku: skuVal,
           batch_number: item.batch_number || '-',
           expiration_date: item.expiration_date || null,
           qty,
@@ -127,14 +132,18 @@ const allStatementItems = computed(() => {
       const remaining = Number(payable.remaining_amount || 0)
       const isPaid = payable.status === 'paid'
 
+      const poItems = payable.purchaseOrder?.items || payable.purchase_order?.items || []
+      const fallbackName = poItems.length > 0 && poItems[0].product?.name ? poItems[0].product.name : ('Faktur ' + (payable.invoice_number_supplier || payable.payable_number))
+      const fallbackSku = poItems.length > 0 && poItems[0].product?.sku ? poItems[0].product.sku : '-'
+
       list.push({
         id: 'p_' + payable.id,
         payable_id: payable.id,
         invoice_number_supplier: payable.invoice_number_supplier || payable.payable_number,
         invoice_date: payable.invoice_date,
-        po_number: payable.purchase_order?.po_number || '-',
-        product_name: 'Faktur Pengadaan ' + (payable.invoice_number_supplier || payable.payable_number),
-        sku: '-',
+        po_number: poNum,
+        product_name: fallbackName,
+        sku: fallbackSku,
         batch_number: '-',
         expiration_date: null,
         qty: 1,

@@ -64,6 +64,11 @@ class PurchaseOrder extends Model
         return $this->hasOne(GoodsReceipt::class);
     }
 
+    public function payable()
+    {
+        return $this->hasOne(Payable::class);
+    }
+
     public function validator() { return $this->belongsTo(\App\Models\User::class, 'validated_by'); }
     public function approver() { return $this->belongsTo(\App\Models\User::class, 'approved_by'); }
 }
