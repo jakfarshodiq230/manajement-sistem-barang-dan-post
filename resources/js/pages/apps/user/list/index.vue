@@ -255,6 +255,86 @@ const resolveUserStatusVariant = stat => {
 
 const isAddNewUserDrawerVisible = ref(false)
 
+// 👉 Edit User Dialog State
+const isEditUserDialogVisible = ref(false)
+const isSavingUser = ref(false)
+const isPasswordVisible = ref(false)
+const editUserData = ref({
+  id: null,
+  fullName: '',
+  email: '',
+  phone: '',
+  role: '',
+  branch_id: null,
+  status: 'Active',
+  password: '',
+  pos_pin: '',
+  address: '',
+})
+
+const openEditUserDialog = user => {
+  editUserData.value = {
+    id: user.id,
+    fullName: user.fullName || user.name || '',
+    email: user.email || '',
+    phone: user.phone || '',
+    role: Array.isArray(user.role) ? (user.role[0] || availableRoles.value[0] || 'Kasir') : (user.role || availableRoles.value[0] || 'Kasir'),
+    branch_id: user.branch_id || (user.assignments?.[0]?.branch_id ?? null),
+    status: (user.status === 'Active' || user.status === 'aktif' || user.status == 1) ? 'Active' : 'Inactive',
+    password: '',
+    pos_pin: user.pos_pin || '',
+    address: user.address || '',
+  }
+  isPasswordVisible.value = false
+  isEditUserDialogVisible.value = true
+}
+
+const generateRandomPin = () => {
+  editUserData.value.pos_pin = Math.floor(100000 + Math.random() * 900000).toString()
+}
+
+const saveUserEdit = async () => {
+  if (!editUserData.value.fullName || !editUserData.value.email) {
+    snackbar.show('Nama Lengkap dan Email wajib diisi!', 'error')
+    return
+  }
+
+  isSavingUser.value = true
+  try {
+    const payload = {
+      fullName: editUserData.value.fullName,
+      email: editUserData.value.email,
+      phone: editUserData.value.phone,
+      role: editUserData.value.role,
+      branch_id: editUserData.value.branch_id,
+      status: editUserData.value.status,
+      address: editUserData.value.address,
+    }
+
+    if (editUserData.value.password && editUserData.value.password.trim() !== '') {
+      payload.password = editUserData.value.password
+    }
+
+    if (editUserData.value.pos_pin && editUserData.value.pos_pin.trim() !== '') {
+      payload.pos_pin = editUserData.value.pos_pin
+    }
+
+    await $api(`/apps/users/${editUserData.value.id}`, {
+      method: 'PUT',
+      body: payload,
+    })
+
+    snackbar.show('Data pengguna berhasil diperbarui!', 'success')
+    isEditUserDialogVisible.value = false
+    await fetchUsers()
+  } catch (error) {
+    console.error('Failed to update user:', error)
+    snackbar.show(error?.data?.message || 'Gagal memperbarui data pengguna.', 'error')
+  } finally {
+    isSavingUser.value = false
+  }
+}
+
 const addNewUser = async userData => {
   await $api('/apps/users', {
     method: 'POST',
@@ -264,10 +344,12 @@ const addNewUser = async userData => {
 }
 
 const deleteUser = async id => {
+  if (!confirm('Apakah Anda yakin ingin menghapus pengguna ini?')) return
   await $api(`/apps/users/${ id }`, { method: 'DELETE' })
   const index = selectedRows.value.findIndex(row => row === id)
   if (index !== -1)
     selectedRows.value.splice(index, 1)
+  snackbar.show('Pengguna berhasil dihapus.', 'success')
   fetchUsers()
 }
 
@@ -583,6 +665,29 @@ const widgetData = computed(() => [
         <!-- Actions -->
         <template #item.actions="{ item }">
           <div class="d-flex align-center justify-end gap-1">
+            <!-- View Profile -->
+            <IconBtn
+              size="small"
+              color="info"
+              variant="tonal"
+              title="Lihat Profil & Aktivitas"
+              :to="{ name: 'apps-user-view-id', params: { id: item.id } }"
+            >
+              <VIcon icon="ri-eye-line" size="18" />
+            </IconBtn>
+
+            <!-- Edit User Details -->
+            <IconBtn
+              size="small"
+              color="warning"
+              variant="tonal"
+              title="Edit Data Pengguna"
+              @click="openEditUserDialog(item)"
+            >
+              <VIcon icon="ri-edit-box-line" size="18" />
+            </IconBtn>
+
+            <!-- Multi-Branch Assignment -->
             <IconBtn
               size="small"
               color="primary"
@@ -593,6 +698,7 @@ const widgetData = computed(() => [
               <VIcon icon="ri-shield-user-line" size="18" />
             </IconBtn>
             
+            <!-- Delete User -->
             <IconBtn
               size="small"
               color="error"
@@ -865,6 +971,219 @@ const widgetData = computed(() => [
             @click="saveAssignments"
           >
             Simpan Penugasan ({{ selectedBranchIds.length }} Cabang)
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- 👉 Edit User Dialog -->
+    <VDialog
+      v-model="isEditUserDialogVisible"
+      max-width="720"
+      persistent
+    >
+      <VCard class="rounded-2xl pa-6">
+        <!-- Header -->
+        <VCardItem class="pa-0 mb-4">
+          <div class="d-flex justify-space-between align-center flex-wrap gap-3">
+            <div class="d-flex align-center gap-3">
+              <VAvatar color="warning" variant="tonal" size="48" rounded="xl">
+                <VIcon icon="ri-edit-box-line" size="26" />
+              </VAvatar>
+              <div>
+                <h3 class="text-h6 font-weight-bold mb-0">
+                  Edit Data Pengguna
+                </h3>
+                <p class="text-caption text-medium-emphasis mb-0">
+                  Perbarui profil, peran, penempatan cabang, password, dan PIN POS kasir.
+                </p>
+              </div>
+            </div>
+            <VBtn
+              icon="ri-close-line"
+              variant="text"
+              density="comfortable"
+              @click="isEditUserDialogVisible = false"
+            />
+          </div>
+        </VCardItem>
+
+        <VDivider class="mb-4" />
+
+        <VCardText class="pa-0 mb-4">
+          <VForm @submit.prevent="saveUserEdit">
+            <VRow>
+              <!-- Full Name -->
+              <VCol cols="12" md="6">
+                <VTextField
+                  v-model="editUserData.fullName"
+                  label="Nama Lengkap"
+                  placeholder="Contoh: Budi Santoso"
+                  density="compact"
+                  variant="outlined"
+                  prepend-inner-icon="ri-user-line"
+                  required
+                />
+              </VCol>
+
+              <!-- Email -->
+              <VCol cols="12" md="6">
+                <VTextField
+                  v-model="editUserData.email"
+                  label="Alamat Email"
+                  placeholder="nama@perusahaan.com"
+                  type="email"
+                  density="compact"
+                  variant="outlined"
+                  prepend-inner-icon="ri-mail-line"
+                  required
+                />
+              </VCol>
+
+              <!-- Phone / WhatsApp -->
+              <VCol cols="12" md="6">
+                <VTextField
+                  v-model="editUserData.phone"
+                  label="Nomor Telepon / WhatsApp"
+                  placeholder="081234567890"
+                  density="compact"
+                  variant="outlined"
+                  prepend-inner-icon="ri-phone-line"
+                />
+              </VCol>
+
+              <!-- Primary Role -->
+              <VCol cols="12" md="6">
+                <VSelect
+                  v-model="editUserData.role"
+                  :items="availableRoles"
+                  label="Peran / Hak Akses Utama"
+                  density="compact"
+                  variant="outlined"
+                  prepend-inner-icon="ri-shield-user-line"
+                />
+              </VCol>
+
+              <!-- Primary Branch -->
+              <VCol cols="12" md="6">
+                <VSelect
+                  v-model="editUserData.branch_id"
+                  :items="availableBranches"
+                  item-title="name"
+                  item-value="id"
+                  label="Cabang Utama (Penempatan)"
+                  density="compact"
+                  variant="outlined"
+                  prepend-inner-icon="ri-store-2-line"
+                  clearable
+                />
+              </VCol>
+
+              <!-- Account Status -->
+              <VCol cols="12" md="6">
+                <VSelect
+                  v-model="editUserData.status"
+                  :items="[
+                    { title: 'Aktif (Dapat Login)', value: 'Active' },
+                    { title: 'Nonaktif (Diblokir)', value: 'Inactive' }
+                  ]"
+                  item-title="title"
+                  item-value="value"
+                  label="Status Akun"
+                  density="compact"
+                  variant="outlined"
+                  prepend-inner-icon="ri-checkbox-circle-line"
+                />
+              </VCol>
+
+              <VCol cols="12">
+                <VDivider class="my-2" />
+                <div class="d-flex align-center gap-2 mb-2">
+                  <VIcon icon="ri-lock-password-line" size="18" color="primary" />
+                  <span class="text-subtitle-2 font-weight-bold text-high-emphasis">Keamanan Akun & Akses POS</span>
+                </div>
+              </VCol>
+
+              <!-- Reset Password -->
+              <VCol cols="12" md="6">
+                <VTextField
+                  v-model="editUserData.password"
+                  label="Ubah Password Baru"
+                  placeholder="Kosongkan jika tidak ingin ganti"
+                  :type="isPasswordVisible ? 'text' : 'password'"
+                  :append-inner-icon="isPasswordVisible ? 'ri-eye-off-line' : 'ri-eye-line'"
+                  density="compact"
+                  variant="outlined"
+                  prepend-inner-icon="ri-lock-line"
+                  hint="Minimal 6 karakter"
+                  persistent-hint
+                  @click:append-inner="isPasswordVisible = !isPasswordVisible"
+                />
+              </VCol>
+
+              <!-- POS PIN -->
+              <VCol cols="12" md="6">
+                <VTextField
+                  v-model="editUserData.pos_pin"
+                  label="PIN Kasir / Supervisor POS (6 Digit)"
+                  placeholder="Contoh: 123456"
+                  maxlength="6"
+                  density="compact"
+                  variant="outlined"
+                  prepend-inner-icon="ri-keypad-line"
+                  hint="Digunakan untuk buka/tutup shift & otorisasi kasir"
+                  persistent-hint
+                >
+                  <template #append>
+                    <VBtn
+                      size="small"
+                      variant="tonal"
+                      color="primary"
+                      class="text-caption font-weight-bold"
+                      @click="generateRandomPin"
+                    >
+                      Acak PIN
+                    </VBtn>
+                  </template>
+                </VTextField>
+              </VCol>
+
+              <!-- Address -->
+              <VCol cols="12">
+                <VTextarea
+                  v-model="editUserData.address"
+                  label="Alamat Lengkap"
+                  placeholder="Alamat domisili atau catatan staf..."
+                  density="compact"
+                  variant="outlined"
+                  rows="2"
+                  prepend-inner-icon="ri-map-pin-line"
+                />
+              </VCol>
+            </VRow>
+          </VForm>
+        </VCardText>
+
+        <VDivider class="mb-4" />
+
+        <!-- Actions -->
+        <VCardActions class="pa-0 d-flex justify-end gap-3">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            :disabled="isSavingUser"
+            @click="isEditUserDialogVisible = false"
+          >
+            Batal
+          </VBtn>
+          <VBtn
+            color="warning"
+            class="font-weight-bold px-6"
+            :loading="isSavingUser"
+            prepend-icon="ri-save-line"
+            @click="saveUserEdit"
+          >
+            Simpan Perubahan
           </VBtn>
         </VCardActions>
       </VCard>

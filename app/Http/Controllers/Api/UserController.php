@@ -12,19 +12,7 @@ class UserController extends Controller
     public function updatePin(Request $request, $id)
     {
         $admin = $request->user();
-        
-        $hasPermission = $admin && (
-            $admin->can('Pengguna PIN')
-            || $admin->can('Daftar Pengguna Pin')
-            || $admin->can('Penugasan & PIN Pin')
-            || $admin->can('Daftar Pengguna Write')
-            || $admin->can('Penugasan & PIN Write')
-            || $admin->can('Pengguna Write')
-            || $admin->can('manage users')
-            || $admin->can('manage all')
-        );
-
-        if (!$hasPermission) {
+        if (!$admin || (!$admin->can('Pengguna Write') && !$admin->can('Pengguna PIN') && !$admin->can('Daftar Pengguna Write'))) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses izin untuk mengubah PIN pengguna.'], 403);
         }
 
@@ -44,7 +32,7 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'PIN berhasil diperbarui',
-            'pin' => $pin // Return the generated pin so the Dev can see it
+            'pin' => $pin
         ]);
     }
 
@@ -326,22 +314,44 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $admin = $request->user();
-        if (!$admin || (!$admin->can('Pengguna Write') && !$admin->can('Daftar Pengguna Write') && !$admin->can('manage all') && !$admin->can('*'))) {
+        if (!$admin || (!$admin->can('Pengguna Write') && !$admin->can('Daftar Pengguna Write'))) {
             abort(403, 'Unauthorized action.');
         }
 
         $request->validate([
-            'fullName' => 'required',
+            'fullName' => 'nullable|string|max:255',
+            'name'     => 'nullable|string|max:255',
             'email'    => 'required|email|unique:users,email,'.$user->id,
+            'password' => 'nullable|string|min:6',
+            'pos_pin'  => 'nullable|string|digits:6',
         ]);
 
-        $user->update([
-            'name'    => $request->fullName,
+        $updateData = [
+            'name'    => $request->fullName ?: ($request->name ?: $user->name),
             'email'   => $request->email,
             'phone'   => $request->phone ?? $user->phone,
             'address' => $request->address ?? $user->address,
-            'status'  => $request->has('status') ? ($request->status === 'Active' || $request->status == 1 ? 1 : 0) : $user->status,
-        ]);
+            'branch_id' => $request->branch_id ?? $user->branch_id,
+            'status'  => $request->has('status') ? ($request->status === 'Active' || $request->status === 'aktif' || $request->status == 1 ? 'Active' : 'Inactive') : $user->status,
+        ];
+
+        if ($request->filled('password')) {
+            $updateData['password'] = Hash::make($request->password);
+        }
+
+        if ($request->filled('pos_pin')) {
+            $updateData['pos_pin'] = $request->pos_pin;
+        }
+
+        $user->update($updateData);
+
+        // Sync primary role if specified
+        if ($request->has('role')) {
+            $roleName = is_array($request->role) ? ($request->role[0] ?? null) : $request->role;
+            if ($roleName) {
+                $user->syncRoles([$roleName]);
+            }
+        }
 
         // Re-sync all branch-role assignments
         if ($request->has('assignments') && is_array($request->assignments)) {
@@ -369,24 +379,7 @@ class UserController extends Controller
             }
         }
 
-        $recentDevices = $user->tokens()
-            ->orderBy('last_used_at', 'desc')
-            ->take(5)
-            ->get()
-            ->map(function ($token) {
-                // Return structure for Vue component
-                // Define active as having been used in the last 15 minutes
-                $isActive = $token->last_used_at && $token->last_used_at->diffInMinutes(now()) <= 15;
-
-                return [
-                    'browser' => $token->name,
-                    'device' => $token->name,
-                    'recentActivity' => $token->last_used_at ? $token->last_used_at->diffForHumans() : '-',
-                    'isActive' => $isActive,
-                ];
-            });
-
-        return response()->json(['message' => 'User updated successfully', 'user' => $user]);
+        return response()->json(['message' => 'Data pengguna berhasil diperbarui.', 'user' => $user->fresh(['roles', 'branch'])]);
     }
 
     public function destroy(User $user)
@@ -423,18 +416,8 @@ class UserController extends Controller
     public function updateAssignments(Request $request, $id)
     {
         $admin = $request->user();
-        $hasPermission = $admin && (
-            $admin->can('Pengguna Write')
-            || $admin->can('Daftar Pengguna Write')
-            || $admin->can('Penugasan & PIN Write')
-            || $admin->can('Penugasan & PIN Create')
-            || $admin->can('manage users')
-            || $admin->can('manage all')
-            || $admin->can('*')
-        );
-
-        if (!$hasPermission) {
-            return response()->json(['message' => 'Anda tidak memiliki hak akses izin untuk mengubah penugasan cabang/jabatan pengguna.'], 403);
+        if (!$admin || (!$admin->can('Pengguna Write') && !$admin->can('Daftar Pengguna Write'))) {
+            return response()->json(['message' => 'Anda tidak memiliki hak akses izin untuk mengubah penugasan cabang pengguna.'], 403);
         }
 
         $user = User::findOrFail($id);
