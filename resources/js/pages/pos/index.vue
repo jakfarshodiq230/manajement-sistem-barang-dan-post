@@ -837,9 +837,21 @@ const addToCart = (productBranch, batch = null) => {
       snackbar.show(`Stok ${batch ? 'batch' : 'cabang'} tidak mencukupi (Maksimal: ${maxQty})`, 'warning')
     }
   } else {
-    const minNego = batch ? batch.min_nego_price : (productBranch.active_batch ? productBranch.active_batch.min_nego_price : productBranch.min_nego_price)
-    const sellingPrice = batch ? batch.price : (productBranch.active_batch ? productBranch.active_batch.price : productBranch.price)
-    
+    // Robust pricing fallback: Priority batch price (>0) -> active batch price (>0) -> branch price -> product price
+    const branchSellingPrice = Number(productBranch.price) || Number(productBranch.selling_price) || Number(productBranch.product?.price) || 0
+    const batchSellingPrice = (batch && Number(batch.price) > 0) ? Number(batch.price) : 0
+    const activeBatchSellingPrice = (productBranch.active_batch && Number(productBranch.active_batch.price) > 0) ? Number(productBranch.active_batch.price) : 0
+    const sellingPrice = batchSellingPrice > 0 ? batchSellingPrice : (activeBatchSellingPrice > 0 ? activeBatchSellingPrice : branchSellingPrice)
+
+    const branchMinNego = Number(productBranch.min_nego_price) || 0
+    const batchMinNego = (batch && Number(batch.min_nego_price) > 0) ? Number(batch.min_nego_price) : 0
+    const activeBatchMinNego = (productBranch.active_batch && Number(productBranch.active_batch.min_nego_price) > 0) ? Number(productBranch.active_batch.min_nego_price) : 0
+    const minNego = batchMinNego > 0 ? batchMinNego : (activeBatchMinNego > 0 ? activeBatchMinNego : branchMinNego)
+
+    const costPrice = (batch && Number(batch.cost_price) > 0) 
+      ? Number(batch.cost_price) 
+      : (Number(productBranch.cost_price) || 0)
+
     if (availableStock <= 3) {
       snackbar.show(`Peringatan: Stok ${productBranch.product?.name || 'produk'} menipis (Sisa: ${availableStock})`, 'warning')
     }
@@ -847,14 +859,16 @@ const addToCart = (productBranch, batch = null) => {
     cart.value.push({
       product_branch_id: productBranch.id,
       batch_id: batch ? batch.id : null,
-      name: productBranch.product.name + (batch ? ` (Batch #${batch.id})` : ''),
+      name: (productBranch.product?.name || productBranch.name || 'Produk') + (batch ? ` (Batch #${batch.id || batch.batch_number})` : ''),
+      sku: productBranch.product?.sku || productBranch.sku || '',
+      unit: productBranch.product?.unit || productBranch.unit || 'PCS',
       qty: 1,
       max_stock: availableStock,
-      cost_price: Math.round(productBranch.cost_price),
-      min_nego_price: Math.round(minNego || 0),
-      original_price: Math.round(sellingPrice || 0),
-      price: Math.round(sellingPrice || 0),
-      tax_percentage: productBranch.tax_percentage,
+      cost_price: Math.round(costPrice),
+      min_nego_price: Math.round(minNego),
+      original_price: Math.round(sellingPrice),
+      price: Math.round(sellingPrice),
+      tax_percentage: Number(productBranch.tax_percentage) || 0,
       tax_type: productBranch.product?.tax_type || 'Exclude PPN',
     })
   }
@@ -2425,8 +2439,8 @@ const startNewTransaction = () => {
                 </VListItemTitle>
                 <VListItemSubtitle class="mt-1">
                   Stok Tersedia: <strong>{{ batch.qty }}</strong> | 
-                  Harga Jual: <strong class="text-success">{{ formatRupiah(batch.price) }}</strong> | 
-                  Batas Nego: <strong>{{ formatRupiah(batch.min_nego_price) }}</strong> | 
+                  Harga Jual: <strong class="text-success">{{ formatRupiah(Number(batch.price) > 0 ? batch.price : (selectedProductForBatch?.price || selectedProductForBatch?.selling_price || 0)) }}</strong> | 
+                  Batas Nego: <strong>{{ formatRupiah(Number(batch.min_nego_price) > 0 ? batch.min_nego_price : (selectedProductForBatch?.min_nego_price || 0)) }}</strong> | 
                   Kadaluarsa: <strong>{{ batch.expiration_date || '-' }}</strong>
                 </VListItemSubtitle>
                 <template #append>
