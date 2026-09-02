@@ -16,6 +16,7 @@ class PayablePayment extends Model
         'payment_date',
         'amount',
         'payment_method',
+        'bank_account_id',
         'bank_name',
         'bank_account_number',
         'bank_account_name',
@@ -36,9 +37,19 @@ class PayablePayment extends Model
         return \Spatie\Activitylog\LogOptions::defaults()->logAll();
     }
 
+    public function bankAccount()
+    {
+        return $this->belongsTo(BankAccount::class);
+    }
+
     public function payableStatement()
     {
-        return $this->belongsTo(PayableStatement::class);
+        return $this->belongsTo(PayableStatement::class, 'payable_statement_id');
+    }
+
+    public function statement()
+    {
+        return $this->belongsTo(PayableStatement::class, 'payable_statement_id');
     }
 
     public function payable()
@@ -57,6 +68,11 @@ class PayablePayment extends Model
     }
 
     public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function user()
     {
         return $this->belongsTo(User::class, 'created_by');
     }

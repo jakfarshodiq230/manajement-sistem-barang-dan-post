@@ -30,6 +30,7 @@ class PayableController extends Controller
             'branch',
             'payables.purchaseOrder',
             'payables.goodsReceipt',
+            'payments.bankAccount',
             'payments.creator',
             'creator',
         ]);
@@ -159,14 +160,16 @@ class PayableController extends Controller
     {
         $statement = PayableStatement::with([
             'supplier',
-            'branch',
+            'branch.owner',
             'payables.purchaseOrder.items.product',
             'payables.goodsReceipt.purchaseOrder',
             'payables.goodsReceipt.items.productBranch.product',
             'payables.goodsReceipt.items.purchaseOrderItem.product',
             'payables.goodsReceipt.items.paymentAllocations',
             'payments.paymentItems.goodsReceiptItem',
+            'payments.bankAccount',
             'payments.creator',
+            'payments.user',
             'payments.supplierCredit',
             'creator',
         ])->findOrFail($id);
@@ -237,13 +240,14 @@ class PayableController extends Controller
      */
     public function recordPayment(Request $request, $id)
     {
-        $user = $request->user() ?: auth()->user();
+        $user = $request->user() ?: (auth('sanctum')->user() ?: (auth()->user() ?: \App\Models\User::first()));
         $statement = PayableStatement::findOrFail($id);
 
         $request->validate([
             'amount' => 'required|numeric|min:1|max:' . ($statement->remaining_amount + 0.01),
             'payment_date' => 'required|date',
             'payment_method' => 'required|in:bank_transfer,cash,giro_cheque,supplier_credit',
+            'bank_account_id' => 'nullable|exists:bank_accounts,id',
             'bank_name' => 'nullable|string|max:100',
             'bank_account_number' => 'nullable|string|max:100',
             'bank_account_name' => 'nullable|string|max:100',
@@ -274,6 +278,18 @@ class PayableController extends Controller
                 }
             }
 
+            $bankAccount = null;
+            if ($request->payment_method === 'bank_transfer' && $request->bank_account_id) {
+                $bankAccount = \App\Models\BankAccount::findOrFail($request->bank_account_id);
+                if ((float) $bankAccount->current_balance < $amount) {
+                    return response()->json([
+                        'message' => "Saldo rekening {$bankAccount->bank_name} ({$bankAccount->account_number}) tidak mencukupi. Tersedia: Rp " . number_format($bankAccount->current_balance, 0, ',', '.') . ", dibutuhkan: Rp " . number_format($amount, 0, ',', '.') . "."
+                    ], 422);
+                }
+                // Potong saldo bank rekening
+                $bankAccount->decrement('current_balance', $amount);
+            }
+
             // If using supplier credit compensation
             if ($request->payment_method === 'supplier_credit' && $request->supplier_credit_id) {
                 $credit = SupplierCredit::findOrFail($request->supplier_credit_id);
@@ -295,14 +311,15 @@ class PayableController extends Controller
                 'payment_date' => $request->payment_date,
                 'amount' => $amount,
                 'payment_method' => $request->payment_method,
-                'bank_name' => $request->bank_name,
-                'bank_account_number' => $request->bank_account_number,
-                'bank_account_name' => $request->bank_account_name,
+                'bank_account_id' => $bankAccount ? $bankAccount->id : null,
+                'bank_name' => $bankAccount ? $bankAccount->bank_name : $request->bank_name,
+                'bank_account_number' => $bankAccount ? $bankAccount->account_number : $request->bank_account_number,
+                'bank_account_name' => $bankAccount ? $bankAccount->account_name : $request->bank_account_name,
                 'reference_number' => $request->reference_number,
                 'proof_file' => $proofPath ? '/storage/' . $proofPath : null,
                 'supplier_credit_id' => $request->supplier_credit_id ?: null,
                 'notes' => $request->notes,
-                'created_by' => $user ? $user->id : null,
+                'created_by' => $user ? $user->id : 1,
             ]);
 
             // Item-level allocation
@@ -403,6 +420,14 @@ class PayableController extends Controller
 
         DB::beginTransaction();
         try {
+            // Revert bank account balance if paid via bank
+            if ($payment->bank_account_id && $payment->amount > 0) {
+                $bankAccount = \App\Models\BankAccount::find($payment->bank_account_id);
+                if ($bankAccount) {
+                    $bankAccount->increment('current_balance', $payment->amount);
+                }
+            }
+
             // Revert supplier credit if applicable
             if ($payment->payment_method === 'supplier_credit' && $payment->supplier_credit_id) {
                 $credit = SupplierCredit::find($payment->supplier_credit_id);
@@ -439,8 +464,8 @@ class PayableController extends Controller
             DB::commit();
 
             return response()->json([
-                'message' => 'Pembayaran tagihan bulanan berhasil dibatalkan.',
-                'statement' => $statement->load('payments'),
+                'message' => 'Pembayaran tagihan bulanan berhasil dibatalkan dan saldo bank dikembalikan.',
+                'statement' => $statement->load(['payments.bankAccount', 'payments.creator']),
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();

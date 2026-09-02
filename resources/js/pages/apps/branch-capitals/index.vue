@@ -15,6 +15,7 @@ const snackbar = useSnackbarStore()
 // State Data
 const transactions = ref([])
 const branches = ref([])
+const bankAccounts = ref([])
 const summary = ref({
   total_injected: 0,
   total_returned: 0,
@@ -63,6 +64,7 @@ const inflowForm = ref({
   amount: '',
   date: new Date().toISOString().substring(0, 10),
   payment_method: 'Transfer Bank',
+  bank_account_id: null,
   bank_name: '',
   account_number: '',
   account_name: '',
@@ -87,6 +89,7 @@ const outflowForm = ref({
   amount: '',
   date: new Date().toISOString().substring(0, 10),
   payment_method: 'Transfer Bank',
+  bank_account_id: null,
   bank_name: '',
   account_number: '',
   account_name: '',
@@ -103,6 +106,7 @@ const editForm = ref({
   amount: '',
   date: '',
   payment_method: 'Transfer Bank',
+  bank_account_id: null,
   bank_name: '',
   account_number: '',
   account_name: '',
@@ -114,6 +118,7 @@ const editForm = ref({
 // Form State 5: Approval Modal Penyaluran (Untuk Permintaan Injeksi)
 const approveForm = ref({
   payment_method: 'Transfer Bank',
+  bank_account_id: null,
   bank_name: '',
   account_number: '',
   account_name: '',
@@ -170,6 +175,27 @@ const fetchBranches = async () => {
   } catch (error) {
     console.error('Error fetching branches:', error)
     branches.value = []
+  }
+}
+
+// Fetch Active Bank Accounts
+const fetchBankAccounts = async () => {
+  try {
+    const res = await $api('/apps/bank-accounts', { query: { is_active: true, itemsPerPage: 100 } })
+    bankAccounts.value = res.data || (Array.isArray(res) ? res : [])
+  } catch (error) {
+    console.error('Error fetching bank accounts:', error)
+    bankAccounts.value = []
+  }
+}
+
+const onBankAccountChange = form => {
+  if (!form || !form.bank_account_id) return
+  const b = bankAccounts.value.find(acc => acc.id === form.bank_account_id)
+  if (b) {
+    form.bank_name = b.bank_name
+    form.account_number = b.account_number
+    form.account_name = b.account_name
   }
 }
 
@@ -274,6 +300,7 @@ const handleInflowSubmit = async () => {
     formData.append('amount', numericAmount)
     formData.append('date', inflowForm.value.date)
     formData.append('payment_method', inflowForm.value.payment_method)
+    if (inflowForm.value.bank_account_id) formData.append('bank_account_id', inflowForm.value.bank_account_id)
     if (inflowForm.value.bank_name) formData.append('bank_name', inflowForm.value.bank_name)
     if (inflowForm.value.account_number) formData.append('account_number', inflowForm.value.account_number)
     if (inflowForm.value.account_name) formData.append('account_name', inflowForm.value.account_name)
@@ -354,6 +381,7 @@ const handleOutflowSubmit = async () => {
     formData.append('amount', numericAmount)
     formData.append('date', outflowForm.value.date)
     formData.append('payment_method', outflowForm.value.payment_method)
+    if (outflowForm.value.bank_account_id) formData.append('bank_account_id', outflowForm.value.bank_account_id)
     if (outflowForm.value.bank_name) formData.append('bank_name', outflowForm.value.bank_name)
     if (outflowForm.value.account_number) formData.append('account_number', outflowForm.value.account_number)
     if (outflowForm.value.account_name) formData.append('account_name', outflowForm.value.account_name)
@@ -388,6 +416,7 @@ const openEditDrawer = item => {
     amount: formatInputRupiah(item.amount),
     date: item.date ? item.date.substring(0, 10) : new Date().toISOString().substring(0, 10),
     payment_method: item.payment_method || 'Transfer Bank',
+    bank_account_id: item.bank_account_id || null,
     bank_name: item.bank_name || '',
     account_number: item.account_number || '',
     account_name: item.account_name || '',
@@ -414,6 +443,7 @@ const handleEditSubmit = async () => {
     formData.append('amount', numericAmount)
     formData.append('date', editForm.value.date)
     formData.append('payment_method', editForm.value.payment_method)
+    if (editForm.value.bank_account_id) formData.append('bank_account_id', editForm.value.bank_account_id)
     if (editForm.value.bank_name) formData.append('bank_name', editForm.value.bank_name)
     if (editForm.value.account_number) formData.append('account_number', editForm.value.account_number)
     if (editForm.value.account_name) formData.append('account_name', editForm.value.account_name)
@@ -440,11 +470,13 @@ const handleEditSubmit = async () => {
 // Approve Transaction
 const confirmApprove = item => {
   selectedTransaction.value = item
+  const defaultBank = bankAccounts.value.find(b => b.is_default) || bankAccounts.value[0] || null
   approveForm.value = {
     payment_method: item.payment_method || 'Transfer Bank',
-    bank_name: item.bank_name || '',
-    account_number: item.account_number || '',
-    account_name: item.account_name || '',
+    bank_account_id: item.bank_account_id || (defaultBank ? defaultBank.id : null),
+    bank_name: item.bank_name || (defaultBank ? defaultBank.bank_name : ''),
+    account_number: item.account_number || (defaultBank ? defaultBank.account_number : ''),
+    account_name: item.account_name || (defaultBank ? defaultBank.account_name : ''),
     proof_file: null,
   }
   isApproveDialogVisible.value = true
@@ -456,6 +488,7 @@ const handleApprove = async () => {
   try {
     const formData = new FormData()
     if (approveForm.value.payment_method) formData.append('payment_method', approveForm.value.payment_method)
+    if (approveForm.value.bank_account_id) formData.append('bank_account_id', approveForm.value.bank_account_id)
     if (approveForm.value.bank_name) formData.append('bank_name', approveForm.value.bank_name)
     if (approveForm.value.account_number) formData.append('account_number', approveForm.value.account_number)
     if (approveForm.value.account_name) formData.append('account_name', approveForm.value.account_name)
@@ -682,15 +715,17 @@ const previewProof = item => {
 
 // Reset form helpers
 const resetInflowForm = () => {
+  const defaultBank = bankAccounts.value.find(b => b.is_default) || bankAccounts.value[0] || null
   inflowForm.value = {
     branch_id: branches.value[0]?.id || null,
     category: 'Modal Awal',
     amount: '',
     date: new Date().toISOString().substring(0, 10),
     payment_method: 'Transfer Bank',
-    bank_name: '',
-    account_number: '',
-    account_name: '',
+    bank_account_id: defaultBank ? defaultBank.id : null,
+    bank_name: defaultBank ? defaultBank.bank_name : '',
+    account_number: defaultBank ? defaultBank.account_number : '',
+    account_name: defaultBank ? defaultBank.account_name : '',
     proof_file: null,
     notes: '',
   }
@@ -708,26 +743,40 @@ const resetRequestForm = () => {
 }
 
 const resetOutflowForm = () => {
+  const defaultBank = bankAccounts.value.find(b => b.is_default) || bankAccounts.value[0] || null
   outflowForm.value = {
     branch_id: branches.value[0]?.id || null,
     category: 'Setoran Laba Closing Shift',
     amount: '',
     date: new Date().toISOString().substring(0, 10),
     payment_method: 'Transfer Bank',
-    bank_name: '',
-    account_number: '',
-    account_name: '',
+    bank_account_id: defaultBank ? defaultBank.id : null,
+    bank_name: defaultBank ? defaultBank.bank_name : '',
+    account_number: defaultBank ? defaultBank.account_number : '',
+    account_name: defaultBank ? defaultBank.account_name : '',
     proof_file: null,
     notes: '',
   }
 }
 
 onMounted(async () => {
-  await fetchBranches()
+  await Promise.all([fetchBranches(), fetchBankAccounts()])
   if (branches.value.length > 0) {
     inflowForm.value.branch_id = branches.value[0].id
     requestForm.value.branch_id = branches.value[0].id
     outflowForm.value.branch_id = branches.value[0].id
+  }
+  const defaultBank = bankAccounts.value.find(b => b.is_default) || bankAccounts.value[0] || null
+  if (defaultBank) {
+    inflowForm.value.bank_account_id = defaultBank.id
+    inflowForm.value.bank_name = defaultBank.bank_name
+    inflowForm.value.account_number = defaultBank.account_number
+    inflowForm.value.account_name = defaultBank.account_name
+
+    outflowForm.value.bank_account_id = defaultBank.id
+    outflowForm.value.bank_name = defaultBank.bank_name
+    outflowForm.value.account_number = defaultBank.account_number
+    outflowForm.value.account_name = defaultBank.account_name
   }
   fetchSummary()
   fetchTransactions()
@@ -1074,12 +1123,20 @@ onMounted(async () => {
 
               <!-- Method & Bank -->
               <td>
-                <div class="d-flex align-center gap-1 text-body-2">
-                  <VIcon :icon="item.payment_method === 'Kas Tunai' ? 'ri-money-dollar-circle-line' : 'ri-bank-card-line'" size="16" />
-                  <span>{{ item.payment_method }}</span>
+                <div v-if="item.payment_method === 'Kas Tunai' || item.payment_method === 'cash'" class="d-flex align-center gap-1">
+                  <VChip size="small" color="success" variant="tonal" class="font-weight-medium">
+                    <VIcon icon="ri-money-dollar-circle-line" start size="14" />
+                    Kas Tunai
+                  </VChip>
                 </div>
-                <div v-if="item.bank_name" class="text-caption text-medium-emphasis">
-                  {{ item.bank_name }} - {{ item.account_number || '-' }}
+                <div v-else class="d-flex flex-column gap-1">
+                  <VChip size="small" color="primary" variant="tonal" class="font-weight-medium">
+                    <VIcon icon="ri-bank-card-line" start size="14" />
+                    {{ item.bankAccount?.bank_name || item.bank_name || 'Transfer Bank' }}
+                  </VChip>
+                  <span v-if="item.bankAccount?.account_number || item.account_number" class="text-caption text-medium-emphasis">
+                    {{ item.bankAccount?.account_number || item.account_number }} ({{ item.bankAccount?.account_name || item.account_name || '-' }})
+                  </span>
                 </div>
               </td>
 
@@ -1329,40 +1386,65 @@ onMounted(async () => {
 
               <!-- Metode Pembayaran -->
               <VCol cols="12">
-                <VSelect
+                <VLabel class="mb-1 font-weight-bold text-body-2">Metode Penyaluran Modal *</VLabel>
+                <VRadioGroup
                   v-model="inflowForm.payment_method"
-                  :items="['Transfer Bank', 'Kas Tunai', 'Cek / Bilyet Giro']"
-                  label="Metode Penyaluran Modal *"
+                  inline
                   density="compact"
-                  variant="outlined"
-                />
+                >
+                  <VRadio value="Transfer Bank">
+                    <template #label>
+                      <div class="d-flex align-center gap-1 text-body-2">
+                        <VIcon icon="ri-bank-card-line" size="18" color="primary" />
+                        <span>Transfer Bank</span>
+                      </div>
+                    </template>
+                  </VRadio>
+                  <VRadio value="Kas Tunai">
+                    <template #label>
+                      <div class="d-flex align-center gap-1 text-body-2">
+                        <VIcon icon="ri-money-dollar-circle-line" size="18" color="success" />
+                        <span>Kas Tunai</span>
+                      </div>
+                    </template>
+                  </VRadio>
+                </VRadioGroup>
               </VCol>
 
               <!-- Bank & Rekening Sumber -->
               <VCol cols="12" v-if="inflowForm.payment_method === 'Transfer Bank'">
-                <VTextField
-                  v-model="inflowForm.bank_name"
-                  label="Nama Bank Pengirim (Owner)"
-                  placeholder="BCA / Mandiri / BRI"
+                <VSelect
+                  v-model="inflowForm.bank_account_id"
+                  :items="bankAccounts"
+                  item-value="id"
+                  :item-title="item => `${item.bank_name} - ${item.account_number} (${item.account_name}) [Saldo: ${formatCurrency(item.current_balance)}]`"
+                  label="Pilih Rekening Bank Sumber (Owner) *"
                   density="compact"
                   variant="outlined"
+                  placeholder="Pilih rekening bank sumber owner"
                   class="mb-2"
+                  @update:model-value="() => onBankAccountChange(inflowForm)"
                 />
-                <VTextField
-                  v-model="inflowForm.account_number"
-                  label="Nomor Rekening Pengirim"
-                  placeholder="1234567890"
+                <VAlert
+                  type="info"
+                  variant="tonal"
                   density="compact"
-                  variant="outlined"
-                  class="mb-2"
-                />
-                <VTextField
-                  v-model="inflowForm.account_name"
-                  label="Atas Nama Rekening"
-                  placeholder="PT / Nama Owner"
+                  class="text-caption mb-0"
+                  icon="ri-information-line"
+                >
+                  Saldo rekening bank yang dipilih akan <strong>otomatis terpotong</strong> saat penyaluran modal ini disimpan.
+                </VAlert>
+              </VCol>
+              <VCol cols="12" v-else-if="inflowForm.payment_method === 'Kas Tunai'">
+                <VAlert
+                  type="success"
+                  variant="tonal"
                   density="compact"
-                  variant="outlined"
-                />
+                  class="text-caption mb-0"
+                  icon="ri-checkbox-circle-line"
+                >
+                  Modal diserahkan secara tunai langsung ke kas fisik cabang.
+                </VAlert>
               </VCol>
 
               <!-- Bukti Transfer -->
@@ -1671,40 +1753,65 @@ onMounted(async () => {
 
               <!-- Metode Pembayaran -->
               <VCol cols="12">
-                <VSelect
+                <VLabel class="mb-1 font-weight-bold text-body-2">Metode Setoran Modal *</VLabel>
+                <VRadioGroup
                   v-model="outflowForm.payment_method"
-                  :items="['Transfer Bank', 'Kas Tunai']"
-                  label="Metode Setoran *"
+                  inline
                   density="compact"
-                  variant="outlined"
-                />
+                >
+                  <VRadio value="Transfer Bank">
+                    <template #label>
+                      <div class="d-flex align-center gap-1 text-body-2">
+                        <VIcon icon="ri-bank-card-line" size="18" color="primary" />
+                        <span>Transfer Bank</span>
+                      </div>
+                    </template>
+                  </VRadio>
+                  <VRadio value="Kas Tunai">
+                    <template #label>
+                      <div class="d-flex align-center gap-1 text-body-2">
+                        <VIcon icon="ri-money-dollar-circle-line" size="18" color="success" />
+                        <span>Kas Tunai Toko</span>
+                      </div>
+                    </template>
+                  </VRadio>
+                </VRadioGroup>
               </VCol>
 
               <!-- Bank & Rekening Tujuan Owner -->
               <VCol cols="12" v-if="outflowForm.payment_method === 'Transfer Bank'">
-                <VTextField
-                  v-model="outflowForm.bank_name"
-                  label="Bank Tujuan Owner"
-                  placeholder="BCA / Mandiri"
+                <VSelect
+                  v-model="outflowForm.bank_account_id"
+                  :items="bankAccounts"
+                  item-value="id"
+                  :item-title="item => `${item.bank_name} - ${item.account_number} (${item.account_name})`"
+                  label="Pilih Rekening Bank Tujuan Owner *"
                   density="compact"
                   variant="outlined"
+                  placeholder="Pilih rekening bank tujuan owner"
                   class="mb-2"
+                  @update:model-value="() => onBankAccountChange(outflowForm)"
                 />
-                <VTextField
-                  v-model="outflowForm.account_number"
-                  label="No. Rekening Tujuan Owner"
-                  placeholder="1234567890"
+                <VAlert
+                  type="info"
+                  variant="tonal"
                   density="compact"
-                  variant="outlined"
-                  class="mb-2"
-                />
-                <VTextField
-                  v-model="outflowForm.account_name"
-                  label="Atas Nama Rekening Owner"
-                  placeholder="Nama Pemilik Rekening"
+                  class="text-caption mb-0"
+                  icon="ri-information-line"
+                >
+                  Saldo rekening bank Owner akan <strong>otomatis bertambah</strong> begitu setoran disetujui.
+                </VAlert>
+              </VCol>
+              <VCol cols="12" v-else-if="outflowForm.payment_method === 'Kas Tunai'">
+                <VAlert
+                  type="warning"
+                  variant="tonal"
                   density="compact"
-                  variant="outlined"
-                />
+                  class="text-caption mb-0"
+                  icon="ri-information-line"
+                >
+                  Setoran tunai akan <strong>otomatis memotong saldo Kas Toko / Kas Kecil</strong> cabang begitu disetujui Owner.
+                </VAlert>
               </VCol>
 
               <!-- Bukti Transfer -->
@@ -1830,35 +1937,42 @@ onMounted(async () => {
 
               <!-- Metode & Bank -->
               <VCol cols="12">
-                <VSelect
+                <VLabel class="mb-1 font-weight-bold text-body-2">Metode Pembayaran *</VLabel>
+                <VRadioGroup
                   v-model="editForm.payment_method"
-                  :items="['Transfer Bank', 'Kas Tunai', 'Cek / Bilyet Giro']"
-                  label="Metode Pembayaran *"
+                  inline
                   density="compact"
-                  variant="outlined"
-                />
+                >
+                  <VRadio value="Transfer Bank">
+                    <template #label>
+                      <div class="d-flex align-center gap-1 text-body-2">
+                        <VIcon icon="ri-bank-card-line" size="18" color="primary" />
+                        <span>Transfer Bank</span>
+                      </div>
+                    </template>
+                  </VRadio>
+                  <VRadio value="Kas Tunai">
+                    <template #label>
+                      <div class="d-flex align-center gap-1 text-body-2">
+                        <VIcon icon="ri-money-dollar-circle-line" size="18" color="success" />
+                        <span>Kas Tunai</span>
+                      </div>
+                    </template>
+                  </VRadio>
+                </VRadioGroup>
               </VCol>
 
               <VCol cols="12" v-if="editForm.payment_method === 'Transfer Bank'">
-                <VTextField
-                  v-model="editForm.bank_name"
-                  label="Nama Bank"
+                <VSelect
+                  v-model="editForm.bank_account_id"
+                  :items="bankAccounts"
+                  item-value="id"
+                  :item-title="item => `${item.bank_name} - ${item.account_number} (${item.account_name})`"
+                  label="Pilih Rekening Bank *"
                   density="compact"
                   variant="outlined"
                   class="mb-2"
-                />
-                <VTextField
-                  v-model="editForm.account_number"
-                  label="Nomor Rekening"
-                  density="compact"
-                  variant="outlined"
-                  class="mb-2"
-                />
-                <VTextField
-                  v-model="editForm.account_name"
-                  label="Atas Nama Rekening"
-                  density="compact"
-                  variant="outlined"
+                  @update:model-value="() => onBankAccountChange(editForm)"
                 />
               </VCol>
 
@@ -1943,24 +2057,40 @@ onMounted(async () => {
             </div>
           </VCard>
 
-          <!-- Extra Input for Injection Request Funding -->
+          <!-- Extra Input for Injection Request Funding / Return Confirmation -->
           <div v-if="selectedTransaction?.type === 'injection'">
-            <div class="text-subtitle-2 font-weight-bold mb-2">Informasi Transfer Penyaluran Owner (Opsional):</div>
-            <VTextField
-              v-model="approveForm.bank_name"
-              label="Bank Pengirim Owner"
-              placeholder="BCA / Mandiri"
+            <div class="text-subtitle-2 font-weight-bold mb-2">Penyaluran Dana Modal (Owner):</div>
+            <VRadioGroup
+              v-model="approveForm.payment_method"
+              inline
               density="compact"
-              variant="outlined"
               class="mb-2"
-            />
-            <VTextField
-              v-model="approveForm.account_number"
-              label="No. Rekening Pengirim"
-              density="compact"
-              variant="outlined"
-              class="mb-2"
-            />
+            >
+              <VRadio value="Transfer Bank" label="Transfer Bank (Rekening)" />
+              <VRadio value="Kas Tunai" label="Kas Tunai" />
+            </VRadioGroup>
+            <div v-if="approveForm.payment_method === 'Transfer Bank'">
+              <VSelect
+                v-model="approveForm.bank_account_id"
+                :items="bankAccounts"
+                item-value="id"
+                :item-title="item => `${item.bank_name} - ${item.account_number} (${item.account_name}) [Saldo: ${formatCurrency(item.current_balance)}]`"
+                label="Rekening Bank Sumber (Owner) *"
+                density="compact"
+                variant="outlined"
+                class="mb-2"
+                @update:model-value="() => onBankAccountChange(approveForm)"
+              />
+              <VAlert
+                type="info"
+                variant="tonal"
+                density="compact"
+                class="text-caption mb-3"
+                icon="ri-information-line"
+              >
+                Saldo rekening bank ini akan <strong>otomatis terpotong</strong> sebesar nominal modal.
+              </VAlert>
+            </div>
             <VFileInput
               v-model="approveForm.proof_file"
               label="Lampirkan Struk Transfer Penyaluran Dana"
@@ -1970,6 +2100,28 @@ onMounted(async () => {
               prepend-inner-icon="ri-attachment-line"
               accept="image/*,application/pdf"
             />
+          </div>
+          <div v-else>
+            <VAlert
+              v-if="selectedTransaction?.payment_method === 'Kas Tunai' || selectedTransaction?.payment_method === 'cash'"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="text-caption mb-0"
+              icon="ri-information-line"
+            >
+              Setoran tunai ini akan <strong>otomatis memotong kas fisik / petty cash</strong> cabang saat disetujui.
+            </VAlert>
+            <VAlert
+              v-else
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="text-caption mb-0"
+              icon="ri-information-line"
+            >
+              Setoran transfer bank ini akan <strong>otomatis menambah saldo rekening bank Owner</strong> ({{ selectedTransaction?.bankAccount?.bank_name || selectedTransaction?.bank_name || 'Bank' }}).
+            </VAlert>
           </div>
         </VCardText>
 
@@ -2174,9 +2326,9 @@ onMounted(async () => {
               <span class="text-medium-emphasis d-block">Metode:</span>
               <strong>{{ selectedTransaction.payment_method }}</strong>
             </VCol>
-            <VCol cols="6" class="py-1" v-if="selectedTransaction.bank_name">
-              <span class="text-medium-emphasis d-block">Rekening:</span>
-              <strong>{{ selectedTransaction.bank_name }} - {{ selectedTransaction.account_number || '-' }}</strong>
+            <VCol cols="6" class="py-1" v-if="selectedTransaction.bank_name || selectedTransaction.bankAccount">
+              <span class="text-medium-emphasis d-block">Rekening Bank:</span>
+              <strong>{{ selectedTransaction.bankAccount?.bank_name || selectedTransaction.bank_name }} - {{ selectedTransaction.bankAccount?.account_number || selectedTransaction.account_number || '-' }} ({{ selectedTransaction.bankAccount?.account_name || selectedTransaction.account_name || '-' }})</strong>
             </VCol>
           </VRow>
 

@@ -192,6 +192,13 @@ const openTrackingDialog = async mutasi => {
   isTrackingDialogVisible.value = true
 }
 
+const onRowClick = (event, { item }) => {
+  if (event.target.closest('button') || event.target.closest('a') || event.target.closest('.v-btn')) {
+    return
+  }
+  openTrackingDialog(item)
+}
+
 // Open Prepare / Checklist Dialog (Tahap 2)
 const openPrepareDialog = async mutasi => {
   try {
@@ -675,11 +682,11 @@ const printDeliveryNote = () => {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Surat Jalan Mutasi - ${deliveryNoteData.value?.reference_no || 'Document'}</title>
+      <title></title>
       <style>
         @page {
           size: auto;
-          margin: 4mm 6mm;
+          margin: 0 !important;
         }
         * {
           box-sizing: border-box;
@@ -692,7 +699,8 @@ const printDeliveryNote = () => {
           background: #fff;
           font-size: ${fontSize};
           line-height: 1.25;
-          padding: 4mm;
+          padding: 4mm 6mm;
+          margin: 0;
         }
         .header-section {
           border-bottom: 2px solid #000;
@@ -950,8 +958,9 @@ const printDeliveryNote = () => {
         :items="mutasiList"
         :items-length="totalItems"
         :loading="isLoading"
-        class="text-no-wrap"
+        class="text-no-wrap clickable-rows-table"
         @update:options="fetchData"
+        @click:row="onRowClick"
       >
         <template #item.reference_no="{ item }">
           <a
@@ -2293,6 +2302,15 @@ const printDeliveryNote = () => {
 </template>
 
 <style>
+.clickable-rows-table tbody tr {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.clickable-rows-table tbody tr:hover {
+  background-color: rgba(var(--v-theme-primary), 0.05) !important;
+}
+
 .qr-sig-hover {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }

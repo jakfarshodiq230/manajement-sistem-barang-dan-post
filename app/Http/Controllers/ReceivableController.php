@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Receivable;
 use App\Models\ReceivablePayment;
+use App\Models\BankAccount;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -11,7 +12,7 @@ class ReceivableController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Receivable::with(['customer', 'sale.branch', 'sale.user']);
+        $query = Receivable::with(['customer', 'sale.branch.owner', 'sale.user']);
 
         if ($request->has('status') && !empty($request->status)) {
             $query->where('status', $request->status);
@@ -91,7 +92,7 @@ class ReceivableController extends Controller
 
     public function show(Receivable $receivable)
     {
-        $receivable->load(['customer', 'sale.items.productBranch.product', 'payments.user']);
+        $receivable->load(['customer', 'sale.branch.owner', 'sale.items.productBranch.product', 'payments.user', 'payments.bankAccount']);
         return response()->json($receivable);
     }
 
@@ -99,27 +100,30 @@ class ReceivableController extends Controller
     {
         $validated = $request->validate([
             'amount' => 'required|numeric|min:1',
-            'payment_method' => 'required|string',
+            'payment_method' => 'required|string|in:cash,transfer,bank_transfer,qris,giro_cheque,other',
+            'bank_account_id' => 'nullable|exists:bank_accounts,id',
             'payment_date' => 'required|date',
             'payment_proof' => 'nullable|image|max:5120',
-            'bank_name' => 'nullable|string',
-            'bank_account_number' => 'nullable|string',
-            'bank_account_name' => 'nullable|string',
-            'transfer_phone_number' => 'nullable|string',
+            'bank_name' => 'nullable|string|max:100',
+            'bank_account_number' => 'nullable|string|max:100',
+            'bank_account_name' => 'nullable|string|max:100',
+            'transfer_phone_number' => 'nullable|string|max:100',
         ]);
 
         if ($receivable->status === 'paid') {
-            return response()->json(['message' => 'This receivable is already fully paid.'], 400);
+            return response()->json(['message' => 'Piutang ini sudah lunas seluruhnya.'], 400);
         }
 
         $remainingBalance = $receivable->amount_due - $receivable->amount_paid;
         
-        if ($validated['amount'] > $remainingBalance) {
+        if ($validated['amount'] > ($remainingBalance + 0.01)) {
             return response()->json([
-                'message' => 'Payment amount cannot exceed remaining balance.',
+                'message' => 'Nominal pembayaran tidak boleh melebihi sisa piutang.',
                 'remaining' => $remainingBalance
-            ], 400);
+            ], 422);
         }
+
+        $user = $request->user() ?: (auth('sanctum')->user() ?: (auth()->user() ?: \App\Models\User::first()));
 
         DB::beginTransaction();
         try {
@@ -128,24 +132,34 @@ class ReceivableController extends Controller
                 $proofPath = $request->file('payment_proof')->store('payment_proofs', 'public');
             }
 
+            // Jika pembayaran non-tunai (Transfer Bank / QRIS), update & tambah saldo rekening bank
+            $bankAccount = null;
+            if ($request->filled('bank_account_id')) {
+                $bankAccount = BankAccount::find($request->bank_account_id);
+                if ($bankAccount) {
+                    $bankAccount->increment('current_balance', $validated['amount']);
+                }
+            }
+
             // Create payment record
             $payment = ReceivablePayment::create([
                 'receivable_id' => $receivable->id,
                 'payment_date' => $validated['payment_date'],
                 'amount' => $validated['amount'],
                 'payment_method' => $validated['payment_method'],
-                'payment_proof' => $proofPath,
-                'bank_name' => $validated['bank_name'] ?? null,
-                'bank_account_number' => $validated['bank_account_number'] ?? null,
-                'bank_account_name' => $validated['bank_account_name'] ?? null,
+                'bank_account_id' => $bankAccount ? $bankAccount->id : null,
+                'payment_proof' => $proofPath ? '/storage/' . $proofPath : null,
+                'bank_name' => $bankAccount ? $bankAccount->bank_name : ($validated['bank_name'] ?? null),
+                'bank_account_number' => $bankAccount ? $bankAccount->account_number : ($validated['bank_account_number'] ?? null),
+                'bank_account_name' => $bankAccount ? $bankAccount->account_name : ($validated['bank_account_name'] ?? null),
                 'transfer_phone_number' => $validated['transfer_phone_number'] ?? null,
-                'user_id' => auth()->id(),
+                'user_id' => $user ? $user->id : 1,
             ]);
 
             // Update receivable amounts and status
             $receivable->amount_paid += $validated['amount'];
             
-            if ($receivable->amount_paid >= $receivable->amount_due) {
+            if ($receivable->amount_paid >= ($receivable->amount_due - 0.01)) {
                 $receivable->status = 'paid';
             } else {
                 $receivable->status = 'partial';
@@ -157,20 +171,20 @@ class ReceivableController extends Controller
 
             // Auto-send Receipt Email jika pelanggan memiliki email
             try {
-                \App\Services\EmailNotificationService::sendReceivableReceipt($payment, null, 'automatic', auth()->id());
+                \App\Services\EmailNotificationService::sendReceivableReceipt($payment, null, 'automatic', $user ? $user->id : 1);
             } catch (\Throwable $mailEx) {
                 \Log::warning("Auto receipt email warning: " . $mailEx->getMessage());
             }
 
             return response()->json([
-                'message' => 'Payment processed successfully.',
-                'payment' => $payment,
-                'receivable' => $receivable
+                'message' => 'Pembayaran piutang berhasil diproses dan saldo telah diperbarui.',
+                'payment' => $payment->load(['user', 'bankAccount']),
+                'receivable' => $receivable->load(['customer', 'sale.branch.owner', 'sale.items.productBranch.product', 'payments.user', 'payments.bankAccount'])
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Failed to process payment.', 'error' => $e->getMessage()], 500);
+            return response()->json(['message' => 'Gagal memproses pembayaran piutang: ' . $e->getMessage()], 500);
         }
     }
 
@@ -256,7 +270,6 @@ class ReceivableController extends Controller
     public function destroy(Request $request, Receivable $receivable)
     {
         // Delete Receivable will actually void the entire Sale transaction.
-        // We will call the SaleController's destroy logic.
         $sale = $receivable->sale;
         
         if ($sale) {

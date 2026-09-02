@@ -26,6 +26,7 @@ class BranchCapitalController extends Controller
             'user:id,name',
             'approvedBy:id,name',
             'cashShift:id,opened_at,closed_at,actual_cash',
+            'bankAccount:id,bank_name,account_number,account_name,type,current_balance',
         ]);
 
         // Branch isolation: if non-global user, scope to their branch
@@ -61,6 +62,10 @@ class BranchCapitalController extends Controller
                   ->orWhere('account_name', 'like', "%{$search}%")
                   ->orWhereHas('branch', function ($b) use ($search) {
                       $b->where('name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('bankAccount', function ($ba) use ($search) {
+                      $ba->where('bank_name', 'like', "%{$search}%")
+                        ->orWhere('account_number', 'like', "%{$search}%");
                   });
             });
         }
@@ -163,10 +168,11 @@ class BranchCapitalController extends Controller
             'amount' => 'required|numeric|min:1',
             'date' => 'required|date',
             'payment_method' => 'required|string|max:50',
+            'bank_account_id' => 'nullable|exists:bank_accounts,id',
             'bank_name' => 'nullable|string|max:100',
             'account_number' => 'nullable|string|max:50',
             'account_name' => 'nullable|string|max:100',
-            'proof_file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
+            'proof_file' => 'nullable|file|mimes:jpg,jpeg,png,pdf,webp|max:5120',
             'notes' => 'nullable|string|max:1000',
             'cash_shift_id' => 'nullable|exists:cash_shifts,id',
         ]);
@@ -187,6 +193,21 @@ class BranchCapitalController extends Controller
         $approvedBy = $status === 'approved' ? $user->id : null;
         $approvedAt = $status === 'approved' ? Carbon::now() : null;
 
+        // Auto-fill bank details if bank_account_id is provided
+        $bankAccountId = $request->bank_account_id;
+        $bankName = $request->bank_name;
+        $accountNumber = $request->account_number;
+        $accountName = $request->account_name;
+
+        if ($bankAccountId) {
+            $bank = \App\Models\BankAccount::find($bankAccountId);
+            if ($bank) {
+                $bankName = $bankName ?: $bank->bank_name;
+                $accountNumber = $accountNumber ?: $bank->account_number;
+                $accountName = $accountName ?: $bank->account_name;
+            }
+        }
+
         $capital = BranchCapital::create([
             'reference_no' => $referenceNo,
             'branch_id' => $request->branch_id,
@@ -197,15 +218,30 @@ class BranchCapitalController extends Controller
             'amount' => $request->amount,
             'date' => $request->date,
             'payment_method' => $request->payment_method,
-            'bank_name' => $request->bank_name,
-            'account_number' => $request->account_number,
-            'account_name' => $request->account_name,
+            'bank_account_id' => $bankAccountId,
+            'bank_name' => $bankName,
+            'account_number' => $accountNumber,
+            'account_name' => $accountName,
             'proof_file' => $proofPath,
             'notes' => $request->notes,
             'status' => $status,
             'approved_by' => $approvedBy,
             'approved_at' => $approvedAt,
         ]);
+
+        // If direct injection from owner via Bank is approved, deduct owner's bank account
+        $isBank = in_array(strtolower($capital->payment_method ?? ''), ['transfer', 'transfer bank', 'bank_transfer', 'qris']);
+        if ($capital->type === 'injection' && $status === 'approved' && $isBank) {
+            $bank = null;
+            if ($capital->bank_account_id) {
+                $bank = \App\Models\BankAccount::find($capital->bank_account_id);
+            } elseif ($capital->bank_name) {
+                $bank = \App\Models\BankAccount::where('bank_name', $capital->bank_name)->where('is_active', true)->first();
+            }
+            if ($bank) {
+                $bank->decrement('current_balance', $capital->amount);
+            }
+        }
 
         $branch = Branch::find($request->branch_id);
         $branchName = $branch ? $branch->name : 'Cabang';
@@ -265,7 +301,7 @@ class BranchCapitalController extends Controller
 
         return response()->json([
             'message' => $message,
-            'capital' => $capital->load(['branch:id,name', 'user:id,name']),
+            'capital' => $capital->load(['branch:id,name', 'user:id,name', 'bankAccount:id,bank_name,account_number,account_name']),
         ], 201);
     }
 
@@ -285,15 +321,20 @@ class BranchCapitalController extends Controller
         if ($request->filled('payment_method')) {
             $dataToUpdate['payment_method'] = $request->payment_method;
         }
-        if ($request->filled('bank_name')) {
+        if ($request->filled('bank_account_id')) {
+            $dataToUpdate['bank_account_id'] = $request->bank_account_id;
+            $b = \App\Models\BankAccount::find($request->bank_account_id);
+            if ($b) {
+                $dataToUpdate['bank_name'] = $b->bank_name;
+                $dataToUpdate['account_number'] = $b->account_number;
+                $dataToUpdate['account_name'] = $b->account_name;
+            }
+        } elseif ($request->filled('bank_name')) {
             $dataToUpdate['bank_name'] = $request->bank_name;
+            if ($request->filled('account_number')) $dataToUpdate['account_number'] = $request->account_number;
+            if ($request->filled('account_name')) $dataToUpdate['account_name'] = $request->account_name;
         }
-        if ($request->filled('account_number')) {
-            $dataToUpdate['account_number'] = $request->account_number;
-        }
-        if ($request->filled('account_name')) {
-            $dataToUpdate['account_name'] = $request->account_name;
-        }
+
         if ($request->hasFile('proof_file')) {
             if ($capital->proof_file) {
                 Storage::disk('public')->delete($capital->proof_file);
@@ -302,6 +343,57 @@ class BranchCapitalController extends Controller
         }
 
         $capital->update($dataToUpdate);
+
+        $isBank = in_array(strtolower($capital->payment_method ?? ''), ['transfer', 'transfer bank', 'bank_transfer', 'qris']);
+        $isCash = in_array(strtolower($capital->payment_method ?? ''), ['cash', 'tunai', 'kas']);
+
+        if ($capital->type === 'injection') {
+            // Injeksi modal disetujui: jika via Bank, potong saldo rekening bank Owner
+            if ($isBank || $capital->bank_account_id) {
+                $bank = null;
+                if ($capital->bank_account_id) {
+                    $bank = \App\Models\BankAccount::find($capital->bank_account_id);
+                } elseif ($capital->bank_name) {
+                    $bank = \App\Models\BankAccount::where('bank_name', $capital->bank_name)->where('is_active', true)->first();
+                }
+                if ($bank) {
+                    $bank->decrement('current_balance', $capital->amount);
+                }
+            }
+        } else {
+            // Pengembalian modal (return) disetujui:
+            if ($isBank || $capital->bank_account_id) {
+                // Via Bank: saldo bank Owner bertambah
+                $bank = null;
+                if ($capital->bank_account_id) {
+                    $bank = \App\Models\BankAccount::find($capital->bank_account_id);
+                } elseif ($capital->bank_name) {
+                    $bank = \App\Models\BankAccount::where('bank_name', $capital->bank_name)->where('is_active', true)->first();
+                }
+                if (!$bank) {
+                    $bank = \App\Models\BankAccount::where('is_default', true)->where('is_active', true)->first();
+                }
+                if ($bank) {
+                    $bank->increment('current_balance', $capital->amount);
+                }
+            } elseif ($isCash) {
+                // Via Tunai: potong kas kecil cabang otomatis
+                try {
+                    \App\Models\PettyCash::create([
+                        'branch_id' => $capital->branch_id,
+                        'user_id' => $capital->user_id,
+                        'cash_shift_id' => $capital->cash_shift_id,
+                        'category' => 'Pengembalian Modal / ROI',
+                        'payment_method' => 'cash',
+                        'amount' => $capital->amount,
+                        'description' => 'Setoran Pengembalian Modal / ROI ke Owner (' . $capital->reference_no . ')',
+                        'date' => $capital->date ?: Carbon::now()->toDateString(),
+                    ]);
+                } catch (\Throwable $pettyEx) {
+                    \Log::warning("Auto petty cash deduction warning: " . $pettyEx->getMessage());
+                }
+            }
+        }
 
         $branch = $capital->branch;
         $branchName = $branch ? $branch->name : 'Cabang';
@@ -341,7 +433,7 @@ class BranchCapitalController extends Controller
 
         return response()->json([
             'message' => $msg,
-            'capital' => $capital->load(['branch:id,name', 'approvedBy:id,name']),
+            'capital' => $capital->load(['branch:id,name', 'approvedBy:id,name', 'bankAccount:id,bank_name,account_number,account_name']),
         ]);
     }
 
@@ -379,7 +471,7 @@ class BranchCapitalController extends Controller
 
         return response()->json([
             'message' => $msg,
-            'capital' => $capital->load(['branch:id,name', 'approvedBy:id,name']),
+            'capital' => $capital->load(['branch:id,name', 'approvedBy:id,name', 'bankAccount:id,bank_name,account_number,account_name']),
         ]);
     }
 
@@ -395,6 +487,24 @@ class BranchCapitalController extends Controller
         $capital = BranchCapital::findOrFail($id);
         $user = $request->user();
 
+        // Revert bank or petty cash balance if it was approved
+        if ($capital->status === 'approved') {
+            $isBank = in_array(strtolower($capital->payment_method ?? ''), ['transfer', 'transfer bank', 'bank_transfer', 'qris']);
+            $isCash = in_array(strtolower($capital->payment_method ?? ''), ['cash', 'tunai', 'kas']);
+
+            if ($capital->type === 'injection' && ($isBank || $capital->bank_account_id)) {
+                $bank = $capital->bank_account_id ? \App\Models\BankAccount::find($capital->bank_account_id) : null;
+                if ($bank) $bank->increment('current_balance', $capital->amount);
+            } elseif ($capital->type === 'return') {
+                if ($isBank || $capital->bank_account_id) {
+                    $bank = $capital->bank_account_id ? \App\Models\BankAccount::find($capital->bank_account_id) : null;
+                    if ($bank) $bank->decrement('current_balance', $capital->amount);
+                } elseif ($isCash) {
+                    \App\Models\PettyCash::where('description', 'like', "%{$capital->reference_no}%")->delete();
+                }
+            }
+        }
+
         $capital->update([
             'status' => 'rejected',
             'notes' => $capital->notes . "\n[Dibatalkan (Void) oleh {$user->name} pada " . Carbon::now()->format('d/m/Y H:i') . ": " . $request->reason . "]",
@@ -402,7 +512,7 @@ class BranchCapitalController extends Controller
 
         return response()->json([
             'message' => 'Transaksi modal berhasil dibatalkan (void).',
-            'capital' => $capital->load(['branch:id,name', 'approvedBy:id,name']),
+            'capital' => $capital->load(['branch:id,name', 'approvedBy:id,name', 'bankAccount:id,bank_name,account_number,account_name']),
         ]);
     }
 

@@ -217,9 +217,22 @@ class SaleController extends Controller
                 $finalCustomerId = $cust->id;
             }
             
+            $paymentMethod = $request->payment_method ?? 'cash';
+            
             $bankAccount = null;
             if ($request->bank_account_id) {
                 $bankAccount = \App\Models\BankAccount::find($request->bank_account_id);
+            }
+            if (!$bankAccount && in_array($paymentMethod, ['transfer', 'bank_transfer', 'qris', 'edc'])) {
+                if ($request->filled('bank_name')) {
+                    $bankAccount = \App\Models\BankAccount::where('bank_name', $request->bank_name)->where('is_active', true)->first();
+                }
+                if (!$bankAccount) {
+                    $bankAccount = \App\Models\BankAccount::where('is_default', true)->where('is_active', true)->first();
+                }
+                if (!$bankAccount) {
+                    $bankAccount = \App\Models\BankAccount::where('is_active', true)->first();
+                }
             }
 
             $sale = \App\Models\Sale::create([

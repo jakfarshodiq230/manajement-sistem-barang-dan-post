@@ -174,6 +174,7 @@
                         <p style="margin: 0 0 5px 0; font-size: 11px;">Penerima Gudang,</p>
                         @if(isset($userQrCode) && $userQrCode)
                             <div><img src="data:image/svg+xml;base64,{{ $userQrCode }}" class="digital-ttd-qr" alt="TTD QR Penerima"></div>
+                            <div class="digital-badge">[TERTANDA DIGITAL]</div>
                         @else
                             <div class="physical-ttd-space"></div>
                         @endif
@@ -187,23 +188,16 @@
                         </div>
                     </td>
                     <td style="width: 33%;">
-                        <p style="margin: 0 0 5px 0; font-size: 11px;">Menyetujui (Ka. Divisi),</p>
-                        @if(isset($approverQrCode) && $approverQrCode)
-                            <div><img src="data:image/svg+xml;base64,{{ $approverQrCode }}" class="digital-ttd-qr" alt="TTD QR Approver"></div>
-                        @elseif(isset($validatorQrCode) && $validatorQrCode)
-                            <div><img src="data:image/svg+xml;base64,{{ $validatorQrCode }}" class="digital-ttd-qr" alt="TTD QR Validator"></div>
-                        @else
-                            <div class="physical-ttd-space"></div>
-                        @endif
+                        <p style="margin: 0 0 5px 0; font-size: 11px;">Menyetujui (Ka. Divisi / Owner),</p>
+                        <div class="physical-ttd-space"></div>
                         <div class="signature-name">
-                            @if(isset($document->approver))
+                            @if(isset($branch) && isset($branch->owner))
+                                ( {{ $branch->owner->name }} )
+                            @elseif(isset($document->approver))
                                 ( {{ $document->approver->name }} )
                                 <br><span style="font-weight: normal; text-decoration: none; font-size: 9px; color: #555;">NIP: {{ $document->approver->nip ?? ($document->approver->employee->nik ?? 'EMP-' . str_pad($document->approver->id, 3, '0', STR_PAD_LEFT)) }}</span>
-                            @elseif(isset($document->validator))
-                                ( {{ $document->validator->name }} )
-                                <br><span style="font-weight: normal; text-decoration: none; font-size: 9px; color: #555;">NIP: {{ $document->validator->nip ?? ($document->validator->employee->nik ?? 'EMP-' . str_pad($document->validator->id, 3, '0', STR_PAD_LEFT)) }}</span>
                             @else
-                                ( ____________________ )
+                                ( Pimpinan Toko )
                             @endif
                         </div>
                     </td>
@@ -213,18 +207,22 @@
             <table class="signature-table" style="width: 100%;">
                 <tr>
                     <td style="width: 33%;">
-                        <p style="margin: 0 0 5px 0; font-size: 11px;">Dibuat Oleh,</p>
+                        <p style="margin: 0 0 5px 0; font-size: 11px;">Dibuat Oleh (Kasir / Petugas),</p>
                         @if(isset($userQrCode) && $userQrCode)
                             <div><img src="data:image/svg+xml;base64,{{ $userQrCode }}" class="digital-ttd-qr" alt="TTD QR Pembuat"></div>
+                            <div class="digital-badge">[TERTANDA DIGITAL]</div>
                         @else
                             <div class="physical-ttd-space"></div>
                         @endif
                         <div class="signature-name">
-                            @if(isset($document->user))
+                            @if(isset($document->user) && $document->user)
                                 ( {{ $document->user->name }} )
                                 <br><span style="font-weight: normal; text-decoration: none; font-size: 9px; color: #555;">NIP: {{ $document->user->nip ?? ($document->user->employee->nik ?? 'EMP-' . str_pad($document->user->id, 3, '0', STR_PAD_LEFT)) }}</span>
+                            @elseif(isset($document->creator) && $document->creator)
+                                ( {{ $document->creator->name }} )
+                                <br><span style="font-weight: normal; text-decoration: none; font-size: 9px; color: #555;">NIP: {{ $document->creator->nip ?? ($document->creator->employee->nik ?? 'EMP-' . str_pad($document->creator->id, 3, '0', STR_PAD_LEFT)) }}</span>
                             @else
-                                ( ____________________ )
+                                ( Admin / Petugas )
                             @endif
                         </div>
                     </td>
@@ -232,6 +230,7 @@
                         <p style="margin: 0 0 5px 0; font-size: 11px;">Diperiksa Oleh,</p>
                         @if(isset($validatorQrCode) && $validatorQrCode)
                             <div><img src="data:image/svg+xml;base64,{{ $validatorQrCode }}" class="digital-ttd-qr" alt="TTD QR Pemeriksa"></div>
+                            <div class="digital-badge">[TERVALIDASI]</div>
                         @else
                             <div class="physical-ttd-space"></div>
                         @endif
@@ -245,18 +244,15 @@
                         </div>
                     </td>
                     <td style="width: 33%;">
-                        <p style="margin: 0 0 5px 0; font-size: 11px;">Disetujui Oleh,</p>
-                        @if(isset($approverQrCode) && $approverQrCode)
-                            <div><img src="data:image/svg+xml;base64,{{ $approverQrCode }}" class="digital-ttd-qr" alt="TTD QR Approver"></div>
-                        @else
-                            <div class="physical-ttd-space"></div>
-                        @endif
+                        <p style="margin: 0 0 5px 0; font-size: 11px;">Mengetahui (Pimpinan / Owner),</p>
+                        <div class="physical-ttd-space"></div>
                         <div class="signature-name">
-                            @if(isset($document->approved_by) && isset($document->approver))
+                            @if(isset($branch) && isset($branch->owner))
+                                ( {{ $branch->owner->name }} )
+                            @elseif(isset($document->approved_by) && isset($document->approver))
                                 ( {{ $document->approver->name }} )
-                                <br><span style="font-weight: normal; text-decoration: none; font-size: 9px; color: #555;">NIP: {{ $document->approver->nip ?? ($document->approver->employee->nik ?? 'EMP-' . str_pad($document->approver->id, 3, '0', STR_PAD_LEFT)) }}</span>
                             @else
-                                ( ____________________ )
+                                ( Pimpinan Toko )
                             @endif
                         </div>
                     </td>

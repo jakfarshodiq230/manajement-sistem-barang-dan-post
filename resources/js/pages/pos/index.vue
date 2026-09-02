@@ -90,6 +90,23 @@ const selectedBankAccount = computed(() => {
   return bankAccounts.value.find(b => b.id === selectedBankAccountId.value) || null
 })
 
+const formatRupiah = val => {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val || 0)
+}
+
+const formatDateTime = dateString => {
+  if (!dateString) return '-'
+  const d = new Date(dateString)
+  if (isNaN(d.getTime())) return dateString
+  return d.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 const transferBankAccounts = computed(() => {
   return bankAccounts.value.filter(b => b.type === 'bank_transfer' || b.type === 'edc_debit' || b.type === 'edc_credit')
 })
@@ -399,16 +416,6 @@ const showCatalogQR = () => {
 const copyCatalogUrl = () => {
   navigator.clipboard.writeText(catalogUrl.value)
   snackbar.show('Tautan katalog berhasil disalin', 'success')
-}
-
-// Format currency (display)
-const formatRupiah = value => {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value)
 }
 
 // Format currency (input)
@@ -2717,7 +2724,7 @@ const startNewTransaction = () => {
                   <span class="text-caption text-disabled ms-2">({{ bill.items_json?.length || 0 }} Item)</span>
                 </VListItemTitle>
                 <VListItemSubtitle class="mt-1">
-                  Total: <strong class="text-primary">{{ formatRupiah(bill.total) }}</strong> • Ditahan: {{ bill.created_at }}
+                  Total: <strong class="text-primary">{{ formatRupiah(bill.total) }}</strong> • Ditahan: {{ formatDateTime(bill.created_at) }}
                 </VListItemSubtitle>
 
                 <template #append>

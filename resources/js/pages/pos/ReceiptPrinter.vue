@@ -91,7 +91,8 @@ const print = () => {
   let pageStyle = ''
   if (isContinuous) {
     pageStyle = `
-      @page { size: auto; margin: 4mm 6mm; }
+      @page { size: auto; margin: 0 !important; }
+      * { box-sizing: border-box; }
       body {
         font-family: 'Courier New', Courier, monospace;
         font-size: 11px;
@@ -100,7 +101,8 @@ const print = () => {
         max-width: 241mm;
         color: #000;
         background: #fff;
-        padding: 4mm;
+        padding: 4mm 6mm;
+        margin: 0;
       }
       .dotmatrix-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
       .dotmatrix-store-name { font-size: 14px; font-weight: bold; }
@@ -130,7 +132,8 @@ const print = () => {
     `
   } else if (isThermal) {
     pageStyle = `
-      @page { size: auto; margin: 0; }
+      @page { size: auto; margin: 0 !important; }
+      * { box-sizing: border-box; }
       body {
         font-family: 'Courier New', Courier, monospace;
         font-size: 11px;
@@ -139,6 +142,7 @@ const print = () => {
         color: #000;
         background: #fff;
         padding: 2mm;
+        margin: 0 auto;
       }
       .text-center { text-align: center; }
       .font-weight-bold { font-weight: bold; }
@@ -154,13 +158,15 @@ const print = () => {
     `
   } else {
     pageStyle = `
-      @page { size: auto; margin: 10mm; }
+      @page { size: auto; margin: 0 !important; }
+      * { box-sizing: border-box; }
       body {
         font-family: Arial, sans-serif;
         color: #000;
         background: #fff;
         font-size: 12px;
-        padding: 5mm;
+        padding: 6mm 8mm;
+        margin: 0;
       }
       .kwitansi-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
       .kwitansi-company { display: flex; align-items: center; gap: 10px; }
@@ -186,9 +192,9 @@ const print = () => {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Faktur / Struk - ${props.sale?.invoice_number || 'Receipt'}</title>
+      <title></title>
       <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { box-sizing: border-box; }
         ${pageStyle}
       </style>
     </head>

@@ -144,6 +144,11 @@ const fetchInvoices = async () => {
   }
 }
 
+const onPaymentUpdated = () => {
+  fetchStatements()
+  fetchInvoices()
+}
+
 const refreshAll = () => {
   if (activeTab.value === 'statements') {
     fetchStatements()
@@ -222,7 +227,11 @@ const getStatementProgress = item => {
   if (!item || Number(item.total_amount) === 0) return 0
   const paid = Number(item.paid_amount) || 0
   const total = Number(item.total_amount) || 1
-  return Math.min(100, Math.round((paid / total) * 100))
+  const pct = (paid / total) * 100
+  if (pct > 0 && pct < 1) {
+    return Number(pct.toFixed(2))
+  }
+  return Math.min(100, Math.round(pct))
 }
 
 const getStatusBadge = item => {
@@ -235,10 +244,6 @@ const getStatusBadge = item => {
 const openDetailDrawer = statementId => {
   selectedStatementId.value = statementId
   isDetailDrawerVisible.value = true
-}
-
-const onPaymentUpdated = () => {
-  fetchStatements()
 }
 </script>
 
@@ -616,7 +621,7 @@ const onPaymentUpdated = () => {
             </VChip>
           </template>
 
-          <!-- Aksi -->
+          <!-- Aksi Tab 1 -->
           <template #item.actions="{ item }">
             <VBtn
               size="small"
@@ -626,7 +631,7 @@ const onPaymentUpdated = () => {
               class="font-weight-bold"
               @click="openDetailDrawer(item.id)"
             >
-              {{ item.status === 'paid' ? 'Rincian Barang' : 'Bayar / Pilih Barang' }}
+              {{ item.status === 'paid' ? 'Rincian Barang' : 'Bayar / Pilih' }}
             </VBtn>
           </template>
         </VDataTableServer>
@@ -734,7 +739,7 @@ const onPaymentUpdated = () => {
             </span>
           </template>
 
-          <!-- Aksi -->
+          <!-- Aksi Tab 2 -->
           <template #item.actions="{ item }">
             <VBtn
               v-if="item.payable_statement"
@@ -744,7 +749,7 @@ const onPaymentUpdated = () => {
               prepend-icon="ri-file-list-3-line"
               @click="openDetailDrawer(item.payable_statement.id)"
             >
-              Lihat Tagihan Bulan
+              Lihat Tagihan
             </VBtn>
           </template>
         </VDataTableServer>

@@ -309,6 +309,17 @@ class ReturnController extends Controller
                 }
             }
 
+            // Jika Retur Penjualan bertipe Pengembalian Dana ke Pelanggan via Transfer Bank
+            if ($returnTransaction->reference_type === 'sale' && in_array($returnTransaction->return_type, ['pengembalian_dana', 'pengembalian_uang'])) {
+                $bankAccountId = $request->input('bank_account_id') ?: ($returnTransaction->sale ? $returnTransaction->sale->bank_account_id : null);
+                if ($bankAccountId) {
+                    $bank = \App\Models\BankAccount::find($bankAccountId);
+                    if ($bank && (float) $bank->current_balance >= (float) $returnTransaction->total_amount) {
+                        $bank->decrement('current_balance', $returnTransaction->total_amount);
+                    }
+                }
+            }
+
             DB::commit();
             return response()->json([
                 'message' => 'Retur berhasil disetujui dan stok telah disesuaikan' . ($returnTransaction->reference_type === 'purchase' && in_array($returnTransaction->return_type, ['pengembalian_dana', 'pengembalian_uang', 'potong_hutang']) ? '. Saldo kredit potong hutang supplier telah diterbitkan!' : ''),

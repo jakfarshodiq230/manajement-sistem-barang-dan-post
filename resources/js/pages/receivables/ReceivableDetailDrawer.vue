@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useSnackbarStore } from '@/stores/snackbar'
 import { $api } from '@/utils/api'
 import ReceivableReceiptPrinter from './ReceivableReceiptPrinter.vue'
@@ -25,25 +25,70 @@ const isLoading = ref(false)
 const lastPayment = ref(null)
 const isSuccessDialogVisible = ref(false)
 
+// Printer & Settings from Database
+const receiptPrinterRef = ref(null)
+const receiptSettings = ref([])
+const activeReceiptSetting = computed(() => {
+  if (receiptSettings.value.length === 0) return null
+  return receiptSettings.value.find(s => s.is_default) || receiptSettings.value[0]
+})
+
+const fetchReceiptSettings = async () => {
+  try {
+    const res = await $api('/apps/receipt-settings')
+    receiptSettings.value = res.data || res || []
+  } catch (e) {
+    console.error('Failed to load receipt settings:', e)
+  }
+}
+
+// Bank Accounts from Database
+const bankAccounts = ref([])
+const isLoadingBankAccounts = ref(false)
+
+const fetchBankAccounts = async () => {
+  isLoadingBankAccounts.value = true
+  try {
+    const res = await $api('/apps/bank-accounts')
+    bankAccounts.value = (res.data || res || []).filter(b => b.is_active)
+  } catch (e) {
+    console.error('Failed to load bank accounts:', e)
+  } finally {
+    isLoadingBankAccounts.value = false
+  }
+}
+
 const activeBranch = computed(() => {
+  if (receivable.value?.sale?.branch) {
+    return receivable.value.sale.branch
+  }
   if (userData.value?.assignments?.length > 0) {
-    // Basic fallback to the first assigned branch for printing
     return { name: userData.value.assignments[0].branch_name }
   }
-  
-  return { name: 'Cabang Utama' }
+  return { name: 'Cabang Toko' }
 })
 
 const paymentForm = ref({
   amount: 0,
   payment_date: new Date().toISOString().substr(0, 10),
   payment_method: 'cash',
+  bank_account_id: null,
   payment_proof: null,
   bank_name: '',
   bank_account_number: '',
   bank_account_name: '',
   transfer_phone_number: '',
 })
+
+const onBankSelected = bankId => {
+  const bank = bankAccounts.value.find(b => b.id === bankId)
+  if (bank) {
+    paymentForm.value.bank_account_id = bank.id
+    paymentForm.value.bank_name = bank.bank_name
+    paymentForm.value.bank_account_number = bank.account_number
+    paymentForm.value.bank_account_name = bank.account_name
+  }
+}
 
 // Email logs and send email dialog
 const emailLogs = ref([])
@@ -117,7 +162,6 @@ const fetchReceivable = async id => {
   isLoading.value = true
   try {
     const response = await $api(`/apps/receivables/${id}`)
-
     receivable.value = response.data || response
     paymentForm.value.amount = remainingBalance.value
     fetchEmailLogs(id)
@@ -132,6 +176,8 @@ const fetchReceivable = async id => {
 watch(() => props.receivableId, newId => {
   if (newId) {
     fetchReceivable(newId)
+    fetchBankAccounts()
+    fetchReceiptSettings()
   } else {
     receivable.value = null
     emailLogs.value = []
@@ -140,8 +186,7 @@ watch(() => props.receivableId, newId => {
 
 const remainingBalance = computed(() => {
   if (!receivable.value) return 0
-  
-  return Number(receivable.value.amount_due) - Number(receivable.value.amount_paid)
+  return Math.max(0, Number(receivable.value.amount_due) - Number(receivable.value.amount_paid))
 })
 
 const amountDisplay = computed({
@@ -150,30 +195,39 @@ const amountDisplay = computed({
   },
   set: val => {
     const numericStr = String(val).replace(/\D/g, '')
-
     paymentForm.value.amount = numericStr ? parseInt(numericStr, 10) : 0
   },
 })
 
 const formatCurrency = value => {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(value || 0)
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value || 0)
 }
 
 const formatDate = dateString => {
   if (!dateString) return '-'
-  
   return new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+const formatDateTime = dateString => {
+  if (!dateString) return '-'
+  const d = new Date(dateString)
+  if (isNaN(d.getTime())) return dateString
+  return d.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 const submitPayment = async () => {
   if (paymentForm.value.amount <= 0) {
     snackbar.show('Nominal pembayaran tidak valid', 'error')
-    
     return
   }
   if (paymentForm.value.amount > remainingBalance.value) {
     snackbar.show('Nominal pembayaran melebihi sisa hutang', 'error')
-    
     return
   }
 
@@ -185,6 +239,7 @@ const submitPayment = async () => {
     formData.append('payment_method', paymentForm.value.payment_method)
     
     if (paymentForm.value.payment_method !== 'cash') {
+      if (paymentForm.value.bank_account_id) formData.append('bank_account_id', paymentForm.value.bank_account_id)
       if (paymentForm.value.bank_name) formData.append('bank_name', paymentForm.value.bank_name)
       if (paymentForm.value.bank_account_number) formData.append('bank_account_number', paymentForm.value.bank_account_number)
       if (paymentForm.value.bank_account_name) formData.append('bank_account_name', paymentForm.value.bank_account_name)
@@ -199,13 +254,12 @@ const submitPayment = async () => {
       body: formData,
     })
 
-    snackbar.show('Pembayaran berhasil dicatat', 'success')
+    snackbar.show('Pembayaran berhasil dicatat & saldo diperbarui!', 'success')
     emit('paymentSaved')
     
     // Save last payment for printing and show success dialog
     lastPayment.value = res.payment
 
-    // Append user to payment if not there, for printer
     if (!lastPayment.value.user && userData.value) {
       lastPayment.value.user = { name: userData.value.fullName || userData.value.name }
     }
@@ -218,6 +272,7 @@ const submitPayment = async () => {
     // Reset form
     paymentForm.value.amount = 0
     paymentForm.value.payment_method = 'cash'
+    paymentForm.value.bank_account_id = null
     paymentForm.value.payment_proof = null
     paymentForm.value.bank_name = ''
     paymentForm.value.bank_account_number = ''
@@ -225,7 +280,8 @@ const submitPayment = async () => {
     paymentForm.value.transfer_phone_number = ''
   } catch (error) {
     console.error(error)
-    snackbar.show(error.response?.data?.message || 'Gagal memproses pembayaran', 'error')
+    const errText = error.response?._data?.message || error.data?.message || error.message || 'Gagal memproses pembayaran'
+    snackbar.show(errText, 'error')
   }
 }
 
@@ -239,9 +295,21 @@ const getStatusColor = status => {
 
 const printReceipt = () => {
   setTimeout(() => {
-    window.print()
+    if (receiptPrinterRef.value?.print) {
+      receiptPrinterRef.value.print()
+    }
   }, 100)
 }
+
+const printPastPaymentReceipt = payment => {
+  lastPayment.value = payment
+  printReceipt()
+}
+
+onMounted(() => {
+  fetchBankAccounts()
+  fetchReceiptSettings()
+})
 </script>
 
 <template>
@@ -249,14 +317,19 @@ const printReceipt = () => {
     :model-value="props.isDrawerOpen"
     temporary
     location="end"
-    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 550)"
+    :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 580)"
     @update:model-value="emit('update:isDrawerOpen', $event)"
   >
     <!-- Header -->
     <div class="d-flex align-center pa-6 pb-4">
-      <h6 class="text-h6">
-        Detail Piutang
-      </h6>
+      <div class="d-flex align-center gap-2">
+        <VAvatar color="primary" variant="tonal" size="36">
+          <VIcon icon="ri-hand-coin-line" size="20" />
+        </VAvatar>
+        <h6 class="text-h6 font-weight-bold mb-0">
+          Detail Piutang Pelanggan
+        </h6>
+      </div>
       <VSpacer />
       <VBtn
         icon
@@ -278,150 +351,129 @@ const printReceipt = () => {
         v-if="isLoading"
         class="d-flex justify-center pa-10"
       >
-        <VProgressCircular
-          indeterminate
-          color="primary"
-        />
+        <VProgressCircular indeterminate color="primary" />
       </div>
 
       <div
         v-else-if="receivable"
-        class="pa-6"
+        class="pa-6 pt-4"
       >
-        <!-- Action Buttons -->
-        <div class="d-flex flex-wrap gap-2 mb-4">
-          <VBtn 
-            v-if="receivable.payments?.length > 0" 
-            color="secondary" 
-            variant="outlined" 
-            class="flex-grow-1" 
-            prepend-icon="ri-printer-line"
-            @click="() => { lastPayment = receivable.payments[receivable.payments.length - 1]; printReceipt(); }"
-          >
-            Cetak Struk
-          </VBtn>
+        <!-- Customer & Sale Info -->
+        <VCard
+          variant="tonal"
+          class="mb-4 pa-4 rounded-xl"
+        >
+          <div class="d-flex justify-space-between align-start mb-2">
+            <div>
+              <p class="text-caption mb-0 text-medium-emphasis">Pelanggan</p>
+              <h5 class="text-h6 font-weight-bold">
+                {{ receivable.customer?.name || 'Pelanggan Umum' }}
+              </h5>
+              <div class="text-caption text-medium-emphasis">
+                {{ receivable.customer?.phone || '-' }} | {{ receivable.customer?.address || '-' }}
+              </div>
+            </div>
+            <VChip
+              :color="getStatusColor(receivable.status)"
+              size="small"
+              class="text-capitalize font-weight-bold"
+            >
+              {{ receivable.status === 'paid' ? 'Lunas' : (receivable.status === 'partial' ? 'Cicilan' : 'Belum Bayar') }}
+            </VChip>
+          </div>
 
+          <VDivider class="my-3" />
+
+          <div class="d-flex justify-space-between align-center text-caption">
+            <div>
+              <span class="text-medium-emphasis">No. Transaksi:</span>
+              <strong class="font-mono ml-1">{{ receivable.sale?.invoice_number }}</strong>
+            </div>
+            <div>
+              <span class="text-medium-emphasis">Jatuh Tempo:</span>
+              <strong class="text-error ml-1">{{ formatDate(receivable.due_date) }}</strong>
+            </div>
+          </div>
+        </VCard>
+
+        <!-- Balance Summary -->
+        <VRow class="mb-4">
+          <VCol cols="4">
+            <VCard
+              variant="outlined"
+              class="pa-3 text-center rounded-xl"
+            >
+              <div class="text-caption text-medium-emphasis">Total Piutang</div>
+              <div class="text-body-1 font-weight-bold">
+                {{ formatCurrency(receivable.amount_due) }}
+              </div>
+            </VCard>
+          </VCol>
+          <VCol cols="4">
+            <VCard
+              variant="outlined"
+              class="pa-3 text-center rounded-xl"
+            >
+              <div class="text-caption text-success">Sudah Dibayar</div>
+              <div class="text-body-1 font-weight-bold text-success">
+                {{ formatCurrency(receivable.amount_paid) }}
+              </div>
+            </VCard>
+          </VCol>
+          <VCol cols="4">
+            <VCard
+              variant="outlined"
+              class="pa-3 text-center rounded-xl"
+              :class="remainingBalance > 0 ? 'border-error' : ''"
+            >
+              <div class="text-caption text-error">Sisa Piutang</div>
+              <div class="text-body-1 font-weight-bold text-error">
+                {{ formatCurrency(remainingBalance) }}
+              </div>
+            </VCard>
+          </VCol>
+        </VRow>
+
+        <!-- Action Button: Kirim Tagihan Email -->
+        <div class="mb-4">
           <VBtn
+            block
             color="info"
-            variant="flat"
-            class="flex-grow-1 font-weight-bold"
+            variant="tonal"
             prepend-icon="ri-mail-send-line"
+            class="rounded-lg"
             @click="openSendEmailDialog"
           >
-            Kirim Email Tagihan
+            Kirim Surat Tagihan via Email
           </VBtn>
         </div>
 
-        <!-- Info Ringkas -->
+        <!-- Payment Form -->
         <VCard
-          class="mb-4 bg-light-primary"
-          variant="flat"
+          v-if="remainingBalance > 0"
+          variant="outlined"
+          class="mb-6 rounded-xl border-primary"
         >
-          <VCardText>
-            <div class="d-flex justify-space-between mb-2">
-              <span class="font-weight-bold">Pelanggan:</span>
-              <span>{{ receivable.customer?.name || '-' }}</span>
-            </div>
-            <div class="d-flex justify-space-between mb-2">
-              <span class="font-weight-bold">No. Nota (Sale):</span>
-              <span>{{ receivable.sale?.invoice_number || '-' }}</span>
-            </div>
-            <div class="d-flex justify-space-between mb-2">
-              <span class="font-weight-bold">Jatuh Tempo:</span>
-              <span class="text-error font-weight-bold">{{ formatDate(receivable.due_date) }}</span>
-            </div>
-            <VDivider class="my-2" />
-            <div class="d-flex justify-space-between mb-1">
-              <span>Total Hutang:</span>
-              <span>{{ formatCurrency(receivable.amount_due) }}</span>
-            </div>
-            <div class="d-flex justify-space-between mb-1">
-              <span>Sudah Dibayar:</span>
-              <span class="text-success">{{ formatCurrency(receivable.amount_paid) }}</span>
-            </div>
-            <div class="d-flex justify-space-between mt-2 pt-2 border-t">
-              <span class="text-h6 font-weight-bold">Sisa Hutang:</span>
-              <span class="text-h6 font-weight-bold text-error">{{ formatCurrency(remainingBalance) }}</span>
-            </div>
-          </VCardText>
-        </VCard>
+          <VCardItem class="bg-primary bg-opacity-10 py-3">
+            <VCardTitle class="text-subtitle-1 font-weight-bold text-primary d-flex align-center gap-2">
+              <VIcon icon="ri-secure-payment-line" size="20" />
+              Catat Pembayaran Cicilan
+            </VCardTitle>
+          </VCardItem>
 
-        <!-- Daftar Barang -->
-        <p class="font-weight-bold mb-2">
-          Barang yang Dibeli (Utang)
-        </p>
-        <VCard
-          class="mb-4 border"
-          variant="flat"
-        >
-          <VTable density="compact">
-            <thead>
-              <tr>
-                <th>Barang</th>
-                <th class="text-center">
-                  Qty
-                </th>
-                <th class="text-right">
-                  Harga
-                </th>
-                <th class="text-right">
-                  Subtotal
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="!receivable.sale?.items?.length">
-                <td
-                  colspan="4"
-                  class="text-center text-medium-emphasis"
-                >
-                  Data barang tidak ditemukan
-                </td>
-              </tr>
-              <tr
-                v-for="item in receivable.sale?.items"
-                :key="item.id"
-              >
-                <td>{{ item.product_branch?.product?.name || 'Produk Tidak Dikenal' }}</td>
-                <td class="text-center">
-                  {{ item.qty }}
-                </td>
-                <td class="text-right">
-                  {{ formatCurrency(item.price) }}
-                </td>
-                <td class="text-right">
-                  {{ formatCurrency(item.subtotal) }}
-                </td>
-              </tr>
-            </tbody>
-          </VTable>
-        </VCard>
-
-        <!-- Form Pembayaran (Jika belum lunas) -->
-        <VCard
-          v-if="receivable.status !== 'paid'"
-          class="mb-4 border"
-        >
-          <VCardTitle class="text-base py-3 bg-light">
-            Terima Pembayaran
-          </VCardTitle>
-          <VDivider />
-          <VCardText>
+          <VCardText class="pa-4">
             <VForm @submit.prevent="submitPayment">
-              <VRow>
-                <VCol cols="12">
+              <VRow dense>
+                <VCol cols="12" sm="6">
                   <VTextField 
                     v-model="amountDisplay" 
-                    label="Nominal Dibayar" 
+                    label="Nominal Bayar" 
                     type="text"
                     prefix="Rp"
                     required 
                   />
                 </VCol>
-                <VCol
-                  cols="12"
-                  md="6"
-                >
+                <VCol cols="12" sm="6">
                   <VTextField 
                     v-model="paymentForm.payment_date" 
                     label="Tanggal Bayar" 
@@ -429,73 +481,66 @@ const printReceipt = () => {
                     required 
                   />
                 </VCol>
-                <VCol
-                  cols="12"
-                  md="6"
-                >
+
+                <VCol cols="12">
                   <VSelect 
                     v-model="paymentForm.payment_method" 
-                    :items="['cash', 'transfer', 'qris']" 
+                    :items="[
+                      { title: 'Kas Tunai Toko', value: 'cash' },
+                      { title: 'Transfer Bank (Tambah Saldo Rekening)', value: 'bank_transfer' },
+                    ]"
+                    item-title="title"
+                    item-value="value"
                     label="Metode Pembayaran" 
                   />
                 </VCol>
               
-                <!-- Extra Fields for Non-Cash -->
+                <!-- Pilihan Rekening Bank Tujuan Jika Non-Tunai -->
                 <VCol
-                  v-if="paymentForm.payment_method !== 'cash'"
+                  v-if="paymentForm.payment_method === 'bank_transfer' || paymentForm.payment_method === 'qris' || paymentForm.payment_method === 'transfer'"
                   cols="12"
                 >
                   <VCard
-                    variant="outlined"
-                    class="pa-4 bg-light"
+                    variant="tonal"
+                    color="info"
+                    class="pa-3 mb-2 rounded-lg"
                   >
-                    <VRow>
-                      <VCol
-                        v-if="paymentForm.payment_method === 'transfer'"
-                        cols="12"
-                        md="6"
-                      >
+                    <div class="text-caption font-weight-bold mb-2">
+                      🏦 Pilih Rekening Bank Tujuan (Saldo Otomatis Bertambah):
+                    </div>
+                    
+                    <VSelect
+                      v-model="paymentForm.bank_account_id"
+                      :items="bankAccounts"
+                      :item-title="item => `${item.bank_name} - ${item.account_number} (a/n ${item.account_name})`"
+                      item-value="id"
+                      label="Rekening Bank Tujuan"
+                      placeholder="Pilih rekening bank..."
+                      density="compact"
+                      class="mb-2"
+                      @update:model-value="onBankSelected"
+                    />
+
+                    <VRow dense>
+                      <VCol cols="12" sm="6">
                         <VTextField
                           v-model="paymentForm.bank_name"
-                          label="Nama Bank (Cth: BCA, Mandiri)"
+                          label="Nama Bank"
+                          density="compact"
                         />
                       </VCol>
-                      <VCol
-                        v-if="paymentForm.payment_method === 'transfer'"
-                        cols="12"
-                        md="6"
-                      >
+                      <VCol cols="12" sm="6">
                         <VTextField
                           v-model="paymentForm.bank_account_number"
                           label="Nomor Rekening"
-                        />
-                      </VCol>
-                      <VCol
-                        v-if="paymentForm.payment_method === 'transfer'"
-                        cols="12"
-                        md="6"
-                      >
-                        <VTextField
-                          v-model="paymentForm.bank_account_name"
-                          label="Atas Nama Rekening"
-                        />
-                      </VCol>
-                      <VCol
-                        v-if="paymentForm.payment_method === 'qris'"
-                        cols="12"
-                        md="6"
-                      >
-                        <VTextField
-                          v-model="paymentForm.transfer_phone_number"
-                          label="No. Handphone / E-Wallet"
+                          density="compact"
                         />
                       </VCol>
                       <VCol cols="12">
-                        <VFileInput 
-                          v-model="paymentForm.payment_proof" 
-                          label="Bukti Pembayaran (Opsional)" 
-                          accept="image/*" 
-                          prepend-icon="ri-image-add-line" 
+                        <VTextField
+                          v-model="paymentForm.bank_account_name"
+                          label="Atas Nama Rekening"
+                          density="compact"
                         />
                       </VCol>
                     </VRow>
@@ -503,13 +548,24 @@ const printReceipt = () => {
                 </VCol>
 
                 <VCol cols="12">
+                  <VFileInput 
+                    v-model="paymentForm.payment_proof" 
+                    label="Bukti Transfer / Nota (Opsional)" 
+                    accept="image/*" 
+                    prepend-icon="ri-image-add-line" 
+                  />
+                </VCol>
+
+                <VCol cols="12" class="mt-2">
                   <VBtn
                     type="submit"
                     color="success"
                     block
-                    prepend-icon="ri-check-line"
+                    size="large"
+                    prepend-icon="ri-check-double-line"
+                    class="font-weight-bold"
                   >
-                    Proses Pembayaran
+                    Simpan Pembayaran & Perbarui Saldo
                   </VBtn>
                 </VCol>
               </VRow>
@@ -518,29 +574,32 @@ const printReceipt = () => {
         </VCard>
 
         <!-- Riwayat Pembayaran -->
-        <p class="font-weight-bold mb-2">
-          Riwayat Pembayaran
-        </p>
+        <div class="d-flex align-center justify-space-between mb-2">
+          <p class="font-weight-bold mb-0 d-flex align-center gap-1">
+            <VIcon icon="ri-history-line" size="18" color="primary" />
+            Riwayat Cicilan & Pembayaran
+          </p>
+        </div>
+
         <VTable
           density="compact"
-          class="border"
+          class="border rounded-xl mb-6"
         >
           <thead>
             <tr>
               <th>Tanggal</th>
               <th>Metode</th>
-              <th class="text-right">
-                Nominal
-              </th>
+              <th class="text-right">Nominal</th>
+              <th class="text-center" style="width: 50px;">Cetak</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="receivable.payments?.length === 0">
               <td
-                colspan="3"
-                class="text-center text-medium-emphasis"
+                colspan="4"
+                class="text-center text-medium-emphasis py-3"
               >
-                Belum ada pembayaran
+                Belum ada catatan pembayaran cicilan
               </td>
             </tr>
             <tr
@@ -549,10 +608,23 @@ const printReceipt = () => {
             >
               <td>{{ formatDate(payment.payment_date) }}</td>
               <td class="text-capitalize">
-                {{ payment.payment_method }}
+                {{ payment.payment_method === 'bank_transfer' ? 'Transfer Bank' : (payment.payment_method === 'qris' ? 'QRIS' : (payment.payment_method === 'cash' ? 'Tunai' : payment.payment_method)) }}
+                <div v-if="payment.bank_account || payment.bank_name" style="font-size: 10px; color: #666;">
+                  {{ payment.bank_account ? payment.bank_account.bank_name : payment.bank_name }}
+                </div>
               </td>
-              <td class="text-right text-success">
+              <td class="text-right text-success font-weight-bold">
                 +{{ formatCurrency(payment.amount) }}
+              </td>
+              <td class="text-center">
+                <VBtn
+                  icon="ri-printer-line"
+                  size="x-small"
+                  variant="text"
+                  color="primary"
+                  title="Cetak Kuitansi Pembayaran"
+                  @click="printPastPaymentReceipt(payment)"
+                />
               </td>
             </tr>
           </tbody>
@@ -573,66 +645,56 @@ const printReceipt = () => {
           />
         </div>
 
-        <VCard class="border" variant="flat" :loading="isLoadingEmailLogs">
+        <VCard class="border rounded-xl" variant="flat" :loading="isLoadingEmailLogs">
           <VProgressLinear v-if="isLoadingEmailLogs" indeterminate color="primary" height="2" />
           <VTable density="compact">
             <thead>
               <tr>
+                <th>Tanggal & Waktu</th>
+                <th>Tipe Dokumen</th>
                 <th>Penerima</th>
-                <th>Tipe / Mode</th>
                 <th>Status</th>
-                <th class="text-right">Aksi</th>
+                <th class="text-center">Aksi</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-if="isLoadingEmailLogs">
-                <td colspan="4" class="text-center text-medium-emphasis py-3 text-caption">
-                  <VProgressCircular indeterminate color="primary" size="18" class="me-2" />
-                  Memuat riwayat email...
-                </td>
-              </tr>
-              <tr v-else-if="emailLogs.length === 0">
-                <td colspan="4" class="text-center text-medium-emphasis py-3 text-caption">
-                  Belum ada riwayat email untuk piutang ini
+              <tr v-if="emailLogs.length === 0">
+                <td colspan="5" class="text-center text-medium-emphasis py-4">
+                  Belum ada riwayat pengiriman email
                 </td>
               </tr>
               <tr v-for="log in emailLogs" :key="log.id">
-                <td class="py-2">
-                  <div class="font-weight-medium text-caption">{{ log.recipient_email }}</div>
-                  <div class="text-disabled" style="font-size: 10px;">{{ log.created_at ? formatDate(log.created_at) : '-' }}</div>
-                </td>
+                <td class="text-caption font-mono">{{ formatDateTime(log.sent_at || log.created_at) }}</td>
                 <td>
-                  <div class="text-caption font-weight-bold">
-                    {{ log.email_type === 'receivable_invoice' ? 'Tagihan Faktur' : (log.email_type === 'receivable_receipt' ? 'Kwitansi Cicilan' : 'Pengingat Tempo') }}
-                  </div>
-                  <span class="text-disabled text-caption" style="font-size: 10px;">{{ log.trigger_mode === 'automatic' ? 'Otomatis' : 'Manual' }}</span>
+                  <VChip size="x-small" variant="outlined" color="primary">
+                    {{ log.mailable_type?.includes('Invoice') ? 'Surat Tagihan' : 'Kwitansi Cicilan' }}
+                  </VChip>
                 </td>
+                <td class="text-caption font-weight-bold">{{ log.recipient_email }}</td>
                 <td>
                   <VChip
-                    :color="log.status === 'sent' ? 'success' : (log.status === 'failed' ? 'error' : 'warning')"
                     size="x-small"
-                    variant="elevated"
-                    class="font-weight-bold"
+                    :color="log.status === 'sent' ? 'success' : 'error'"
+                    class="text-capitalize"
                   >
-                    {{ log.status === 'sent' ? 'Terkirim' : (log.status === 'failed' ? 'Gagal' : 'Pending') }}
+                    {{ log.status === 'sent' ? 'Terkirim' : 'Gagal' }}
                   </VChip>
-                  <div v-if="log.error_message" class="text-error mt-1 text-truncate" style="max-width: 120px; font-size: 10px;" :title="log.error_message">
-                    {{ log.error_message }}
-                  </div>
                 </td>
-                <td class="text-right">
+                <td class="text-center">
                   <VBtn
                     v-if="log.status === 'failed'"
                     size="x-small"
-                    color="error"
                     variant="tonal"
+                    color="warning"
                     prepend-icon="ri-refresh-line"
                     :loading="isRetryingEmail[log.id]"
                     @click="retryEmail(log.id)"
                   >
                     Kirim Ulang
                   </VBtn>
-                  <VIcon v-else-if="log.status === 'sent'" icon="ri-check-double-line" color="success" size="16" />
+                  <span v-else class="text-caption text-success font-weight-bold">
+                    <VIcon icon="ri-check-line" size="14" /> Sukses
+                  </span>
                 </td>
               </tr>
             </tbody>
@@ -642,59 +704,45 @@ const printReceipt = () => {
     </div>
   </VNavigationDrawer>
 
-  <!-- Dialog Konfirmasi Kirim Email Tagihan -->
+  <!-- Dialog Kirim Surat Tagihan Email Manual -->
   <VDialog
     v-model="isSendEmailDialogVisible"
     max-width="480"
   >
-    <VCard>
-      <VCardTitle class="bg-primary text-white pa-4 d-flex align-center justify-space-between">
-        <div class="d-flex align-center gap-2">
-          <VIcon icon="ri-mail-send-line" />
-          <span>Kirim Surat Tagihan ke Email</span>
-        </div>
-        <VBtn icon="ri-close-line" variant="text" size="small" @click="isSendEmailDialogVisible = false" />
+    <VCard class="rounded-xl">
+      <VCardTitle class="pa-5 pb-3 font-weight-bold text-h6 d-flex align-center gap-2">
+        <VIcon icon="ri-mail-send-line" color="primary" />
+        Kirim Surat Tagihan Piutang
       </VCardTitle>
-
-      <VCardText class="pa-5">
-        <p class="text-body-2 text-medium-emphasis mb-4">
-          Kirim rincian invoice nota tagihan piutang resmi ke email pelanggan:
+      
+      <VCardText class="px-5 py-3">
+        <p class="text-caption text-medium-emphasis mb-3">
+          Sistem akan men-generate PDF Invoice Tagihan secara otomatis dan mengirimkannya langsung ke alamat email pelanggan.
         </p>
 
         <VTextField
           v-model="emailInput"
-          label="Alamat Email Penerima *"
-          placeholder="contoh: pelanggan@email.com"
-          prepend-inner-icon="ri-mail-line"
+          label="Alamat Email Pelanggan"
+          placeholder="contoh@domain.com"
           type="email"
-          variant="outlined"
-          density="compact"
-          class="mb-3"
+          prepend-inner-icon="ri-mail-line"
+          outlined
+          dense
+          required
         />
-
-        <div class="pa-3 rounded bg-light-primary border text-caption">
-          <div class="d-flex justify-space-between mb-1">
-            <span>Pelanggan:</span>
-            <strong>{{ receivable?.customer?.name || '-' }}</strong>
-          </div>
-          <div class="d-flex justify-space-between mb-1">
-            <span>No. Nota:</span>
-            <strong>{{ receivable?.sale?.invoice_number || '-' }}</strong>
-          </div>
-          <div class="d-flex justify-space-between">
-            <span>Sisa Tagihan:</span>
-            <strong class="text-error">{{ formatCurrency(remainingBalance) }}</strong>
-          </div>
-        </div>
       </VCardText>
 
-      <VCardActions class="pa-4 pt-0 justify-end gap-2">
-        <VBtn variant="tonal" color="secondary" @click="isSendEmailDialogVisible = false">
+      <VCardActions class="pa-5 pt-0 d-flex justify-end gap-2">
+        <VBtn
+          variant="outlined"
+          color="secondary"
+          @click="isSendEmailDialogVisible = false"
+        >
           Batal
         </VBtn>
         <VBtn
           color="primary"
-          class="font-weight-bold"
+          variant="flat"
           prepend-icon="ri-send-plane-fill"
           :loading="isSendingEmail"
           @click="submitSendEmail"
@@ -711,7 +759,7 @@ const printReceipt = () => {
     max-width="400"
     persistent
   >
-    <VCard class="text-center pa-6">
+    <VCard class="text-center pa-6 rounded-xl">
       <VIcon
         icon="ri-checkbox-circle-fill"
         color="success"
@@ -722,7 +770,7 @@ const printReceipt = () => {
         Pembayaran Berhasil!
       </VCardTitle>
       <VCardText>
-        Cicilan piutang telah berhasil dicatat ke dalam sistem.
+        Cicilan piutang telah berhasil dicatat & saldo rekening bank diperbarui secara otomatis.
       </VCardText>
       
       <VCardActions class="d-flex flex-column gap-3 mt-4">
@@ -732,9 +780,10 @@ const printReceipt = () => {
           variant="flat"
           size="large"
           prepend-icon="ri-printer-line"
+          class="font-weight-bold"
           @click="printReceipt"
         >
-          Cetak Struk Pembayaran
+          Cetak Kuitansi Pembayaran
         </VBtn>
         <VBtn
           color="secondary"
@@ -743,16 +792,19 @@ const printReceipt = () => {
           size="large"
           @click="isSuccessDialogVisible = false"
         >
-          Tutup
+          Selesai / Tutup
         </VBtn>
       </VCardActions>
     </VCard>
   </VDialog>
 
-  <!-- Hidden Printable Component -->
+  <!-- Hidden Printable Component using Database Paper Rules -->
   <ReceivableReceiptPrinter 
+    ref="receiptPrinterRef"
     :receivable="receivable" 
     :last-payment="lastPayment"
     :branch="activeBranch"
+    :setting="activeReceiptSetting"
+    :print-format="activeReceiptSetting?.name?.toLowerCase().includes('thermal') ? 'thermal' : 'kwitansi'"
   />
 </template>

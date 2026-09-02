@@ -78,6 +78,31 @@ const selectedBankForSales = ref(null)
 const recentSalesList = ref([])
 const isLoadingRecentSales = ref(false)
 
+// Rekening Koran / Bank Statement State
+const isStatementModalOpen = ref(false)
+const selectedBankForStatement = ref(null)
+const statementData = ref({
+  bank_account: {},
+  period: {},
+  summary: {
+    initial_balance: 0,
+    opening_balance: 0,
+    total_credit: 0,
+    total_debit: 0,
+    closing_balance: 0,
+    current_balance: 0,
+    mutation_count: 0,
+  },
+  mutations: [],
+})
+const isLoadingStatement = ref(false)
+const isDownloadingPdf = ref(false)
+const statementSearch = ref('')
+const statementTypeFilter = ref('all') // 'all' | 'credit' | 'debit'
+const statementQuickRange = ref('month') // 'today' | '7days' | 'month' | 'year' | 'all' | 'custom'
+const statementStartDate = ref('')
+const statementEndDate = ref('')
+
 const currentMonthName = computed(() => {
   const m = monthNames.find(item => item.value === selectedMonth.value)
   return m ? m.name : ''
@@ -199,6 +224,107 @@ const openRecentSales = async account => {
     recentSalesList.value = []
   } finally {
     isLoadingRecentSales.value = false
+  }
+}
+
+const setQuickRange = range => {
+  statementQuickRange.value = range
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+
+  if (range === 'today') {
+    statementStartDate.value = `${year}-${month}-${day}`
+    statementEndDate.value = `${year}-${month}-${day}`
+  } else if (range === '7days') {
+    const prior = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000)
+    const pYear = prior.getFullYear()
+    const pMonth = String(prior.getMonth() + 1).padStart(2, '0')
+    const pDay = String(prior.getDate()).padStart(2, '0')
+    statementStartDate.value = `${pYear}-${pMonth}-${pDay}`
+    statementEndDate.value = `${year}-${month}-${day}`
+  } else if (range === 'month') {
+    const lastDay = new Date(year, now.getMonth() + 1, 0).getDate()
+    statementStartDate.value = `${year}-${month}-01`
+    statementEndDate.value = `${year}-${month}-${String(lastDay).padStart(2, '0')}`
+  } else if (range === 'year') {
+    statementStartDate.value = `${year}-01-01`
+    statementEndDate.value = `${year}-12-31`
+  } else if (range === 'all') {
+    statementStartDate.value = ''
+    statementEndDate.value = ''
+  }
+  fetchStatement()
+}
+
+const openStatementModal = async account => {
+  selectedBankForStatement.value = account
+  isStatementModalOpen.value = true
+  statementSearch.value = ''
+  statementTypeFilter.value = 'all'
+  setQuickRange('month')
+}
+
+const fetchStatement = async () => {
+  if (!selectedBankForStatement.value) return
+  isLoadingStatement.value = true
+  try {
+    const params = {}
+    if (statementStartDate.value) params.start_date = statementStartDate.value
+    if (statementEndDate.value) params.end_date = statementEndDate.value
+    if (statementSearch.value) params.search = statementSearch.value
+    if (statementTypeFilter.value && statementTypeFilter.value !== 'all') params.type_filter = statementTypeFilter.value
+
+    const res = await $api(`/apps/bank-accounts/${selectedBankForStatement.value.id}/statement`, { query: params })
+    statementData.value = res || {}
+  } catch (error) {
+    console.error('Failed to fetch bank statement:', error)
+    snackbar.show('Gagal memuat rekening koran bank', 'error')
+  } finally {
+    isLoadingStatement.value = false
+  }
+}
+
+const downloadStatementPdf = async () => {
+  if (!selectedBankForStatement.value) return
+  isDownloadingPdf.value = true
+  try {
+    const queryParams = new URLSearchParams()
+    if (statementStartDate.value) queryParams.append('start_date', statementStartDate.value)
+    if (statementEndDate.value) queryParams.append('end_date', statementEndDate.value)
+    if (statementSearch.value) queryParams.append('search', statementSearch.value)
+    if (statementTypeFilter.value && statementTypeFilter.value !== 'all') queryParams.append('type_filter', statementTypeFilter.value)
+
+    const url = `/api/apps/bank-accounts/${selectedBankForStatement.value.id}/export-pdf?${queryParams.toString()}`
+    
+    // Fetch blob with auth token
+    const token = useCookie('accessToken').value
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/pdf',
+      },
+    })
+
+    if (!response.ok) throw new Error('Download failed')
+
+    const blob = await response.blob()
+    const blobUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = `Rekening_Koran_${selectedBankForStatement.value.bank_name.replace(/[^a-zA-Z0-9]/g, '_')}_${statementStartDate.value || 'All'}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(blobUrl)
+
+    snackbar.show('Buku Rekening Koran PDF berhasil diunduh!', 'success')
+  } catch (error) {
+    console.error('Failed to download PDF:', error)
+    snackbar.show('Gagal mengunduh PDF Rekening Koran', 'error')
+  } finally {
+    isDownloadingPdf.value = false
   }
 }
 
@@ -332,24 +458,31 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="bank-accounts-page">
-    <!-- Top Header -->
-    <div class="d-flex justify-space-between align-center mb-5 flex-wrap gap-4">
+  <div class="pa-4">
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-center justify-space-between mb-4 gap-4">
       <div>
-        <h4 class="text-h4 font-weight-bold mb-1 d-flex align-center gap-2">
-          <VIcon icon="ri-bank-card-line" color="primary" size="32" />
-          Rekening Bank & Pendapatan Penjualan
-        </h4>
-        <p class="text-body-1 text-medium-emphasis mb-0">
-          Monitoring buku kas & rekening bank, rincian omzet per bulan, serta penetapan rekening penerima kasir POS.
+        <h2 class="text-h4 font-weight-bold mb-1">
+          Rekening Bank & Kas Penerimaan
+        </h2>
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          Monitoring buku bank, rekening koran resmi, penerimaan penjualan kasir, dan penagihan piutang.
         </p>
       </div>
 
       <div class="d-flex align-center gap-3">
         <VBtn
+          color="secondary"
+          variant="tonal"
+          prepend-icon="ri-refresh-line"
+          :loading="isLoading"
+          @click="fetchBankAccounts"
+        >
+          Muat Ulang
+        </VBtn>
+        <VBtn
           color="primary"
           prepend-icon="ri-add-line"
-          class="font-weight-bold"
           @click="openAddDrawer"
         >
           Tambah Rekening Bank
@@ -357,223 +490,167 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Period Filter Toolbar: Year Selector & 12 Month Bar -->
-    <VCard class="mb-6 rounded-xl border shadow-sm period-filter-card">
-      <VCardText class="pa-4">
-        <div class="d-flex align-center justify-space-between flex-wrap gap-4 mb-3">
-          <!-- Left: Year Picker & Quick Jump -->
-          <div class="d-flex align-center gap-3 flex-wrap">
-            <div class="d-flex align-center gap-2">
-              <VIcon icon="ri-calendar-event-line" color="primary" size="22" />
-              <span class="font-weight-bold text-subtitle-2 text-uppercase letter-spacing-1">
-                Pilih Periode Tahun:
-              </span>
-            </div>
-
-            <div style="width: 140px;">
-              <VSelect
-                v-model="selectedYear"
-                :items="availableYears"
-                density="compact"
-                variant="outlined"
-                class="font-weight-bold font-mono"
-                hide-details
-              />
-            </div>
-
-            <VBtn
-              size="small"
-              variant="tonal"
-              color="primary"
-              prepend-icon="ri-time-line"
-              @click="resetToCurrentPeriod"
-            >
-              Bulan Sekarang
-            </VBtn>
-          </div>
-
-          <!-- Right: Branch & Type Quick Filters -->
-          <div class="d-flex align-center gap-3 flex-wrap">
-            <div style="min-width: 180px;">
-              <VSelect
-                v-model="selectedBranch"
-                :items="[{ title: 'Semua Cabang', value: null }, ...branches.map(b => ({ title: b.name, value: b.id }))]"
-                item-title="title"
-                item-value="value"
-                density="compact"
-                variant="outlined"
-                placeholder="Pilih Cabang"
-                hide-details
-              />
-            </div>
-
-            <div style="min-width: 160px;">
-              <VSelect
-                v-model="selectedType"
-                :items="[
-                  { title: 'Semua Tipe', value: null },
-                  { title: 'Transfer Bank', value: 'bank_transfer' },
-                  { title: 'QRIS Merchant', value: 'qris' },
-                  { title: 'EDC Kasir', value: 'edc_debit' },
-                  { title: 'Kas Tunai', value: 'cash' },
-                ]"
-                item-title="title"
-                item-value="value"
-                density="compact"
-                variant="outlined"
-                placeholder="Tipe Akun"
-                hide-details
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- 12 Months Horizontal Selector Bar -->
-        <div class="month-selector-wrapper pt-2 border-t">
-          <div class="d-flex gap-2 overflow-x-auto pb-1 month-scroll">
-            <button
-              v-for="m in monthNames"
-              :key="m.value"
-              type="button"
-              class="month-btn"
-              :class="{ 'month-btn-active': selectedMonth === m.value }"
-              @click="selectedMonth = m.value"
-            >
-              <span class="month-name">{{ m.name }}</span>
-              <span class="month-year">{{ selectedYear }}</span>
-            </button>
-          </div>
-        </div>
-      </VCardText>
-    </VCard>
-
-    <!-- Monthly KPI Cards Overview -->
-    <VRow class="mb-6">
-      <!-- 1. Total Saldo Berjalan Semua Bank -->
+    <!-- KPI Summary Row (Matching standard template design) -->
+    <VRow class="mb-4">
+      <!-- 1. Total Saldo Bank (Berjalan) -->
       <VCol cols="12" sm="6" md="3">
-        <VCard class="h-100 rounded-xl border shadow-xs">
-          <VCardText class="d-flex align-center justify-space-between pa-4">
+        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+          <div class="d-flex align-center justify-space-between">
             <div>
-              <span class="text-caption text-medium-emphasis font-weight-medium">Total Saldo Bank (Berjalan):</span>
-              <h5 class="text-h5 font-weight-bold font-mono text-primary mt-1">
+              <div class="text-caption text-primary font-weight-bold">TOTAL SALDO BANK</div>
+              <div class="text-h5 font-weight-bold text-primary mt-1 font-mono">
                 {{ formatCurrency(summary.total_balance) }}
-              </h5>
-              <span class="text-caption text-medium-emphasis">
-                {{ summary.active_accounts }} Rekening Bank Aktif
-              </span>
+              </div>
             </div>
-            <VAvatar color="primary" variant="tonal" size="46" class="rounded-xl">
-              <VIcon icon="ri-wallet-3-line" size="22" />
+            <VAvatar color="primary" variant="tonal" rounded size="44">
+              <VIcon icon="ri-wallet-3-line" size="24" />
             </VAvatar>
-          </VCardText>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">{{ summary.active_accounts }} Rekening Bank Aktif</div>
         </VCard>
       </VCol>
 
       <!-- 2. Penerimaan Bulan Ini -->
       <VCol cols="12" sm="6" md="3">
-        <VCard class="h-100 rounded-xl border shadow-xs">
-          <VCardText class="d-flex align-center justify-space-between pa-4">
+        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+          <div class="d-flex align-center justify-space-between">
             <div>
-              <span class="text-caption text-medium-emphasis font-weight-medium">
-                Penerimaan {{ currentMonthName }} {{ selectedYear }}:
-              </span>
-              <h5 class="text-h5 font-weight-bold font-mono text-success mt-1">
+              <div class="text-caption text-success font-weight-bold">PENERIMAAN {{ currentMonthName.toUpperCase() }}</div>
+              <div class="text-h5 font-weight-bold text-success mt-1 font-mono">
                 {{ formatCurrency(summary.selected_month_received) }}
-              </h5>
-              <span class="text-caption text-success font-weight-medium">
-                {{ summary.selected_month_tx_count }} Transaksi Masuk
-              </span>
+              </div>
             </div>
-            <VAvatar color="success" variant="tonal" size="46" class="rounded-xl">
-              <VIcon icon="ri-arrow-down-circle-line" size="22" />
+            <VAvatar color="success" variant="tonal" rounded size="44">
+              <VIcon icon="ri-arrow-down-circle-line" size="24" />
             </VAvatar>
-          </VCardText>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">{{ summary.selected_month_tx_count }} Transaksi Masuk</div>
         </VCard>
       </VCol>
 
-      <!-- 3. Penerimaan Tahun Terpilih -->
+      <!-- 3. Omzet Tahun Berjalan -->
       <VCol cols="12" sm="6" md="3">
-        <VCard class="h-100 rounded-xl border shadow-xs">
-          <VCardText class="d-flex align-center justify-space-between pa-4">
+        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+          <div class="d-flex align-center justify-space-between">
             <div>
-              <span class="text-caption text-medium-emphasis font-weight-medium">
-                Total Omzet Tahun {{ selectedYear }}:
-              </span>
-              <h5 class="text-h5 font-weight-bold font-mono text-high-emphasis mt-1">
+              <div class="text-caption text-info font-weight-bold">TOTAL OMZET TAHUN {{ selectedYear }}</div>
+              <div class="text-h5 font-weight-bold text-info mt-1 font-mono">
                 {{ formatCurrency(summary.selected_year_received) }}
-              </h5>
-              <span class="text-caption text-medium-emphasis">
-                Akumulasi Seluruh Rekening
-              </span>
+              </div>
             </div>
-            <VAvatar color="info" variant="tonal" size="46" class="rounded-xl">
-              <VIcon icon="ri-line-chart-line" size="22" />
+            <VAvatar color="info" variant="tonal" rounded size="44">
+              <VIcon icon="ri-line-chart-line" size="24" />
             </VAvatar>
-          </VCardText>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Akumulasi Seluruh Rekening</div>
         </VCard>
       </VCol>
 
-      <!-- 4. Rata-rata per Transaksi -->
+      <!-- 4. Rata-rata Nominal per Transaksi -->
       <VCol cols="12" sm="6" md="3">
-        <VCard class="h-100 rounded-xl border shadow-xs">
-          <VCardText class="d-flex align-center justify-space-between pa-4">
+        <VCard elevation="2" class="pa-4 border-s-lg border-warning">
+          <div class="d-flex align-center justify-space-between">
             <div>
-              <span class="text-caption text-medium-emphasis font-weight-medium">
-                Rata-rata / Bon ({{ currentMonthName }}):
-              </span>
-              <h5 class="text-h5 font-weight-bold font-mono text-warning mt-1">
+              <div class="text-caption text-warning font-weight-bold">RATA-RATA / BON</div>
+              <div class="text-h5 font-weight-bold text-warning mt-1 font-mono">
                 {{ formatCurrency(summary.selected_month_tx_count > 0 ? (summary.selected_month_received / summary.selected_month_tx_count) : 0) }}
-              </h5>
-              <span class="text-caption text-medium-emphasis">
-                Tiket Pembayaran Bank
-              </span>
+              </div>
             </div>
-            <VAvatar color="warning" variant="tonal" size="46" class="rounded-xl">
-              <VIcon icon="ri-money-dollar-circle-line" size="22" />
+            <VAvatar color="warning" variant="tonal" rounded size="44">
+              <VIcon icon="ri-money-dollar-circle-line" size="24" />
             </VAvatar>
-          </VCardText>
+          </div>
+          <div class="text-caption text-medium-emphasis mt-2">Rata-rata Penerimaan Kasir</div>
         </VCard>
       </VCol>
     </VRow>
 
-    <!-- Main View Switcher & Search Bar -->
-    <div class="d-flex justify-space-between align-center mb-4 flex-wrap gap-3">
-      <VTabs v-model="activeTab" density="compact" class="border-b-0">
+    <!-- Clean Single-Row Filter Card -->
+    <VCard elevation="2" class="mb-4">
+      <VCardText class="pa-4">
+        <VRow dense align="center">
+          <VCol cols="12" sm="6" md="2">
+            <VSelect
+              v-model="selectedYear"
+              :items="availableYears"
+              label="Tahun"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </VCol>
+          <VCol cols="12" sm="6" md="2">
+            <VSelect
+              v-model="selectedMonth"
+              :items="monthNames"
+              item-title="name"
+              item-value="value"
+              label="Bulan"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </VCol>
+          <VCol cols="12" sm="6" md="2">
+            <VSelect
+              v-model="selectedBranch"
+              :items="[{ title: 'Semua Cabang', value: null }, ...branches.map(b => ({ title: b.name, value: b.id }))]"
+              item-title="title"
+              item-value="value"
+              label="Cabang"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </VCol>
+          <VCol cols="12" sm="6" md="2">
+            <VSelect
+              v-model="selectedType"
+              :items="[
+                { title: 'Semua Tipe', value: null },
+                { title: 'Transfer Bank', value: 'bank_transfer' },
+                { title: 'QRIS Merchant', value: 'qris' },
+                { title: 'EDC Kasir', value: 'edc_debit' },
+                { title: 'Kas Tunai', value: 'cash' },
+              ]"
+              item-title="title"
+              item-value="value"
+              label="Tipe Akun"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </VCol>
+          <VCol cols="12" sm="12" md="4">
+            <VTextField
+              v-model="searchQuery"
+              placeholder="Cari nama bank, no. rek..."
+              prepend-inner-icon="ri-search-line"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details
+            />
+          </VCol>
+        </VRow>
+      </VCardText>
+    </VCard>
+
+    <!-- Main View Switcher -->
+    <div class="d-flex justify-space-between align-center mb-4">
+      <VTabs v-model="activeTab" density="compact">
         <VTab value="cards" class="font-weight-bold">
           <VIcon icon="ri-grid-fill" size="18" class="me-1" />
-          Kartu ATM & QRIS ({{ bankAccounts.length }})
+          Kartu Rekening ({{ bankAccounts.length }})
         </VTab>
         <VTab value="table" class="font-weight-bold">
           <VIcon icon="ri-table-line" size="18" class="me-1" />
           Tabel Rekap Bulan {{ currentMonthName }}
         </VTab>
       </VTabs>
-
-      <div class="d-flex align-center gap-3">
-        <div style="width: 260px;">
-          <VTextField
-            v-model="searchQuery"
-            placeholder="Cari nama bank, no. rek..."
-            prepend-inner-icon="ri-search-line"
-            density="compact"
-            variant="outlined"
-            clearable
-            hide-details
-          />
-        </div>
-        <VBtn
-          color="secondary"
-          variant="tonal"
-          size="small"
-          icon="ri-refresh-line"
-          :loading="isLoading"
-          title="Segarkan Data"
-          @click="fetchBankAccounts"
-        />
-      </div>
     </div>
 
-    <!-- TAB 1: Visual ATM Cards Gallery Grid -->
+    <!-- TAB 1: Clean Bank Cards Gallery Grid -->
     <div v-if="activeTab === 'cards'">
       <VRow v-if="bankAccounts.length > 0">
         <VCol
@@ -583,25 +660,23 @@ onMounted(() => {
           sm="6"
           lg="4"
         >
-          <div
-            class="atm-card rounded-xl text-white position-relative overflow-hidden shadow-md"
-            :style="{ background: `linear-gradient(135deg, ${account.color || '#0066AE'} 0%, #151a30 100%)` }"
-          >
-            <!-- Watermark Pattern -->
-            <div class="card-decor-circle-1" />
-            <div class="card-decor-circle-2" />
+          <VCard elevation="2" class="h-100 d-flex flex-column rounded-xl border">
+            <!-- Card Header -->
+            <VCardItem class="pb-3">
+              <template #prepend>
+                <VAvatar
+                  :color="account.type === 'qris' ? 'info' : (account.type === 'edc_debit' ? 'warning' : 'primary')"
+                  variant="tonal"
+                  rounded
+                  size="44"
+                  class="me-3"
+                >
+                  <VIcon :icon="account.type === 'qris' ? 'ri-qr-code-line' : (account.type === 'edc_debit' ? 'ri-bank-card-line' : 'ri-bank-line')" size="24" />
+                </VAvatar>
+              </template>
 
-            <div class="pa-5 position-relative z-1">
-              <!-- Top Row: Bank Header & Badges -->
-              <div class="d-flex justify-space-between align-start mb-3">
-                <div>
-                  <span class="text-caption text-white text-opacity-75 text-uppercase font-weight-bold letter-spacing-1 d-block">
-                    {{ account.type === 'qris' ? 'QRIS MERCHANT' : (account.type === 'edc_debit' ? 'EDC KASIR' : 'REKENING BANK') }}
-                  </span>
-                  <h5 class="text-h5 font-weight-bold text-white mb-0">
-                    {{ account.bank_name }}
-                  </h5>
-                </div>
+              <VCardTitle class="text-h6 font-weight-bold d-flex align-center justify-space-between">
+                <span>{{ account.bank_name }}</span>
                 <div class="d-flex align-center gap-1">
                   <VChip
                     v-if="account.is_default"
@@ -615,123 +690,116 @@ onMounted(() => {
                   <VChip
                     :color="account.is_active ? 'success' : 'secondary'"
                     size="x-small"
-                    variant="flat"
+                    variant="tonal"
                     class="font-weight-bold"
                   >
-                    {{ account.is_active ? 'AKTIF' : 'NON-AKTIF' }}
+                    {{ account.is_active ? 'Aktif' : 'Non-aktif' }}
                   </VChip>
                 </div>
-              </div>
+              </VCardTitle>
 
-              <!-- Chip & QRIS Preview Button -->
+              <VCardSubtitle class="text-caption text-medium-emphasis">
+                {{ account.branch?.name || 'Semua Cabang' }} &bull; {{ account.account_name || '-' }}
+              </VCardSubtitle>
+            </VCardItem>
+
+            <VDivider />
+
+            <!-- Card Body -->
+            <VCardText class="py-3 flex-grow-1">
+              <!-- Account Number Row -->
               <div class="d-flex justify-space-between align-center mb-3">
-                <div class="atm-chip shadow-xs" />
-                <div v-if="account.qris_image">
-                  <VBtn
-                    size="x-small"
-                    color="white"
-                    variant="flat"
-                    class="text-primary font-weight-bold shadow-xs"
-                    prepend-icon="ri-qr-code-line"
-                    @click="openQrisPreview(account)"
-                  >
-                    QRIS Barcode
-                  </VBtn>
-                </div>
-              </div>
-
-              <!-- Account Number & 1-Click Copy -->
-              <div class="mb-3">
-                <span class="text-caption text-white text-opacity-75 d-block">Nomor Rekening / ID:</span>
-                <div class="d-flex align-center gap-2">
-                  <span class="text-h6 font-mono font-weight-bold text-white letter-spacing-2">
-                    {{ account.account_number || '-' }}
-                  </span>
+                <div class="d-flex align-center gap-1.5">
+                  <span class="text-caption text-medium-emphasis">No. Rek:</span>
+                  <span class="font-mono font-weight-bold text-body-1">{{ account.account_number || '-' }}</span>
                   <VBtn
                     v-if="account.account_number"
                     icon="ri-file-copy-line"
                     size="x-small"
                     variant="text"
-                    color="white"
+                    color="secondary"
                     title="Salin Nomor Rekening"
                     @click="copyToClipboard(account.account_number, account.bank_name)"
                   />
                 </div>
-              </div>
-
-              <!-- Account Holder & Balances -->
-              <div class="d-flex justify-space-between align-end pt-2 border-t border-white border-opacity-25 mb-3">
-                <div>
-                  <span class="text-caption text-white text-opacity-75 d-block">Atas Nama:</span>
-                  <div class="text-subtitle-2 font-weight-bold text-white text-uppercase">
-                    {{ account.account_name || '-' }}
-                  </div>
-                  <span class="text-caption text-white text-opacity-75 font-weight-medium">
-                    {{ account.branch?.name || 'Semua Cabang' }}
-                  </span>
-                </div>
-                <div class="text-right">
-                  <span class="text-caption text-white text-opacity-75 d-block">Saldo Berjalan:</span>
-                  <div class="text-h6 font-mono font-weight-bold text-white">
-                    {{ formatCurrency(account.current_balance) }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Monthly Highlight Box -->
-              <div class="month-highlight-box pa-2 rounded-lg bg-black bg-opacity-25 border border-white border-opacity-15 mb-3">
-                <div class="d-flex justify-space-between align-center text-caption">
-                  <span class="text-white text-opacity-90">
-                    <VIcon icon="ri-calendar-check-line" size="14" class="me-1" />
-                    Omzet {{ currentMonthName }} {{ selectedYear }}:
-                  </span>
-                  <span class="font-weight-bold font-mono text-white">
-                    {{ formatCurrency(account.month_received || 0) }}
-                  </span>
-                </div>
-                <div class="d-flex justify-space-between align-center text-caption mt-1">
-                  <span class="text-white text-opacity-75">
-                    Transaksi Masuk Bulan Ini:
-                  </span>
-                  <span class="font-mono text-white text-opacity-90">
-                    {{ account.month_tx_count || 0 }} Transaksi
-                  </span>
-                </div>
-              </div>
-
-              <!-- Card Action Buttons -->
-              <div class="d-flex justify-space-between align-center pt-2 border-t border-white border-opacity-15">
                 <VBtn
+                  v-if="account.qris_image"
                   size="x-small"
                   variant="tonal"
-                  color="white"
+                  color="info"
+                  prepend-icon="ri-qr-code-line"
+                  @click="openQrisPreview(account)"
+                >
+                  QRIS
+                </VBtn>
+              </div>
+
+              <!-- Saldo & Omzet 2-Column Info -->
+              <VRow dense class="mt-1">
+                <VCol cols="6">
+                  <div class="text-caption text-medium-emphasis">Saldo Berjalan</div>
+                  <div class="text-h6 font-weight-bold font-mono text-primary mt-1">
+                    {{ formatCurrency(account.current_balance) }}
+                  </div>
+                </VCol>
+                <VCol cols="6" class="text-right">
+                  <div class="text-caption text-medium-emphasis">Penerimaan ({{ currentMonthName }})</div>
+                  <div class="text-subtitle-1 font-weight-bold font-mono text-success mt-1">
+                    +{{ formatCurrency(account.month_received || 0) }}
+                  </div>
+                  <div class="text-caption text-disabled" style="font-size: 11px;">
+                    {{ account.month_tx_count || 0 }} Transaksi
+                  </div>
+                </VCol>
+              </VRow>
+            </VCardText>
+
+            <VDivider />
+
+            <!-- Card Actions -->
+            <VCardActions class="pa-3 bg-surface d-flex justify-space-between align-center">
+              <div class="d-flex gap-2">
+                <VBtn
+                  size="small"
+                  variant="flat"
+                  color="primary"
+                  prepend-icon="ri-book-read-line"
+                  class="font-weight-bold"
+                  @click="openStatementModal(account)"
+                >
+                  Buku Bank
+                </VBtn>
+                <VBtn
+                  size="small"
+                  variant="tonal"
+                  color="secondary"
                   prepend-icon="ri-history-line"
                   @click="openRecentSales(account)"
                 >
                   Mutasi Bon
                 </VBtn>
-
-                <div class="d-flex gap-1">
-                  <VBtn
-                    size="x-small"
-                    variant="tonal"
-                    color="white"
-                    prepend-icon="ri-edit-line"
-                    @click="openEditDrawer(account)"
-                  >
-                    Edit
-                  </VBtn>
-                  <VBtn
-                    size="x-small"
-                    variant="tonal"
-                    color="error"
-                    icon="ri-delete-bin-line"
-                    @click="deleteBankAccount(account)"
-                  />
-                </div>
               </div>
-            </div>
-          </div>
+
+              <div class="d-flex gap-1">
+                <VBtn
+                  size="small"
+                  variant="text"
+                  color="secondary"
+                  icon="ri-edit-line"
+                  title="Edit Rekening"
+                  @click="openEditDrawer(account)"
+                />
+                <VBtn
+                  size="small"
+                  variant="text"
+                  color="error"
+                  icon="ri-delete-bin-line"
+                  title="Hapus Rekening"
+                  @click="deleteBankAccount(account)"
+                />
+              </div>
+            </VCardActions>
+          </VCard>
         </VCol>
       </VRow>
 
@@ -815,12 +883,15 @@ onMounted(() => {
                 <div class="d-flex justify-center gap-1">
                   <VBtn
                     size="x-small"
-                    variant="tonal"
+                    variant="flat"
                     color="primary"
-                    icon="ri-history-line"
-                    title="Lihat Mutasi Bon"
-                    @click="openRecentSales(acc)"
-                  />
+                    prepend-icon="ri-book-read-line"
+                    class="font-weight-bold"
+                    title="Buku Bank / Rekening Koran"
+                    @click="openStatementModal(acc)"
+                  >
+                    Buku Bank
+                  </VBtn>
                   <VBtn
                     size="x-small"
                     variant="tonal"
@@ -828,6 +899,14 @@ onMounted(() => {
                     icon="ri-edit-line"
                     title="Edit Rekening"
                     @click="openEditDrawer(acc)"
+                  />
+                  <VBtn
+                    size="x-small"
+                    variant="tonal"
+                    color="error"
+                    icon="ri-delete-bin-line"
+                    title="Hapus Rekening"
+                    @click="deleteBankAccount(acc)"
                   />
                 </div>
               </td>
@@ -1157,126 +1236,357 @@ onMounted(() => {
         </VCardText>
       </VCard>
     </VDialog>
+    <!-- MODAL BUKU BANK & REKENING KORAN (CLEAN & ELEGANT) -->
+    <VDialog
+      v-model="isStatementModalOpen"
+      max-width="1100"
+      scrollable
+      transition="dialog-bottom-transition"
+    >
+      <VCard class="rounded-xl overflow-hidden border">
+        <!-- Dialog Header -->
+        <VCardItem class="pa-5 bg-surface border-b">
+          <template #prepend>
+            <VAvatar color="primary" variant="tonal" rounded size="44" class="me-3">
+              <VIcon icon="ri-book-read-line" size="24" />
+            </VAvatar>
+          </template>
+
+          <VCardTitle class="text-h6 font-weight-bold d-flex align-center justify-space-between">
+            <div class="d-flex align-center gap-2 flex-wrap">
+              <span>Buku Mutasi & Rekening Koran</span>
+              <VChip size="small" color="primary" variant="tonal" class="font-weight-bold">
+                {{ selectedBankForStatement?.bank_name }}
+              </VChip>
+              <VChip
+                v-if="selectedBankForStatement?.is_default"
+                size="small"
+                color="warning"
+                variant="flat"
+                class="font-weight-bold"
+              >
+                UTAMA
+              </VChip>
+            </div>
+            <VBtn
+              icon="ri-close-line"
+              variant="text"
+              color="secondary"
+              size="small"
+              @click="isStatementModalOpen = false"
+            />
+          </VCardTitle>
+
+          <VCardSubtitle class="text-caption text-medium-emphasis mt-1">
+            <span class="d-inline-flex align-center gap-1">
+              <span>No. Rek:</span>
+              <strong class="font-mono text-high-emphasis">{{ selectedBankForStatement?.account_number || '-' }}</strong>
+              <VBtn
+                v-if="selectedBankForStatement?.account_number"
+                icon="ri-file-copy-line"
+                size="x-small"
+                variant="text"
+                color="secondary"
+                title="Salin No. Rekening"
+                @click="copyToClipboard(selectedBankForStatement.account_number, selectedBankForStatement.bank_name)"
+              />
+            </span>
+            <span class="mx-2">&bull;</span>
+            <span>Atas Nama: <strong class="text-high-emphasis">{{ selectedBankForStatement?.account_name || '-' }}</strong></span>
+            <span class="mx-2">&bull;</span>
+            <span>Cabang: <strong>{{ selectedBankForStatement?.branch?.name || 'Semua Cabang' }}</strong></span>
+          </VCardSubtitle>
+        </VCardItem>
+
+        <!-- Filter & Date Controls -->
+        <div class="pa-4 bg-surface border-b">
+          <!-- Top Row: Quick Presets & Refresh -->
+          <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-3">
+            <div class="d-flex align-center gap-1.5 flex-wrap">
+              <span class="text-caption font-weight-bold text-medium-emphasis me-1">Rentang:</span>
+              <VBtn
+                v-for="range in [
+                  { key: 'today', label: 'Hari Ini' },
+                  { key: '7days', label: '7 Hari' },
+                  { key: 'month', label: 'Bulan Ini' },
+                  { key: 'year', label: 'Tahun Ini' },
+                  { key: 'all', label: 'Semua' },
+                ]"
+                :key="range.key"
+                size="small"
+                :variant="statementQuickRange === range.key ? 'flat' : 'tonal'"
+                :color="statementQuickRange === range.key ? 'primary' : 'secondary'"
+                class="font-weight-bold"
+                @click="setQuickRange(range.key)"
+              >
+                {{ range.label }}
+              </VBtn>
+            </div>
+
+            <VBtn
+              size="small"
+              variant="tonal"
+              color="secondary"
+              prepend-icon="ri-refresh-line"
+              :loading="isLoadingStatement"
+              @click="fetchStatement"
+            >
+              Segarkan
+            </VBtn>
+          </div>
+
+          <!-- Bottom Row: Filter Inputs with proper full widths -->
+          <VRow dense align="center">
+            <VCol cols="12" sm="3">
+              <VTextField
+                v-model="statementStartDate"
+                type="date"
+                label="Dari Tanggal"
+                density="compact"
+                variant="outlined"
+                hide-details
+                @change="fetchStatement"
+              />
+            </VCol>
+            <VCol cols="12" sm="3">
+              <VTextField
+                v-model="statementEndDate"
+                type="date"
+                label="Sampai Tanggal"
+                density="compact"
+                variant="outlined"
+                hide-details
+                @change="fetchStatement"
+              />
+            </VCol>
+            <VCol cols="12" sm="3">
+              <VSelect
+                v-model="statementTypeFilter"
+                :items="[
+                  { title: 'Semua Mutasi', value: 'all' },
+                  { title: 'Masuk (Kredit +)', value: 'credit' },
+                  { title: 'Keluar (Debet -)', value: 'debit' },
+                ]"
+                item-title="title"
+                item-value="value"
+                label="Jenis Mutasi"
+                density="compact"
+                variant="outlined"
+                hide-details
+                @update:model-value="fetchStatement"
+              />
+            </VCol>
+            <VCol cols="12" sm="3">
+              <VTextField
+                v-model="statementSearch"
+                placeholder="Cari transaksi..."
+                prepend-inner-icon="ri-search-line"
+                density="compact"
+                variant="outlined"
+                clearable
+                hide-details
+                @input="fetchStatement"
+              />
+            </VCol>
+          </VRow>
+        </div>
+
+        <!-- 4-KPI Balance Summary (Standard Left-Border Style) -->
+        <div class="pa-4 bg-surface">
+          <VRow dense>
+            <!-- 1. Saldo Awal -->
+            <VCol cols="12" sm="6" md="3">
+              <VCard elevation="1" class="pa-3 border-s-lg border-primary h-100">
+                <div class="text-caption text-primary font-weight-bold">SALDO AWAL PERIODE</div>
+                <div class="text-h6 font-weight-bold font-mono text-primary mt-1">
+                  {{ formatCurrency(statementData.summary?.opening_balance || 0) }}
+                </div>
+                <div class="text-caption text-medium-emphasis mt-1">
+                  Per {{ formatDate(statementData.period?.start_date) }}
+                </div>
+              </VCard>
+            </VCol>
+
+            <!-- 2. Total Masuk (Kredit +) -->
+            <VCol cols="12" sm="6" md="3">
+              <VCard elevation="1" class="pa-3 border-s-lg border-success h-100">
+                <div class="text-caption text-success font-weight-bold">TOTAL MASUK (KREDIT +)</div>
+                <div class="text-h6 font-weight-bold font-mono text-success mt-1">
+                  +{{ formatCurrency(statementData.summary?.total_credit || 0) }}
+                </div>
+                <div class="text-caption text-medium-emphasis mt-1">
+                  Penjualan POS, Piutang & Modal
+                </div>
+              </VCard>
+            </VCol>
+
+            <!-- 3. Total Keluar (Debet -) -->
+            <VCol cols="12" sm="6" md="3">
+              <VCard elevation="1" class="pa-3 border-s-lg border-error h-100">
+                <div class="text-caption text-error font-weight-bold">TOTAL KELUAR (DEBET -)</div>
+                <div class="text-h6 font-weight-bold font-mono text-error mt-1">
+                  -{{ formatCurrency(statementData.summary?.total_debit || 0) }}
+                </div>
+                <div class="text-caption text-medium-emphasis mt-1">
+                  Hutang Supplier & Kas Kecil
+                </div>
+              </VCard>
+            </VCol>
+
+            <!-- 4. Saldo Akhir Berjalan -->
+            <VCol cols="12" sm="6" md="3">
+              <VCard elevation="1" class="pa-3 border-s-lg border-info h-100">
+                <div class="text-caption text-info font-weight-bold">SALDO AKHIR PERIODE</div>
+                <div class="text-h6 font-weight-bold font-mono text-info mt-1">
+                  {{ formatCurrency(statementData.summary?.closing_balance || 0) }}
+                </div>
+                <div class="text-caption text-medium-emphasis mt-1">
+                  Saldo akhir per {{ formatDate(statementData.period?.end_date) }}
+                </div>
+              </VCard>
+            </VCol>
+          </VRow>
+        </div>
+
+        <!-- Ledger Table / Mutations -->
+        <VCardText class="pa-4 bg-surface" style="max-height: 480px; overflow-y: auto;">
+          <div v-if="isLoadingStatement" class="py-10 text-center">
+            <VProgressCircular indeterminate color="primary" size="38" />
+            <div class="text-caption text-medium-emphasis mt-2">Memuat riwayat buku mutasi bank...</div>
+          </div>
+
+          <div v-else-if="statementData.mutations && statementData.mutations.length > 0">
+            <div class="border rounded-lg overflow-hidden">
+              <table class="w-100 table-clean" style="border-collapse: collapse;">
+                <thead>
+                  <tr class="bg-grey-100 text-medium-emphasis text-uppercase text-caption font-weight-bold border-b">
+                    <th class="pa-3 text-center" style="width: 45px;">No</th>
+                    <th class="pa-3 text-center" style="width: 105px;">Tgl & Jam</th>
+                    <th class="pa-3 text-left" style="width: 140px;">No. Referensi</th>
+                    <th class="pa-3 text-left" style="width: 150px;">Kategori</th>
+                    <th class="pa-3 text-left">Keterangan</th>
+                    <th class="pa-3 text-right" style="width: 125px;">Debet (-)</th>
+                    <th class="pa-3 text-right" style="width: 125px;">Kredit (+)</th>
+                    <th class="pa-3 text-right" style="width: 135px;">Saldo Berjalan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Opening Balance Row -->
+                  <tr class="font-italic text-caption border-b bg-grey-50">
+                    <td class="pa-3 text-center font-weight-bold text-disabled">-</td>
+                    <td class="pa-3 text-center font-weight-bold text-medium-emphasis">{{ formatDate(statementData.period?.start_date) }}</td>
+                    <td class="pa-3 text-left font-weight-bold text-disabled">-</td>
+                    <td class="pa-3 text-left">
+                      <VChip size="x-small" color="secondary" variant="flat" class="font-weight-bold">SALDO AWAL</VChip>
+                    </td>
+                    <td class="pa-3 text-left font-weight-medium text-medium-emphasis">Saldo awal sebelum periode mutasi berjalan</td>
+                    <td class="pa-3 text-right font-mono text-disabled">-</td>
+                    <td class="pa-3 text-right font-mono text-disabled">-</td>
+                    <td class="pa-3 text-right font-mono font-weight-bold text-primary">
+                      {{ formatCurrency(statementData.summary?.opening_balance || 0) }}
+                    </td>
+                  </tr>
+
+                  <!-- Mutation Rows -->
+                  <tr
+                    v-for="(item, idx) in statementData.mutations"
+                    :key="item.id || idx"
+                    class="border-b table-row-hover text-caption"
+                  >
+                    <td class="pa-3 text-center text-disabled">{{ idx + 1 }}</td>
+                    <td class="pa-3 text-center">
+                      <div class="font-weight-bold text-high-emphasis">{{ formatDate(item.date) }}</div>
+                      <div class="text-caption text-disabled" style="font-size: 10px;">{{ item.time || '' }}</div>
+                    </td>
+                    <td class="pa-3 font-mono font-weight-bold text-primary">
+                      {{ item.reference_no }}
+                    </td>
+                    <td class="pa-3">
+                      <VChip
+                        size="x-small"
+                        :color="
+                          item.category.includes('Penjualan') ? 'info' :
+                          (item.category.includes('Piutang') ? 'teal' :
+                          (item.category.includes('Modal') ? 'purple' :
+                          (item.category.includes('Hutang') ? 'warning' :
+                          (item.category.includes('Kas Kecil') ? 'secondary' : 'error'))))
+                        "
+                        variant="tonal"
+                        class="font-weight-bold"
+                      >
+                        {{ item.category }}
+                      </VChip>
+                    </td>
+                    <td class="pa-3 text-high-emphasis" style="max-width: 300px;">
+                      <div class="font-weight-medium text-truncate" :title="item.description">
+                        {{ item.description }}
+                      </div>
+                    </td>
+                    <td class="pa-3 text-right font-mono font-weight-bold text-error">
+                      {{ item.debit > 0 ? ('-' + formatCurrency(item.debit)) : '-' }}
+                    </td>
+                    <td class="pa-3 text-right font-mono font-weight-bold text-success">
+                      {{ item.credit > 0 ? ('+' + formatCurrency(item.credit)) : '-' }}
+                    </td>
+                    <td class="pa-3 text-right font-mono font-weight-bold text-high-emphasis">
+                      {{ formatCurrency(item.running_balance) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div v-else class="pa-10 text-center text-medium-emphasis border rounded-lg bg-surface">
+            <VAvatar color="secondary" variant="tonal" size="48" class="mb-2">
+              <VIcon icon="ri-file-list-3-line" size="24" />
+            </VAvatar>
+            <div class="text-subtitle-2 font-weight-bold text-high-emphasis">Tidak Ada Mutasi Transaksi</div>
+            <div class="text-caption text-medium-emphasis mt-1">
+              Tidak ditemukan pergerakan debet/kredit pada rekening ini untuk rentang tanggal yang dipilih.
+            </div>
+          </div>
+        </VCardText>
+
+        <!-- Dialog Footer Action Bar -->
+        <VDivider />
+        <div class="pa-4 bg-surface d-flex justify-space-between align-center flex-wrap gap-2">
+          <div class="text-caption text-medium-emphasis">
+            Total <strong>{{ statementData.mutations?.length || 0 }}</strong> baris mutasi dalam periode laporan.
+          </div>
+          <div class="d-flex align-center gap-2">
+            <VBtn
+              variant="outlined"
+              color="secondary"
+              @click="isStatementModalOpen = false"
+            >
+              Tutup
+            </VBtn>
+            <VBtn
+              color="primary"
+              variant="flat"
+              prepend-icon="ri-file-pdf-2-line"
+              class="font-weight-bold"
+              :loading="isDownloadingPdf"
+              @click="downloadStatementPdf"
+            >
+              Unduh Rekening Koran (PDF)
+            </VBtn>
+          </div>
+        </div>
+      </VCard>
+    </VDialog>
   </div>
 </template>
 
 <style scoped>
-.period-filter-card {
-  background: linear-gradient(135deg, rgba(var(--v-theme-surface), 1) 0%, rgba(var(--v-theme-primary), 0.03) 100%);
-}
-
-.month-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 16px;
-  min-width: 90px;
-  border-radius: 10px;
-  border: 1px solid rgba(var(--v-theme-primary), 0.15);
-  background: rgba(var(--v-theme-surface), 1);
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  user-select: none;
-}
-
-.month-btn:hover {
-  background: rgba(var(--v-theme-primary), 0.08);
-  border-color: rgba(var(--v-theme-primary), 0.4);
-  transform: translateY(-2px);
-}
-
-.month-btn-active {
-  background: linear-gradient(135deg, rgb(var(--v-theme-primary)) 0%, #4338ca 100%) !important;
-  border-color: transparent !important;
-  box-shadow: 0 4px 12px rgba(var(--v-theme-primary), 0.35);
-  transform: translateY(-2px);
-}
-
-.month-btn-active .month-name,
-.month-btn-active .month-year {
-  color: #ffffff !important;
-  font-weight: 700;
-}
-
-.month-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(var(--v-theme-on-surface), 0.87);
-}
-
-.month-year {
-  font-size: 10px;
-  color: rgba(var(--v-theme-on-surface), 0.55);
-}
-
-.atm-card {
-  min-height: 220px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25);
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
-}
-
-.atm-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 16px 32px -5px rgba(0, 0, 0, 0.35);
-}
-
-.card-decor-circle-1 {
-  position: absolute;
-  top: -50px;
-  right: -50px;
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.07);
-  pointer-events: none;
-}
-
-.card-decor-circle-2 {
-  position: absolute;
-  bottom: -60px;
-  left: -40px;
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.04);
-  pointer-events: none;
-}
-
-.atm-chip {
-  width: 38px;
-  height: 28px;
-  border-radius: 5px;
-  background: linear-gradient(135deg, #ffd700 0%, #d4af37 100%);
-  border: 1px solid rgba(0, 0, 0, 0.25);
-}
-
-.color-preset-dot {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-}
-
-.color-indicator-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.bg-gradient-header {
-  background: linear-gradient(135deg, rgba(var(--v-theme-primary), 0.05) 0%, rgba(var(--v-theme-surface), 1) 100%);
-}
-
 .table-clean th {
   letter-spacing: 0.5px;
   font-size: 11px;
 }
 
 .table-row-hover:hover {
-  background-color: rgba(var(--v-theme-primary), 0.02);
+  background-color: rgba(var(--v-theme-primary), 0.03);
 }
 
 .month-scroll::-webkit-scrollbar {

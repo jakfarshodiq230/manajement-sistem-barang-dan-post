@@ -55,7 +55,21 @@ class CashShiftController extends Controller
             ->where('created_at', '>=', $shift->opened_at)
             ->sum('amount');
 
-        $expectedCash = (float) $shift->start_cash + (float) $cashSales - (float) $expenses;
+        // Penerimaan Cicilan Piutang Tunai selama Shift ini
+        $receivableCashPayments = \App\Models\ReceivablePayment::where('user_id', $user->id)
+            ->where('payment_method', 'cash')
+            ->where('created_at', '>=', $shift->opened_at)
+            ->sum('amount');
+
+        // Retur Penjualan Tunai Keluar selama Shift ini
+        $returnCash = \App\Models\ReturnTransaction::where('user_id', $user->id)
+            ->where('reference_type', 'sale')
+            ->whereIn('return_type', ['pengembalian_dana', 'pengembalian_uang'])
+            ->where('status', 'completed')
+            ->where('created_at', '>=', $shift->opened_at)
+            ->sum('total_amount');
+
+        $expectedCash = (float) $shift->start_cash + (float) $cashSales + (float) $receivableCashPayments - (float) $expenses - (float) $returnCash;
 
         // Rincian Penerimaan SEMUA Rekening Bank & QRIS yang Terdaftar selama Shift Ini
         $activeBanks = \App\Models\BankAccount::where('is_active', true)
@@ -108,7 +122,9 @@ class CashShiftController extends Controller
                 'total_cash_sales' => (float) $cashSales,
                 'total_non_cash_sales' => (float) $nonCashSales,
                 'total_sales' => (float) $cashSales + (float) $nonCashSales,
+                'total_receivable_cash' => (float) $receivableCashPayments,
                 'total_expenses' => (float) $expenses,
+                'total_return_cash' => (float) $returnCash,
                 'expected_cash' => $expectedCash,
                 'bank_breakdown' => $bankBreakdown,
                 'opened_at' => $shift->opened_at ? $shift->opened_at->format('Y-m-d H:i:s') : date('Y-m-d H:i:s'),
@@ -194,7 +210,19 @@ class CashShiftController extends Controller
             ->where('created_at', '>=', $shift->opened_at)
             ->sum('amount');
 
-        $expectedCash = (float) $shift->start_cash + (float) $cashSales - (float) $expenses;
+        $receivableCashPayments = \App\Models\ReceivablePayment::where('user_id', $user->id)
+            ->where('payment_method', 'cash')
+            ->where('created_at', '>=', $shift->opened_at)
+            ->sum('amount');
+
+        $returnCash = \App\Models\ReturnTransaction::where('user_id', $user->id)
+            ->where('reference_type', 'sale')
+            ->whereIn('return_type', ['pengembalian_dana', 'pengembalian_uang'])
+            ->where('status', 'completed')
+            ->where('created_at', '>=', $shift->opened_at)
+            ->sum('total_amount');
+
+        $expectedCash = (float) $shift->start_cash + (float) $cashSales + (float) $receivableCashPayments - (float) $expenses - (float) $returnCash;
         $actualCash = (float) $request->actual_cash;
         $difference = $actualCash - $expectedCash;
 

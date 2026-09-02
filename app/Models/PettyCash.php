@@ -17,6 +17,8 @@ class PettyCash extends Model
         'user_id',
         'cash_shift_id',
         'category',
+        'payment_method',
+        'bank_account_id',
         'amount',
         'description',
         'receipt_image',
@@ -46,5 +48,10 @@ class PettyCash extends Model
     public function cashShift()
     {
         return $this->belongsTo(CashShift::class);
+    }
+
+    public function bankAccount()
+    {
+        return $this->belongsTo(BankAccount::class);
     }
 }

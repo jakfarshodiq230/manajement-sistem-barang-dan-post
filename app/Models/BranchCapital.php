@@ -22,6 +22,7 @@ class BranchCapital extends Model
         'amount',
         'date',
         'payment_method',
+        'bank_account_id',
         'bank_name',
         'account_number',
         'account_name',
@@ -66,5 +67,10 @@ class BranchCapital extends Model
     public function cashShift()
     {
         return $this->belongsTo(CashShift::class);
+    }
+
+    public function bankAccount()
+    {
+        return $this->belongsTo(BankAccount::class);
     }
 }

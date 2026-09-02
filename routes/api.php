@@ -122,7 +122,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     Route::post('payables/{id}/pay', [\App\Http\Controllers\Api\PayableController::class, 'recordPayment']);
     Route::delete('payables/{id}/payments/{paymentId}', [\App\Http\Controllers\Api\PayableController::class, 'voidPayment']);
 
-    // Bank Accounts (Master Rekening Bank & Saldo Penerimaan)
+    // Bank Accounts (Master Rekening Bank, Saldo Penerimaan, Buku Bank & Rekening Koran)
+    Route::get('bank-accounts/{id}/statement', [\App\Http\Controllers\Api\BankAccountController::class, 'statement']);
+    Route::get('bank-accounts/{id}/export-pdf', [\App\Http\Controllers\Api\BankAccountController::class, 'exportPdf']);
     Route::apiResource('bank-accounts', \App\Http\Controllers\Api\BankAccountController::class);
 
     // Products endpoints

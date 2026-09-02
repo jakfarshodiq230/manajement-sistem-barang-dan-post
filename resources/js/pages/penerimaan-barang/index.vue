@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useSnackbarStore } from '@/stores/snackbar'
 import ReceiveGoodsDrawer from './ReceiveGoodsDrawer.vue'
+import GoodsReceiptPrinter from './GoodsReceiptPrinter.vue'
 import DocumentActions from '@/components/DocumentActions.vue'
 import { useRouter } from 'vue-router'
 import { useAbility } from '@casl/vue'
@@ -21,6 +22,24 @@ const printUrl = ref('')
 const detailDialogData = ref(null)
 const selectedPO = ref(null)
 const selectedGR = ref(null)
+
+// Kuitansi & Pengaturan Struk Database
+const goodsReceiptPrinterRef = ref(null)
+const selectedGRForPrint = ref(null)
+const receiptSettings = ref([])
+const activeReceiptSetting = computed(() => {
+  if (receiptSettings.value.length === 0) return null
+  return receiptSettings.value.find(s => s.is_default) || receiptSettings.value[0]
+})
+
+const fetchReceiptSettings = async () => {
+  try {
+    const res = await $api('/apps/receipt-settings')
+    receiptSettings.value = res.data || res || []
+  } catch (e) {
+    console.error('Failed to load receipt settings:', e)
+  }
+}
 
 const isConfirmDeleteVisible = ref(false)
 const grToDelete = ref(null)
@@ -134,6 +153,7 @@ const handleSearch = () => {
 onMounted(() => {
   fetchCounts()
   fetchData()
+  fetchReceiptSettings()
 })
 
 const saveGoodsReceipt = async grData => {
@@ -283,27 +303,23 @@ const isDownloading = ref(false)
 const printGR = async id => {
   isDownloading.value = true
   try {
-    const response = await $api(`/apps/documents/goods_receipt/${id}/pdf`, {
-      responseType: 'blob',
-    })
-    
-    const blob = new Blob([response], { type: 'application/pdf' })
-    printUrl.value = URL.createObjectURL(blob)
-    isPrintDialogVisible.value = true
-    snackbar.show('PDF berhasil dimuat', 'success')
+    const res = await $api(`/apps/goods-receipts/${id}`)
+    selectedGRForPrint.value = res.data || res
+
+    if (receiptSettings.value.length === 0) {
+      await fetchReceiptSettings()
+    }
+
+    setTimeout(() => {
+      if (goodsReceiptPrinterRef.value?.print) {
+        goodsReceiptPrinterRef.value.print()
+      }
+    }, 150)
   } catch (error) {
-    console.error(error)
-    snackbar.show('Gagal memuat PDF', 'error')
+    console.error('Failed to print goods receipt:', error)
+    snackbar.show('Gagal memuat data cetak penerimaan barang', 'error')
   } finally {
     isDownloading.value = false
-  }
-}
-
-const closePrintDialog = () => {
-  isPrintDialogVisible.value = false
-  if (printUrl.value) {
-    URL.revokeObjectURL(printUrl.value)
-    printUrl.value = ''
   }
 }
 
@@ -1137,7 +1153,7 @@ const executeDeleteGR = async () => {
               prepend-icon="ri-printer-line"
               @click="printGR(detailDialogData.id)"
             >
-              Cetak Faktur PDF
+              Cetak Faktur / Kuitansi
             </VBtn>
           </template>
         </VCardActions>
@@ -1316,6 +1332,15 @@ const executeDeleteGR = async () => {
         </VCardActions>
       </VCard>
     </VDialog>
+
+    <!-- Goods Receipt Printer Component with Database Paper Rules -->
+    <GoodsReceiptPrinter
+      ref="goodsReceiptPrinterRef"
+      :goods-receipt="selectedGRForPrint"
+      :branch="selectedGRForPrint?.purchase_order?.branch || selectedGRForPrint?.purchaseOrder?.branch"
+      :setting="activeReceiptSetting"
+      :print-format="activeReceiptSetting?.name?.toLowerCase().includes('thermal') ? 'thermal' : 'kwitansi'"
+    />
   </section>
 </template>
 
