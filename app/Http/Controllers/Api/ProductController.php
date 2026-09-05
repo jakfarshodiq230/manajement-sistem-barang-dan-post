@@ -15,7 +15,7 @@ class ProductController extends Controller
         $itemsPerPage = $request->query('itemsPerPage', 15);
         $page = $request->query('page', 1);
 
-        $query = Product::with(['category']);
+        $query = Product::with(['category', 'productBranches']);
 
         if ($search) {
             $query->where(function($q) use ($search) {

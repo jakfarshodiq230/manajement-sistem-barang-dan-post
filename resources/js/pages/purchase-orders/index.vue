@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { paginationMeta } from '@/utils/paginationMeta'
 import { useSnackbarStore } from '@/stores/snackbar'
 import AddNewPurchaseOrderDrawer from './AddNewPurchaseOrderDrawer.vue'
 import DocumentActions from '@/components/DocumentActions.vue'
@@ -653,6 +654,51 @@ const executeDeletePO = async () => {
             <div>Tidak ada data purchase order pada filter ini.</div>
           </div>
         </template>
+
+        <!-- Pagination -->
+        <template #bottom>
+          <VDivider />
+
+          <div class="d-flex justify-end flex-wrap gap-x-6 px-4 py-2">
+            <div class="d-flex align-center gap-x-2 text-medium-emphasis text-body-2">
+              Baris per halaman:
+              <VSelect
+                v-model="itemsPerPage"
+                class="per-page-select"
+                variant="plain"
+                density="compact"
+                :items="[10, 20, 25, 50, 100]"
+                hide-details
+              />
+            </div>
+
+            <p class="d-flex align-center text-body-2 text-high-emphasis me-2 mb-0">
+              {{ paginationMeta({ page, itemsPerPage }, totalItems) }}
+            </p>
+
+            <div class="d-flex gap-x-2 align-center me-2">
+              <VBtn
+                class="flip-in-rtl"
+                icon="ri-arrow-left-s-line"
+                variant="text"
+                density="comfortable"
+                color="high-emphasis"
+                :disabled="page <= 1"
+                @click="page <= 1 ? page = 1 : page--"
+              />
+
+              <VBtn
+                class="flip-in-rtl"
+                icon="ri-arrow-right-s-line"
+                density="comfortable"
+                variant="text"
+                color="high-emphasis"
+                :disabled="page >= Math.ceil(totalItems / itemsPerPage)"
+                @click="page >= Math.ceil(totalItems / itemsPerPage) ? page = Math.ceil(totalItems / itemsPerPage) : page++"
+              />
+            </div>
+          </div>
+        </template>
       </VDataTableServer>
     </VCard>
 
@@ -1209,6 +1255,12 @@ const executeDeletePO = async () => {
     </VDialog>
   </section>
 </template>
+
+<style lang="scss">
+.per-page-select {
+  inline-size: 5.5rem;
+}
+</style>
 
 <route lang="yaml">
 meta:

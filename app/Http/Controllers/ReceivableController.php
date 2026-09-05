@@ -169,6 +169,13 @@ class ReceivableController extends Controller
 
             DB::commit();
 
+            // Auto-journal in accounting (Debit Kas/Bank, Kredit Piutang Usaha)
+            try {
+                \App\Services\JournalService::journalForReceivablePayment($payment);
+            } catch (\Exception $jEx) {
+                \Log::warning("Auto-journal ReceivablePayment failed: " . $jEx->getMessage());
+            }
+
             // Auto-send Receipt Email jika pelanggan memiliki email
             try {
                 \App\Services\EmailNotificationService::sendReceivableReceipt($payment, null, 'automatic', $user ? $user->id : 1);

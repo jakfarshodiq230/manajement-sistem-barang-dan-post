@@ -144,7 +144,9 @@ class AuthController extends Controller
         ]);
 
         $user = $request->user();
-        $user->pos_pin = $request->pin;
+        $hashedPin = \Illuminate\Support\Facades\Hash::make($request->pin);
+        $user->pos_pin = $hashedPin;
+        $user->pin = $hashedPin;
         $user->save();
 
         return response()->json(['message' => 'PIN berhasil diperbarui']);
@@ -153,45 +155,100 @@ class AuthController extends Controller
     public function verifyPin(Request $request)
     {
         $request->validate([
-            'pin' => 'required',
+            'pin' => 'required|string',
+            'user_id' => 'nullable|exists:users,id',
+            'branch_id' => 'nullable|exists:branches,id',
         ]);
 
-        $approver = $request->user();
+        $approver = null;
+        if ($request->filled('user_id')) {
+            $approver = \App\Models\User::find($request->user_id);
+            if (!$approver) {
+                return response()->json(['message' => 'Data otorisator tidak ditemukan.'], 404);
+            }
+        } else {
+            $approver = $request->user();
+        }
+
         if (!$approver) {
             return response()->json(['message' => 'Sesi login tidak valid'], 401);
         }
 
-        $pinInput = trim((string) $request->pin);
-        $savedPin = trim((string) ($approver->pos_pin ?? $approver->pin ?? ''));
+        // 1. Check if approver is ONLY a cashier (Kasir cannot authorize supervisor overrides)
+        $roleNames = \Illuminate\Support\Facades\DB::table('model_has_roles')
+            ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
+            ->where('model_has_roles.model_id', $approver->id)
+            ->where('model_has_roles.model_type', 'App\\Models\\User')
+            ->pluck('roles.name')
+            ->map(fn($r) => strtolower(trim($r)))
+            ->toArray();
 
-        // If no PIN is configured on user yet, allow standard master pin or set it
-        if (!$savedPin) {
-            if ($pinInput === '123456' || $pinInput === '1234') {
-                $approver->pos_pin = $pinInput;
-                $approver->save();
-                return response()->json(['message' => 'Otorisasi Berhasil (PIN Default Diatur)', 'approver_id' => $approver->id]);
+        if (empty($roleNames) && method_exists($approver, 'getRoleNames')) {
+            $roleNames = $approver->getRoleNames()->map(fn($r) => strtolower(trim($r)))->toArray();
+        }
+
+        $isOnlyCashier = !empty($roleNames) && count($roleNames) === 1 && in_array('kasir', $roleNames);
+        if ($isOnlyCashier) {
+            return response()->json([
+                'message' => 'Pengguna ' . $approver->name . ' berstatus Kasir dan tidak memiliki wewenang otorisasi supervisor!'
+            ], 403);
+        }
+
+        // 2. Check branch assignment if branch_id is provided
+        if ($request->filled('branch_id')) {
+            $branchId = $request->branch_id;
+            $isGlobalAdmin = in_array('super admin', $roleNames) || in_array('dev', $roleNames) || in_array('developer', $roleNames) || in_array('admin pusat', $roleNames);
+            
+            if (!$isGlobalAdmin) {
+                $isAssignedToBranch = \Illuminate\Support\Facades\DB::table('model_has_roles')
+                    ->where('model_id', $approver->id)
+                    ->where('model_type', 'App\\Models\\User')
+                    ->where(function($q) use ($branchId) {
+                        $q->where('branch_id', $branchId)->orWhereNull('branch_id');
+                    })
+                    ->exists() || ($approver->branch_id == $branchId);
+
+                if (!$isAssignedToBranch) {
+                    return response()->json([
+                        'message' => 'Otorisator ' . $approver->name . ' tidak ditugaskan pada cabang ini!'
+                    ], 403);
+                }
             }
-            return response()->json(['message' => 'PIN otorisasi belum diatur. Gunakan PIN default 123456 atau atur di Pengaturan Pengguna.'], 400);
+        }
+
+        $pinInput = trim((string) $request->pin);
+        $savedPin = trim((string) ($approver->pos_pin ?: $approver->pin ?: ''));
+
+        if (!$savedPin) {
+            return response()->json([
+                'message' => 'PIN otorisasi untuk ' . $approver->name . ' belum diatur. Harap atur PIN terlebih dahulu di Pengaturan Pengguna.'
+            ], 400);
         }
 
         $isValid = false;
-        // 1. Direct string match
-        if ($pinInput === $savedPin) {
+        // 1. Hash check (Bcrypt)
+        if (\Illuminate\Support\Facades\Hash::check($pinInput, $savedPin)) {
             $isValid = true;
         }
-        // 2. Hash check if stored as bcrypt hash
-        elseif (\Illuminate\Support\Facades\Hash::check($pinInput, $savedPin)) {
+        // 2. Direct string match for legacy unhashed PINs, then auto-upgrade to hash
+        elseif ($pinInput === $savedPin) {
             $isValid = true;
-        }
-        // 3. Fallback master pin (123456)
-        elseif ($pinInput === '123456') {
-            $isValid = true;
+            $hashedPin = \Illuminate\Support\Facades\Hash::make($pinInput);
+            $approver->pos_pin = $hashedPin;
+            $approver->pin = $hashedPin;
+            $approver->save();
         }
 
         if (!$isValid) {
-            return response()->json(['message' => 'PIN Salah. Masukkan PIN yang benar.'], 400);
+            return response()->json([
+                'message' => 'PIN salah. Masukkan PIN yang benar untuk ' . $approver->name . '.'
+            ], 422);
         }
 
-        return response()->json(['message' => 'Otorisasi Berhasil', 'approver_id' => $approver->id]);
+        return response()->json([
+            'message' => 'Otorisasi Berhasil',
+            'approver_id' => $approver->id,
+            'approver_name' => $approver->name,
+        ]);
     }
 }

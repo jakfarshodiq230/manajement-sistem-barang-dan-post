@@ -685,6 +685,13 @@ class GoodsReceiptController extends Controller
 
             \Illuminate\Support\Facades\DB::commit();
 
+            // Auto-journal in accounting (Debit Persediaan, Kredit Hutang Usaha)
+            try {
+                \App\Services\JournalService::journalForGoodsReceipt($gr);
+            } catch (\Exception $jEx) {
+                \Log::warning('Auto-journal GoodsReceipt failed: ' . $jEx->getMessage());
+            }
+
             return response()->json([
                 'message' => 'Penerimaan barang berhasil divalidasi dan disetujui! Stok fisik cabang dan nomor batch telah bertambah.',
                 'gr' => $gr->fresh(['purchaseOrder', 'items.productBranch.product', 'user', 'approver', 'validator'])

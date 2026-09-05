@@ -26,8 +26,9 @@ const categories = [
   { id: 'retur_piutang', title: '5. Retur & Piutang', icon: 'ri-exchange-dollar-line' },
   { id: 'audit_laporan', title: '6. Audit & Opname', icon: 'ri-archive-stack-line' },
   { id: 'keuangan', title: '7. Keuangan & Closing', icon: 'ri-file-chart-line' },
-  { id: 'modal_roi', title: '8. Modal & ROI Cabang', icon: 'ri-hand-coin-line' },
-  { id: 'security', title: '9. Keamanan & RBAC', icon: 'ri-shield-keyhole-line' },
+  { id: 'akuntansi', title: '8. Akuntansi & Buku Besar', icon: 'ri-book-read-line' },
+  { id: 'modal_roi', title: '9. Modal & ROI Cabang', icon: 'ri-hand-coin-line' },
+  { id: 'security', title: '10. Keamanan & RBAC', icon: 'ri-shield-keyhole-line' },
 ]
 
 // Visual Architecture Flow Steps
@@ -90,9 +91,17 @@ const visualFlowSteps = [
   },
   {
     step: 8,
+    title: 'Sistem Akuntansi & Neraca',
+    icon: 'ri-book-read-line',
+    color: 'primary',
+    desc: 'Double-entry otomatis, Bagan Akun COA, Jurnal Umum, Buku Besar, Neraca & Laba Rugi.',
+    route: '/akuntansi',
+  },
+  {
+    step: 9,
     title: 'Modal & ROI Cabang',
     icon: 'ri-hand-coin-line',
-    color: 'primary',
+    color: 'warning',
     desc: 'Injeksi modal, pengajuan proposal PDF, approval setoran laba & KPI ROI %.',
     route: '/apps/branch-capitals',
   },
@@ -100,39 +109,6 @@ const visualFlowSteps = [
 
 // Detailed Module Guides
 const guides = [
-  {
-    id: 'master-bank',
-    category: 'bank',
-    icon: 'ri-bank-card-line',
-    color: 'info',
-    title: '2. Modul Rekening Bank, Multi-Bank Owner & Barcode QRIS',
-    subtitle: 'Manajemen rekening bank penampung (BCA, Mandiri, BRI, QRIS), saldo berjalan, dan pelacakan mutasi bon per cabang',
-    steps: [
-      {
-        title: 'Pendaftaran Master Rekening Bank',
-        desc: 'Buka menu Daftar Rekening Bank (/bank-accounts). Daftarkan seluruh rekening yang dimiliki Owner (BCA, Mandiri, BRI, BNI, BSI, QRIS Merchant, Mesin EDC). Masukkan Nama Bank, Nomor Rekening, Nama Pemilik Rekening (A.N), Saldo Awal, Warna Kartu Visual, dan upload gambar barcode QRIS jika ada.',
-        link: '/bank-accounts',
-        linkText: 'Buka Rekening Bank',
-      },
-      {
-        title: 'Filter Periode Bulanan & Tahunan Interaktif',
-        desc: 'Gunakan pemilih Tahun dan bar 12 Bulan (Januari - Desember) di bagian atas untuk melihat tren omzet masuk dan jumlah transaksi per bank pada periode yang dipilih.',
-      },
-      {
-        title: 'Integrasi POS Kasir & Pemilihan Bank Dinamis',
-        desc: 'Saat kasir memilih metode Transfer Bank atau QRIS di kasir POS (/pos), sistem secara dinamis menampilkan pilihan rekening bank dari database lengkap dengan nomor rekening, nama pemilik, dan tombol salin 1-klik.',
-        link: '/pos',
-        linkText: 'Ke Kasir POS',
-      },
-      {
-        title: 'Rekonsiliasi Bank di Tutup Shift & Closing Harian',
-        desc: 'Saat kasir melakukan Tutup Shift di POS atau Closing Harian di menu Audit, sistem memisahkan perhitungan Kas Fisik Tunai di laci dan Rincian Penerimaan per Rekening Bank secara transparan.',
-        link: '/audit/closing-harian',
-        linkText: 'Buka Closing Harian',
-      },
-    ],
-    tips: 'Setiap transaksi penjualan non-tunai di POS otomatis menambah saldo berjalan (current balance) rekening bank penerima secara real-time.',
-  },
   {
     id: 'master-data',
     category: 'master',
@@ -175,11 +151,44 @@ const guides = [
     tips: 'Gunakan tombol "Kelola Batch" di Inventori Cabang untuk mengatur HPP Real, Harga Jual POS, dan Batas Nego untuk masing-masing batch pengiriman supplier.',
   },
   {
+    id: 'master-bank',
+    category: 'bank',
+    icon: 'ri-bank-card-line',
+    color: 'info',
+    title: '2. Modul Rekening Bank, Multi-Bank Owner & Barcode QRIS',
+    subtitle: 'Manajemen rekening bank penampung (BCA, Mandiri, BRI, QRIS), saldo berjalan, dan pelacakan mutasi bon per cabang',
+    steps: [
+      {
+        title: 'Pendaftaran Master Rekening Bank',
+        desc: 'Buka menu Daftar Rekening Bank (/bank-accounts). Daftarkan seluruh rekening yang dimiliki Owner (BCA, Mandiri, BRI, BNI, BSI, QRIS Merchant, Mesin EDC). Masukkan Nama Bank, Nomor Rekening, Nama Pemilik Rekening (A.N), Saldo Awal, Warna Kartu Visual, dan upload gambar barcode QRIS jika ada.',
+        link: '/bank-accounts',
+        linkText: 'Buka Rekening Bank',
+      },
+      {
+        title: 'Filter Periode Bulanan & Tahunan Interaktif',
+        desc: 'Gunakan pemilih Tahun dan bar 12 Bulan (Januari - Desember) di bagian atas untuk melihat tren omzet masuk dan jumlah transaksi per bank pada periode yang dipilih.',
+      },
+      {
+        title: 'Integrasi POS Kasir & Pemilihan Bank Dinamis',
+        desc: 'Saat kasir memilih metode Transfer Bank atau QRIS di kasir POS (/pos), sistem secara dinamis menampilkan pilihan rekening bank dari database lengkap dengan nomor rekening, nama pemilik, dan tombol salin 1-klik.',
+        link: '/pos',
+        linkText: 'Ke Kasir POS',
+      },
+      {
+        title: 'Rekonsiliasi Bank di Tutup Shift & Closing Harian',
+        desc: 'Saat kasir melakukan Tutup Shift di POS atau Closing Harian di menu Audit, sistem memisahkan perhitungan Kas Fisik Tunai di laci dan Rincian Penerimaan per Rekening Bank secara transparan.',
+        link: '/audit/closing-harian',
+        linkText: 'Buka Closing Harian',
+      },
+    ],
+    tips: 'Setiap transaksi penjualan non-tunai di POS otomatis menambah saldo berjalan (current balance) rekening bank penerima secara real-time.',
+  },
+  {
     id: 'pengadaan-gudang',
     category: 'gudang',
     icon: 'ri-truck-line',
     color: 'info',
-    title: '2. Pengadaan Barang (PO), Penerimaan Gudang & Kalkulasi HPP Real',
+    title: '3. Pengadaan Barang (PO), Penerimaan Gudang & Kalkulasi HPP Real',
     subtitle: 'Alur pesanan pembelian (PO) fisik, verifikasi faktur gudang, diskon bertingkat D1..D5, kode SCC aki, dan mutasi stok',
     steps: [
       {
@@ -216,7 +225,7 @@ const guides = [
     category: 'pos',
     icon: 'ri-shopping-cart-2-line',
     color: 'success',
-    title: '3. Operasional Transaksi Kasir (POS), Diskon Total & Otorisasi Nego',
+    title: '4. Operasional Transaksi Kasir (POS), Diskon Total & Otorisasi Nego',
     subtitle: 'Proses checkout cepat, scan barcode, diskon total faktur, otorisasi PIN supervisor, dan cetak struk',
     steps: [
       {
@@ -253,7 +262,7 @@ const guides = [
     category: 'retur_piutang',
     icon: 'ri-arrow-go-back-line',
     color: 'error',
-    title: '4. Manajemen Retur Barang (Penjualan & Pembelian)',
+    title: '5. Manajemen Retur Barang (Penjualan & Pembelian)',
     subtitle: 'SOP pengembalian barang rusak/cacat dan penyesuaian otomatis stok inventaris',
     steps: [
       {
@@ -278,7 +287,7 @@ const guides = [
     category: 'retur_piutang',
     icon: 'ri-wallet-3-line',
     color: 'warning',
-    title: '5. Buku Piutang Usaha, Pengiriman Email Tagihan & Kwitansi Otomatis',
+    title: '6. Buku Piutang Usaha, Pengiriman Email Tagihan & Kwitansi Otomatis',
     subtitle: 'Pelacakan nota tempo kasbon, pengiriman invoice ke email pelanggan, kwitansi cicilan otomatis, dan pengingat jatuh tempo',
     steps: [
       {
@@ -311,7 +320,7 @@ const guides = [
     category: 'audit_laporan',
     icon: 'ri-archive-stack-line',
     color: 'primary',
-    title: '6. Stock Opname & Cycle Counting (Audit Fisik vs Sistem)',
+    title: '7. Stock Opname & Cycle Counting (Audit Fisik vs Sistem)',
     subtitle: 'Metodologi audit parsial per kategori dan cabang tanpa menghentikan operasional toko',
     steps: [
       {
@@ -323,6 +332,8 @@ const guides = [
       {
         title: 'Penghitungan Fisik & Input Angka Riil',
         desc: 'Petugas gudang menghitung barang fisik di rak dan menginput angka riil ke sistem. Sistem otomatis menghitung Selisih (Variance) = Fisik - Sistem.',
+        link: '/audit/stock-opname',
+        linkText: 'Buka Stock Opname',
       },
       {
         title: 'Penyesuaian Stok Otomatis (Adjustment Approval)',
@@ -336,7 +347,7 @@ const guides = [
     category: 'keuangan',
     icon: 'ri-safe-2-line',
     color: 'success',
-    title: '7. Closing Harian Kasir & Penguncian Transaksi (Transaction Lock)',
+    title: '8. Closing Harian Kasir & Penguncian Transaksi (Transaction Lock)',
     subtitle: 'Rekonsiliasi uang fisik di laci kasir dan pencegahan kecurangan kas',
     steps: [
       {
@@ -357,11 +368,68 @@ const guides = [
     tips: 'Pastikan seluruh setoran cicilan modal ke Owner dan kas kecil hari tersebut sudah dicatat agar perhitungan kas laci kasir sinkron 100%.',
   },
   {
+    id: 'sistem-akuntansi',
+    category: 'akuntansi',
+    icon: 'ri-book-read-line',
+    color: 'primary',
+    title: '9. Modul Akuntansi Terpadu (Double-Entry, COA, Jurnal Umum, Buku Besar & Neraca)',
+    subtitle: 'Sistem pembukuan otomatis berstandar akuntansi Indonesia (SAK) dengan auto-journaling POS, HPP, hutang piutang, dan neraca real-time',
+    steps: [
+      {
+        title: 'Bagan Akun Standar (Chart of Accounts / COA 5 Kategori)',
+        desc: 'Buka menu Bagan Akun (COA). Akun dikelompokkan ke dalam 5 klasifikasi standar:\n• 1xxx Aset / Aktiva: Harta milik toko (1101 Kas Laci Kasir, 1102 Bank BCA, 1201 Piutang Usaha Konsumen, 1301 Persediaan Barang Dagang, 1401 Aset Tetap Peralatan Toko).\n• 2xxx Kewajiban / Hutang: Kewajiban bayar ke pihak luar (2101 Hutang Dagang Supplier, 2102 Hutang Beban Operasional).\n• 3xxx Ekuitas / Modal: Hak pemilik atas aset bersih (3101 Modal Disetor Owner, 3102 Prive/Pengembalian Modal Dividen Owner, 3201 Laba Ditahan, Laba Tahun Berjalan).\n• 4xxx Pendapatan / Revenue: Arus masuk omzet penjualan (4101 Penjualan Kasir POS, 4201 Pendapatan Jasa Service, 4301 Pendapatan Lain-lain).\n• 5xxx Beban / Biaya: Pengorbanan ekonomis untuk operasional (5101 Beban Pokok Penjualan HPP, 5201 Beban Gaji Karyawan, 5202 Beban Sewa Ruko, 5205 Pengeluaran Kas Kecil/Petty Cash).',
+        link: '/akuntansi/coa',
+        linkText: 'Buka Bagan Akun (COA)',
+      },
+      {
+        title: 'Prinsip Double-Entry Bookkeeping & Keseimbangan Debit vs Kredit',
+        desc: 'Setiap transaksi memiliki dua sisi pencatatan berpasangan dengan aturan saldo normal:\n• Debit (+) : Menambah nilai Aset (Kas/Bank/Piutang/Persediaan) dan Beban (HPP/Biaya Operasional).\n• Kredit (+) : Menambah nilai Kewajiban (Hutang), Ekuitas (Modal), dan Pendapatan (Omzet Kasir).\n• Keseimbangan Mutlak: Total Debit HARUS SELALU SAMA dengan Total Kredit pada setiap entri jurnal (Balance).',
+      },
+      {
+        title: 'Mesin Auto-Journaling (Otomatisasi Jurnal Tanpa Perlu Input Manual)',
+        desc: 'Sistem secara otomatis menjurnal setiap transaksi bisnis seketika di latar belakang:\n• Penjualan Kasir POS: Otomatis [Debit Kas/Bank/Piutang] & [Kredit Penjualan POS], serta [Debit HPP Beban Pokok] & [Kredit Persediaan Barang Dagang].\n• Penerimaan Barang Gudang: Otomatis [Debit Persediaan Barang Dagang] & [Kredit Kas/Bank atau Hutang Dagang Supplier].\n• Pembayaran Hutang / Piutang: Mengupdate saldo rekening kas/bank dan mengeliminasi saldo hutang/piutang terkait.\n• Kas Kecil (Petty Cash) & Modal Owner: Terposting instan ke pos beban operasional dan ekuitas modal.',
+        link: '/akuntansi/jurnal',
+        linkText: 'Buka Jurnal Umum',
+      },
+      {
+        title: 'Buku Besar Interaktif (General Ledger) & Saldo Berjalan',
+        desc: 'Buka menu Buku Besar. Pilih akun tertentu (misal: 1101 Kas Laci Kasir atau 1301 Persediaan Barang Dagang) dan tentukan rentang tanggal. Sistem menyajikan kronologis mutasi debit/kredit per transaksi beserta Saldo Berjalan (Running Balance) dan nomor referensi faktur sumber.',
+        link: '/akuntansi/buku-besar',
+        linkText: 'Buka Buku Besar',
+      },
+      {
+        title: 'Neraca Saldo (Trial Balance) & Validasi Keseimbangan Buku',
+        desc: 'Buka menu Neraca Saldo untuk melihat ringkasan seluruh saldo akun (Debit vs Kredit). Berfungsi memverifikasi dan mengaudit bahwa seluruh pembukuan debit kredit 100% seimbang dan tidak ada pencatatan gantung.',
+        link: '/akuntansi/neraca',
+        linkText: 'Buka Neraca Saldo',
+      },
+      {
+        title: 'Neraca Keuangan (Balance Sheet): Aset = Kewajiban + Ekuitas',
+        desc: 'Menampilkan potret posisi kesehatan finansial toko pada suatu tanggal:\n• Total Aset (Kas + Bank + Piutang + Persediaan + Aset Tetap)\n• Total Pasiva = Kewajiban (Hutang Supplier) + Total Ekuitas (Modal Disetor - Prive + Laba Periode Berjalan).\nKeduanya selalu seimbang 100% (Balanced).',
+        link: '/akuntansi/neraca',
+        linkText: 'Buka Neraca Keuangan',
+      },
+      {
+        title: 'Laporan Laba Rugi Akuntansi (Income Statement)',
+        desc: 'Menghitung Pendapatan Bersih dikurangi Beban Pokok Penjualan (HPP FIFO/FEFO) untuk menghasilkan Laba Kotor, lalu dikurangi Beban Operasional untuk menghasilkan Laba Bersih Periode Berjalan. Angka laba ini otomatis ditarik sebagai penambah Ekuitas di Neraca Keuangan.',
+        link: '/akuntansi/neraca',
+        linkText: 'Lihat Laba Rugi',
+      },
+      {
+        title: 'Input Jurnal Penyesuaian Manual (Manual Journal Voucher - JV)',
+        desc: 'Digunakan untuk transaksi non-kasir seperti: penyusutan inventaris bulanan, penyesuaian sewa toko dibayar di muka, atau koreksi audit. Form jurnal manual dilengkapi live balance validator yang mengunci tombol Simpan jika Debit ≠ Kredit.',
+        link: '/akuntansi/jurnal',
+        linkText: 'Input Jurnal Manual',
+      },
+    ],
+    tips: 'Seluruh transaksi kasir POS, gudang, hutang piutang, kas kecil, dan permodalan sudah 100% terintegrasi ke jurnal akuntansi secara real-time. Admin tidak perlu lagi membuat pembukuan manual.',
+  },
+  {
     id: 'rekap-keuangan',
     category: 'keuangan',
     icon: 'ri-file-chart-line',
     color: 'warning',
-    title: '8. Laporan Laba Rugi, HPP FIFO/FEFO & Rekap Tahunan PDF',
+    title: '10. Laporan Laba Rugi, HPP FIFO/FEFO & Rekap Tahunan PDF',
     subtitle: 'Laporan keuangan ringkasan omzet, HPP modal aktual, laba bersih, dan arus kas',
     steps: [
       {
@@ -384,42 +452,11 @@ const guides = [
     tips: 'Semua angka laba bersih dihitung otomatis berdasarkan HPP aktual saat batch barang dibeli dari supplier.',
   },
   {
-    id: 'security-rbac',
-    category: 'security',
-    icon: 'ri-shield-keyhole-line',
-    color: 'primary',
-    title: '9. Manajemen Hak Akses Murni Database (RBAC) & Penugasan Multi-Cabang',
-    subtitle: 'Pengaturan otorisasi granular Spatie RBAC, penugasan peran per toko, dan PIN keamanan supervisor',
-    steps: [
-      {
-        title: 'Kelola Pengguna & Hak Akses Database (RBAC)',
-        desc: 'Buka menu Pengaturan Pengguna. Daftarkan akun karyawan dan atur izin akses (Permissions) secara granular per modul (Create, Read, Write, Delete, Approve, Export, Import, PIN). Tidak ada peran yang dikunci secara kaku (hardcoded), seluruhnya dikelola dinamis melalui database.',
-        link: '/apps/pengaturan-pengguna',
-        linkText: 'Buka Pengaturan Pengguna',
-      },
-      {
-        title: 'Penugasan Multi-Cabang & Peran Ganda (Branch Assignments)',
-        desc: 'Satu pengguna dapat ditugaskan pada beberapa cabang sekaligus dengan peran berbeda (misal: Admin di Toko A, namun Kasir di Toko B). Fitur Switch Role di profil memungkinkan pengguna berganti konteks toko secara instan.',
-      },
-      {
-        title: 'PIN Otorisasi Supervisor Dinamis',
-        desc: 'Setiap otorisasi tindakan berisiko tinggi (diskon di bawah batas nego, void nota, penghapusan piutang) diverifikasi melalui PIN 6-digit pengguna yang memiliki hak akses approval dari database.',
-      },
-      {
-        title: 'Jejak Audit Keamanan (Audit Trail Log)',
-        desc: 'Buka Dashboard Audit untuk melacak seluruh histori aktivitas: siapa yang mengedit data, kapan waktu terjadinya, dan nilai sebelum vs sesudah diedit.',
-        link: '/dashboards/audit',
-        linkText: 'Buka Dashboard Audit',
-      },
-    ],
-    tips: 'Ganti PIN supervisor secara berkala untuk menjaga kerahasiaan otorisasi tindakan kritis.',
-  },
-  {
     id: 'modal-roi',
     category: 'modal_roi',
     icon: 'ri-hand-coin-line',
     color: 'warning',
-    title: '10. Manajemen Modal, Notifikasi Email Owner & Pengembalian ROI Cabang',
+    title: '11. Manajemen Modal, Notifikasi Email Owner & Pengembalian ROI Cabang',
     subtitle: 'Alur terpadu penyertaan modal Owner, pengajuan dana proposal PDF, setoran laba, dan pengiriman laporan rekap ke email Owner',
     steps: [
       {
@@ -454,11 +491,42 @@ const guides = [
     tips: 'Gunakan fitur Kirim Rekap Modal ke Email Owner untuk mengirimkan laporan mingguan atau bulanan secara praktis.',
   },
   {
+    id: 'security-rbac',
+    category: 'security',
+    icon: 'ri-shield-keyhole-line',
+    color: 'primary',
+    title: '12. Manajemen Hak Akses Murni Database (RBAC) & Penugasan Multi-Cabang',
+    subtitle: 'Pengaturan otorisasi granular Spatie RBAC, penugasan peran per toko, dan PIN keamanan supervisor',
+    steps: [
+      {
+        title: 'Kelola Pengguna & Hak Akses Database (RBAC)',
+        desc: 'Buka menu Pengaturan Pengguna. Daftarkan akun karyawan dan atur izin akses (Permissions) secara granular per modul (Create, Read, Write, Delete, Approve, Export, Import, PIN). Tidak ada peran yang dikunci secara kaku (hardcoded), seluruhnya dikelola dinamis melalui database.',
+        link: '/apps/pengaturan-pengguna',
+        linkText: 'Buka Pengaturan Pengguna',
+      },
+      {
+        title: 'Penugasan Multi-Cabang & Peran Ganda (Branch Assignments)',
+        desc: 'Satu pengguna dapat ditugaskan pada beberapa cabang sekaligus dengan peran berbeda (misal: Admin di Toko A, namun Kasir di Toko B). Fitur Switch Role di profil memungkinkan pengguna berganti konteks toko secara instan.',
+      },
+      {
+        title: 'PIN Otorisasi Supervisor Dinamis',
+        desc: 'Setiap otorisasi tindakan berisiko tinggi (diskon di bawah batas nego, void nota, penghapusan piutang) diverifikasi melalui PIN 6-digit pengguna yang memiliki hak akses approval dari database.',
+      },
+      {
+        title: 'Jejak Audit Keamanan (Audit Trail Log)',
+        desc: 'Buka Dashboard Audit untuk melacak seluruh histori aktivitas: siapa yang mengedit data, kapan waktu terjadinya, dan nilai sebelum vs sesudah diedit.',
+        link: '/dashboards/audit',
+        linkText: 'Buka Dashboard Audit',
+      },
+    ],
+    tips: 'Ganti PIN supervisor secara berkala untuk menjaga kerahasiaan otorisasi tindakan kritis.',
+  },
+  {
     id: 'notifikasi-redis',
     category: 'security',
     icon: 'ri-notification-3-line',
     color: 'warning',
-    title: '11. Notifikasi Real-Time (Cabang & Jabatan) & Akselerasi Redis',
+    title: '13. Notifikasi Real-Time (Cabang & Jabatan) & Akselerasi Redis',
     subtitle: 'Notifikasi otomatis per cabang/jabatan untuk approval modal, selisih closing kasir, mutasi stok, dan ancaman keamanan',
     steps: [
       {

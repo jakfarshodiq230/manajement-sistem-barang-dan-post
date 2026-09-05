@@ -153,6 +153,13 @@ class PettyCashController extends Controller
 
             DB::commit();
 
+            // Auto-journal in accounting
+            try {
+                \App\Services\JournalService::journalForPettyCash($pettyCash);
+            } catch (\Exception $jEx) {
+                \Illuminate\Support\Facades\Log::warning('Auto-journal PettyCash failed: ' . $jEx->getMessage());
+            }
+
             return response()->json([
                 'message' => 'Pengeluaran kas kecil berhasil dicatat' . ($bankAccount ? ' dan saldo bank berhasil dipotong.' : '.'),
                 'data' => $pettyCash->load(['user:id,name', 'branch:id,name', 'bankAccount']),

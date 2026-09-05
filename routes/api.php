@@ -135,6 +135,13 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     Route::put('product-batches/{batchId}', [\App\Http\Controllers\Api\ProductBranchController::class, 'updateBatchPrice']);
     Route::get('product-batches/detail/{batchId}', [\App\Http\Controllers\Api\ProductBranchController::class, 'batchDetail']);
     Route::get('pos/scan-batch/{batchId}', [\App\Http\Controllers\Api\ProductBranchController::class, 'scanBatch']);
+
+    // Price Adjustments (Penyesuaian Harga Periode & Riwayat Perubahan)
+    Route::get('price-adjustments/history', [\App\Http\Controllers\Api\PriceAdjustmentController::class, 'history']);
+    Route::get('price-adjustments/{id}/export-pdf', [\App\Http\Controllers\Api\PriceAdjustmentController::class, 'exportPdf']);
+    Route::post('price-adjustments/{id}/apply', [\App\Http\Controllers\Api\PriceAdjustmentController::class, 'apply']);
+    Route::post('price-adjustments/{id}/cancel', [\App\Http\Controllers\Api\PriceAdjustmentController::class, 'cancel']);
+    Route::apiResource('price-adjustments', \App\Http\Controllers\Api\PriceAdjustmentController::class);
     // Cash Shifts (Shift Kasir)
     Route::get('cash-shifts/current', [\App\Http\Controllers\Api\CashShiftController::class, 'current']);
     Route::post('cash-shifts/open', [\App\Http\Controllers\Api\CashShiftController::class, 'open']);
@@ -167,6 +174,24 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     Route::post('security/block-ip', [\App\Http\Controllers\Api\SecurityController::class, 'blockIp']);
     Route::post('security/unblock-ip', [\App\Http\Controllers\Api\SecurityController::class, 'unblockIp']);
     Route::delete('security/logs/clear', [\App\Http\Controllers\Api\SecurityController::class, 'clearOldLogs']);
+
+    // Accounting & Double-Entry General Ledger (Modul Sistem Akuntansi)
+    Route::get('accounting/overview', [\App\Http\Controllers\Api\AccountingController::class, 'overview']);
+    Route::get('accounting/accounts', [\App\Http\Controllers\Api\AccountingController::class, 'getAccounts']);
+    Route::get('accounting/accounts/export-pdf', [\App\Http\Controllers\Api\AccountingController::class, 'exportCoaPdf']);
+    Route::post('accounting/accounts', [\App\Http\Controllers\Api\AccountingController::class, 'storeAccount']);
+    Route::put('accounting/accounts/{id}', [\App\Http\Controllers\Api\AccountingController::class, 'updateAccount']);
+    Route::delete('accounting/accounts/{id}', [\App\Http\Controllers\Api\AccountingController::class, 'deleteAccount']);
+    Route::get('accounting/journals', [\App\Http\Controllers\Api\AccountingController::class, 'getJournalEntries']);
+    Route::get('accounting/journals/export-pdf', [\App\Http\Controllers\Api\AccountingController::class, 'exportJournalPdf']);
+    Route::post('accounting/journals/manual', [\App\Http\Controllers\Api\AccountingController::class, 'storeManualJournal']);
+    Route::get('accounting/general-ledger', [\App\Http\Controllers\Api\AccountingController::class, 'getGeneralLedger']);
+    Route::get('accounting/general-ledger/export-pdf', [\App\Http\Controllers\Api\AccountingController::class, 'exportLedgerPdf']);
+    Route::get('accounting/trial-balance', [\App\Http\Controllers\Api\AccountingController::class, 'getTrialBalance']);
+    Route::get('accounting/balance-sheet', [\App\Http\Controllers\Api\AccountingController::class, 'getBalanceSheet']);
+    Route::get('accounting/income-statement', [\App\Http\Controllers\Api\AccountingController::class, 'getIncomeStatement']);
+    Route::get('accounting/financial-statements/export-pdf', [\App\Http\Controllers\Api\AccountingController::class, 'exportFinancialStatementsPdf']);
+    Route::post('accounting/sync-historical', [\App\Http\Controllers\Api\AccountingController::class, 'syncHistoricalTransactions']);
 
     Route::get('stock-transfers/status-counts', [\App\Http\Controllers\Api\StockTransferController::class, 'statusCounts']);
     Route::apiResource('stock-transfers', \App\Http\Controllers\Api\StockTransferController::class)->except(['update', 'destroy']);

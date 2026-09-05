@@ -35,6 +35,7 @@ export const useSnackbarStore = defineStore('snackbar', () => {
     color,
     timeout,
     show,
+    showSnackbar: show,
     showSuccess,
     showError,
     showWarning,

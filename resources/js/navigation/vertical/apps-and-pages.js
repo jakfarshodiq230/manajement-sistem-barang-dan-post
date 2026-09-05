@@ -103,6 +103,11 @@ export default [
     to: 'bank-accounts',
   },
   {
+    title: 'Penyesuaian Harga',
+    icon: { icon: 'ri-price-tag-3-line' },
+    to: 'price-adjustments',
+  },
+  {
     title: 'Pengaturan Pengguna',
     icon: { icon: 'ri-user-settings-line' },
     to: 'pengaturan-pengguna',

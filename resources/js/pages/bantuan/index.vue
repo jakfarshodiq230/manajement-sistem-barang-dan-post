@@ -22,48 +22,12 @@ const workflowCategories = [
   { id: 'piutang_retur', title: '5. Piutang & Retur', icon: 'ri-exchange-dollar-line' },
   { id: 'opname', title: '6. Opname & Audit Stok', icon: 'ri-archive-stack-line' },
   { id: 'laporan', title: '7. Laporan & Keuangan', icon: 'ri-file-chart-line' },
-  { id: 'modal_roi', title: '8. Modal & ROI Cabang', icon: 'ri-hand-coin-line' },
+  { id: 'akuntansi', title: '8. Akuntansi & Neraca', icon: 'ri-book-read-line' },
+  { id: 'modal_roi', title: '9. Modal & ROI Cabang', icon: 'ri-hand-coin-line' },
 ]
 
 // 1. Alur Sistem Lengkap & Step-by-Step
 const systemWorkflows = [
-  {
-    id: 'wf-bank',
-    category: 'bank',
-    icon: 'ri-bank-card-line',
-    color: 'info',
-    title: 'Tahap 2: Manajemen Rekening Bank, Multi-Bank & Barcode QRIS',
-    subtitle: 'Pengelolaan daftar rekening bank penampung (BCA, Mandiri, BRI, QRIS), saldo berjalan, serta integrasi POS dan Closing Harian.',
-    steps: [
-      {
-        no: 1,
-        title: 'Daftarkan Master Rekening Bank',
-        desc: 'Buka menu Daftar Rekening Bank (/bank-accounts). Daftarkan seluruh rekening yang dimiliki (BCA, Mandiri, BRI, QRIS, EDC). Masukkan nomor rekening, nama pemilik (A.N), saldo awal, dan upload barcode QRIS.',
-        link: '/bank-accounts',
-        linkText: 'Buka Rekening Bank',
-      },
-      {
-        no: 2,
-        title: 'Filter Periode Bulan & Tahun',
-        desc: 'Gunakan bar 12 bulan dan pemilih tahun di bagian atas untuk memantau omzet masuk dan total transaksi per bank.',
-      },
-      {
-        no: 3,
-        title: 'Pilihan Bank Dinamis di POS Kasir',
-        desc: 'Saat transaksi non-tunai di POS (/pos), kasir memilih bank penerima dari database lengkap dengan nomor rekening dan tombol salin.',
-        link: '/pos',
-        linkText: 'Ke Kasir POS',
-      },
-      {
-        no: 4,
-        title: 'Rekonsiliasi Bank di Closing Harian Kasir',
-        desc: 'Sistem audit closing harian memisahkan kalkulasi fisik kasir di laci vs pendapatan per rekening bank secara akurat.',
-        link: '/audit/closing-harian',
-        linkText: 'Buka Closing Harian',
-      },
-    ],
-    tips: 'Setiap pembayaran non-tunai di kasir otomatis menambah saldo rekening bank terkait secara real-time.',
-  },
   {
     id: 'wf-master',
     category: 'master',
@@ -104,11 +68,48 @@ const systemWorkflows = [
     tips: 'Gunakan tombol "Kelola Batch" di panel Inventori Cabang untuk mengatur HPP Real, Harga Jual POS, dan Batas Nego untuk masing-masing batch pengiriman supplier.',
   },
   {
+    id: 'wf-bank',
+    category: 'bank',
+    icon: 'ri-bank-card-line',
+    color: 'info',
+    title: 'Tahap 2: Manajemen Rekening Bank, Multi-Bank & Barcode QRIS',
+    subtitle: 'Pengelolaan daftar rekening bank penampung (BCA, Mandiri, BRI, QRIS), saldo berjalan, serta integrasi POS dan Closing Harian.',
+    steps: [
+      {
+        no: 1,
+        title: 'Daftarkan Master Rekening Bank',
+        desc: 'Buka menu Daftar Rekening Bank (/bank-accounts). Daftarkan seluruh rekening yang dimiliki (BCA, Mandiri, BRI, QRIS, EDC). Masukkan nomor rekening, nama pemilik (A.N), saldo awal, dan upload barcode QRIS.',
+        link: '/bank-accounts',
+        linkText: 'Buka Rekening Bank',
+      },
+      {
+        no: 2,
+        title: 'Filter Periode Bulan & Tahun',
+        desc: 'Gunakan bar 12 bulan dan pemilih tahun di bagian atas untuk memantau omzet masuk dan total transaksi per bank.',
+      },
+      {
+        no: 3,
+        title: 'Pilihan Bank Dinamis di POS Kasir',
+        desc: 'Saat transaksi non-tunai di POS (/pos), kasir memilih bank penerima dari database lengkap dengan nomor rekening dan tombol salin.',
+        link: '/pos',
+        linkText: 'Ke Kasir POS',
+      },
+      {
+        no: 4,
+        title: 'Rekonsiliasi Bank di Closing Harian Kasir',
+        desc: 'Sistem audit closing harian memisahkan kalkulasi fisik kasir di laci vs pendapatan per rekening bank secara akurat.',
+        link: '/audit/closing-harian',
+        linkText: 'Buka Closing Harian',
+      },
+    ],
+    tips: 'Setiap pembayaran non-tunai di kasir otomatis menambah saldo rekening bank terkait secara real-time.',
+  },
+  {
     id: 'wf-gudang',
     category: 'gudang',
     icon: 'ri-truck-line',
     color: 'info',
-    title: 'Tahap 2: Pengadaan (PO), Penerimaan Gudang (Diskon D1..D5) & Mutasi',
+    title: 'Tahap 3: Pengadaan (PO), Penerimaan Gudang (Diskon D1..D5) & Mutasi',
     subtitle: 'Alur pasokan dari Purchase Order kuantitas fisik, verifikasi faktur gudang, diskon bertingkat hingga 5 level, dan nomor batch/SCC.',
     steps: [
       {
@@ -145,7 +146,7 @@ const systemWorkflows = [
     category: 'pos',
     icon: 'ri-shopping-cart-2-line',
     color: 'success',
-    title: 'Tahap 3: Operasional Kasir (POS), Diskon Total & Otorisasi Nego',
+    title: 'Tahap 4: Operasional Kasir (POS), Diskon Total & Otorisasi Nego',
     subtitle: 'Panduan kasir dari buka shift kas, scan transaksi, diskon total bon, otorisasi nego batas bawah, hingga cetak struk.',
     steps: [
       {
@@ -184,7 +185,7 @@ const systemWorkflows = [
     category: 'piutang_retur',
     icon: 'ri-exchange-dollar-line',
     color: 'warning',
-    title: 'Tahap 4: Pengelolaan Buku Piutang, Notifikasi Email & Retur Barang',
+    title: 'Tahap 5: Pengelolaan Buku Piutang, Notifikasi Email & Retur Barang',
     subtitle: 'Pencatatan tagihan pelanggan tempo, pengiriman invoice & kwitansi email otomatis, serta retur barang.',
     steps: [
       {
@@ -228,7 +229,7 @@ const systemWorkflows = [
     category: 'opname',
     icon: 'ri-archive-stack-line',
     color: 'error',
-    title: 'Tahap 5: Audit Stok & Stock Opname Berkala (Cycle Counting)',
+    title: 'Tahap 6: Audit Stok & Stock Opname Berkala (Cycle Counting)',
     subtitle: 'Prosedur rekonsiliasi jumlah fisik barang di gudang dengan catatan sistem untuk mendeteksi selisih dan barang rusak.',
     steps: [
       {
@@ -260,7 +261,7 @@ const systemWorkflows = [
     category: 'laporan',
     icon: 'ri-file-chart-line',
     color: 'secondary',
-    title: 'Tahap 6: Laporan Finansial, Laba Rugi & Tutup Buku Harian',
+    title: 'Tahap 7: Laporan Finansial, Laba Rugi & Tutup Buku Harian',
     subtitle: 'Pemantauan omzet penjualan, HPP, laba bersih, arus kas, dan ekspor laporan resmi.',
     steps: [
       {
@@ -288,11 +289,64 @@ const systemWorkflows = [
     tips: 'Filter tanggal dapat disesuaikan untuk melihat performa Harian, Mingguan, Bulanan, maupun Tahunan.',
   },
   {
+    id: 'wf-akuntansi',
+    category: 'akuntansi',
+    icon: 'ri-book-read-line',
+    color: 'primary',
+    title: 'Tahap 8: Sistem Akuntansi & Pembukuan Otomatis (COA, Jurnal, Buku Besar & Neraca)',
+    subtitle: 'Panduan lengkap pembukuan double-entry otomatis berstandar SAK, Bagan Akun (COA), Jurnal Penyesuaian, Buku Besar, Neraca Saldo, dan Neraca Keuangan.',
+    steps: [
+      {
+        no: 1,
+        title: 'Bagan Akun (Chart of Accounts / COA 5 Kategori)',
+        desc: 'Buka menu Bagan Akun (/akuntansi/coa). Memuat 5 kelompok akun: 1xxx Aset (Kas, Bank, Piutang, Persediaan, Aset Tetap), 2xxx Kewajiban (Hutang Supplier), 3xxx Ekuitas (Modal Owner, Prive, Laba Ditahan), 4xxx Pendapatan (Penjualan POS), dan 5xxx Beban (HPP, Biaya Toko).',
+        link: '/akuntansi/coa',
+        linkText: 'Buka Bagan Akun (COA)',
+      },
+      {
+        no: 2,
+        title: 'Auto-Journaling POS, Gudang & Hutang Piutang',
+        desc: 'Buka menu Jurnal Umum (/akuntansi/jurnal). Setiap transaksi kasir POS, barang masuk gudang, kas kecil, dan pembayaran hutang/piutang otomatis membentuk pasangan Debit & Kredit secara real-time.',
+        link: '/akuntansi/jurnal',
+        linkText: 'Buka Jurnal Umum',
+      },
+      {
+        no: 3,
+        title: 'Buku Besar Akun (General Ledger) & Saldo Berjalan',
+        desc: 'Buka menu Buku Besar (/akuntansi/buku-besar). Pilih akun tertentu dan filter rentang tanggal untuk melihat mutasi debit/kredit kronologis serta Saldo Berjalan (Running Balance) akun.',
+        link: '/akuntansi/buku-besar',
+        linkText: 'Buka Buku Besar',
+      },
+      {
+        no: 4,
+        title: 'Neraca Saldo (Trial Balance) & Keseimbangan Debit Kredit',
+        desc: 'Buka tab Neraca Saldo di menu Neraca (/akuntansi/neraca) untuk memvalidasi bahwa Total Debit sama persis dengan Total Kredit di seluruh akun buku besar.',
+        link: '/akuntansi/neraca',
+        linkText: 'Buka Neraca Saldo',
+      },
+      {
+        no: 5,
+        title: 'Neraca Keuangan (Balance Sheet): Aset = Kewajiban + Ekuitas',
+        desc: 'Buka tab Neraca Keuangan di menu Neraca (/akuntansi/neraca). Menyajikan posisi kekayaan toko: Total Aset berbanding Total Kewajiban + Ekuitas Bersih secara seimbang 100%.',
+        link: '/akuntansi/neraca',
+        linkText: 'Buka Neraca Keuangan',
+      },
+      {
+        no: 6,
+        title: 'Laporan Laba Rugi & Jurnal Penyesuaian Manual (JV)',
+        desc: 'Lihat Laba Rugi periode berjalan dan input Jurnal Penyesuaian Manual untuk penyusutan aset toko, biaya sewa dibayar di muka, atau penyesuaian audit dengan validasi live balance.',
+        link: '/akuntansi/jurnal',
+        linkText: 'Input Jurnal Manual',
+      },
+    ],
+    tips: 'Sistem akuntansi menggunakan prinsip double-entry resmi: Aset = Kewajiban + Modal Owner + Laba Berjalan. Saldo kas bank dan persediaan barang selalu sinkron dengan modul POS dan Gudang.',
+  },
+  {
     id: 'wf-modal-roi',
     category: 'modal_roi',
     icon: 'ri-hand-coin-line',
     color: 'warning',
-    title: 'Tahap 7: Manajemen Modal, Permohonan Dana (PDF) & Pengembalian ROI Cabang',
+    title: 'Tahap 9: Manajemen Modal, Permohonan Dana (PDF) & Pengembalian ROI Cabang',
     subtitle: 'Alur komprehensif investasi modal Owner, pengajuan dana toko dengan proposal PDF, otorisasi transfer, dan pengembalian dividen/laba closing shift.',
     steps: [
       {
@@ -440,10 +494,58 @@ const faqs = [
     answer: 'Pada drawer detail transaksi di Buku Piutang atau Modal Cabang, terdapat tabel "Riwayat Log Pengiriman Email" (email_logs). Jika status email "Gagal" (misal: koneksi SMTP down), sistem menampilkan pesan error dan menyediakan tombol [ Kirim Ulang ] (Retry) yang bisa diklik langsung kapan saja.',
   },
   {
-    id: '18',
+    id: 18,
     category: 'gudang',
     question: 'Bagaimana jika supplier menaikkan harga barang saat stok batch lama masih ada dan sudah ada transaksi penjualan?',
     answer: '1. Transaksi penjualan yang sudah terjadi tetap menggunakan HPP historis transaksi pada saat itu (Laba Rugi masa lalu tetap akurat).\n2. Saat penerimaan batch baru tiba di gudang dengan harga naik, batch tersebut tercatat dengan HPP modal barunya.\n3. Di menu Inventori Cabang > "Kelola Batch", Owner dapat menyesuaikan HPP Real dan Harga Jual (POS) untuk batch baru atau menerapkan harga baru ke semua batch stok fisik yang tersisa.',
+  },
+  {
+    id: 19,
+    category: 'akuntansi',
+    question: 'Apa itu Bagan Akun (Chart of Accounts / COA) dan bagaimana klasifikasi kodenya (1xxx s/d 5xxx)?',
+    answer: 'Bagan Akun (COA) adalah daftar seluruh pos akun penampung transaksi keuangan toko yang terbagi dalam 5 kategori standar akuntansi:\n• 1xxx Aset / Aktiva: Seluruh harta kekayaan toko (1101 Kas Kasir, 1102 Rekening Bank BCA/Mandiri/BRI, 1201 Piutang Usaha Konsumen, 1301 Persediaan Barang Dagang, 1401 Aset Tetap Peralatan Toko).\n• 2xxx Kewajiban / Hutang: Tanggungan kewajiban bayar toko (2101 Hutang Dagang Supplier, 2102 Hutang Beban Operasional).\n• 3xxx Ekuitas / Modal: Hak kepemilikan modal bersih (3101 Modal Disetor Owner, 3102 Prive / Pengembalian Modal Owner, 3201 Laba Ditahan, Laba Tahun Berjalan).\n• 4xxx Pendapatan / Revenue: Seluruh pemasukan omzet bisnis (4101 Penjualan Kasir POS, 4201 Pendapatan Jasa Service, 4301 Pendapatan Lain-lain).\n• 5xxx Beban / Biaya: Beban operasional toko (5101 Beban Pokok Penjualan / HPP, 5201 Beban Gaji Karyawan, 5202 Beban Sewa Toko, 5205 Beban Kas Kecil / Petty Cash).',
+  },
+  {
+    id: 20,
+    category: 'akuntansi',
+    question: 'Bagaimana cara kerja Jurnal Otomatis (Auto-Journaling) saat kasir memproses transaksi POS?',
+    answer: 'Saat kasir memproses transaksi penjualan (misal: Tunai Rp 100.000 dengan modal HPP Rp 70.000), sistem secara cerdas mengeksekusi dua pasang pencatatan akuntansi double-entry di background:\n1. Sisi Kas & Penjualan:\n   • [Debit] 1101 Kas Laci Kasir : +Rp 100.000\n   • [Kredit] 4101 Pendapatan Penjualan POS : +Rp 100.000\n2. Sisi HPP & Persediaan:\n   • [Debit] 5101 Beban Pokok Penjualan (HPP) : +Rp 70.000\n   • [Kredit] 1301 Persediaan Barang Dagang : -Rp 70.000\nEfeknya: Kas bertambah, omzet tercatat, beban modal terhitung, dan nilai stok di neraca otomatis berkurang secara akurat tanpa kasir harus paham akuntansi rumit.',
+  },
+  {
+    id: 21,
+    category: 'akuntansi',
+    question: 'Apa arti istilah Debit dan Kredit dalam sistem akuntansi ini?',
+    answer: 'Debit dan Kredit dalam akuntansi BUKAN berarti sekadar "uang masuk" dan "uang keluar", melainkan posisi penambahan atau pengurangan saldo akun:\n• Posisi DEBIT bertambah (+) pada: Akun ASET (Kas, Bank, Piutang, Persediaan Barang) dan Akun BEBAN (HPP, Biaya Gaji, Sewa, Listrik).\n• Posisi KREDIT bertambah (+) pada: Akun KEWAJIBAN (Hutang Dagang), Akun EKUITAS (Modal Owner), dan Akun PENDAPATAN (Omzet Penjualan POS).\n• Hukum Keseimbangan: Di setiap transaksi dan jurnal, Total Debit HARUS SELALU SAMA dengan Total Kredit (Balance).',
+  },
+  {
+    id: 22,
+    category: 'akuntansi',
+    question: 'Mengapa Neraca Keuangan (Balance Sheet) harus selalu seimbang (Total Aset = Total Kewajiban + Total Ekuitas)?',
+    answer: 'Neraca mencerminkan hukum fundamental akuntansi: Total Aset = Total Kewajiban + Total Ekuitas.\nArtinya, seluruh harta yang dimiliki toko (uang tunai di laci, saldo rekening bank, piutang tempo kasbon, stok barang di rak gudang, dan peralatan toko) PASTI bersumber dari dua asal:\n1. Pinjaman/Kewajiban dari pihak luar (Hutang tempo ke Supplier barang), atau\n2. Modal sendiri yang disetor oleh Owner ditambah keuntungan laba bersih usaha yang belum diambil (Ekuitas).\nJika Aset = Kewajiban + Ekuitas, maka pembukuan toko dinyatakan valid dan sehat 100%.',
+  },
+  {
+    id: 23,
+    category: 'akuntansi',
+    question: 'Apa itu akun Prive / Pengembalian Modal Owner dan bagaimana perhitungannya di Neraca?',
+    answer: 'Prive (Akun 3102) adalah akun kontra-ekuitas (memiliki saldo normal Debit) yang mencatat penarikan dana atau cicilan pengembalian modal dari kas toko kepada Owner.\nPada laporan Neraca Keuangan:\n• Total Ekuitas = Modal Disetor Owner (3101) - Prive / Pengembalian Modal (3102) + Laba Ditahan (3201) + Laba Bersih Periode Berjalan.\nPrive mengurangi ekuitas sehingga posisi kas yang disetorkan keluar ke Owner tetap seimbang dengan total pasiva.',
+  },
+  {
+    id: 24,
+    category: 'akuntansi',
+    question: 'Bagaimana cara membaca Buku Besar (General Ledger) per akun?',
+    answer: 'Buka menu Buku Besar (/akuntansi/buku-besar). Pilih akun yang ingin diperiksa (misal: 1101 Kas Kasir, 1102 Rekening BCA, atau 2101 Hutang Supplier) dan tentukan rentang tanggal:\n1. Saldo Awal: Nilai saldo akun pada awal periode yang dipilih.\n2. Tabel Mutasi: Menampilkan setiap baris transaksi lengkap dengan tanggal, nomor jurnal, keterangan, debit, dan kredit.\n3. Saldo Berjalan (Running Balance): Menampilkan posisi saldo akumulatif terbaru setelah transaksi tersebut terjadi.\n4. Link Dokumen: Anda dapat mengklik nomor referensi transaksi untuk melihat rincian faktur sumbernya.',
+  },
+  {
+    id: 25,
+    category: 'akuntansi',
+    question: 'Kapan admin perlu menginput Jurnal Penyesuaian Manual (Manual Journal Voucher - JV)?',
+    answer: 'Jurnal manual digunakan untuk transaksi non-kasir yang membutuhkan pencatatan akuntansi resmi, contohnya:\n1. Beban penyusutan inventaris / komputer / peralatan toko bulanan (Debit: Beban Penyusutan, Kredit: Akumulasi Penyusutan).\n2. Pengakuan biaya sewa tempat / asuransi dibayar di muka (Debit: Beban Sewa, Kredit: Sewa Dibayar di Muka).\n3. Beban administrasi bulanan bank atau potongan biaya transfer (Debit: Beban Administrasi Bank, Kredit: Rekening Bank Terkait).\n4. Koreksi pembukuan atas audit selisih kas masa lalu.\nMenu Jurnal Umum menyediakan form input dengan live balance validator yang mengunci tombol Simpan jika Debit ≠ Kredit.',
+  },
+  {
+    id: 26,
+    category: 'akuntansi',
+    question: 'Apa perbedaan antara Neraca Saldo (Trial Balance) dan Neraca Keuangan (Balance Sheet)?',
+    answer: '• Neraca Saldo (Trial Balance): Daftar seluruh akun COA beserta saldo debit dan kreditnya pada akhir periode. Tujuannya adalah menguji secara teknis bahwa Total Debit = Total Kredit dan tidak ada kesalahan pembukuan.\n• Neraca Keuangan (Balance Sheet): Laporan keuangan resmi yang mengelompokkan akun ke dalam struktur Aset (Aktiva Lancar & Tetap) vs Kewajiban & Ekuitas (Pasiva) untuk menilai kesehatan finansial perusahaan bagi Owner, Bank, atau Investor.',
   },
 ]
 

@@ -54,7 +54,8 @@ const login = async () => {
     localStorage.setItem('userAbilityRules', JSON.stringify(userAbilityRules))
     ability.update(userAbilityRules)
     
-    const cookieOptions = rememberMe.value ? { maxAge: 432000 } : { maxAge: null }
+    // Durasi Cookie: 7 Hari jika 'Ingat Saya' dicentang (604.800 detik), 24 Jam secara default (86.400 detik)
+    const cookieOptions = rememberMe.value ? { maxAge: 604800 } : { maxAge: 86400 }
 
     useCookie('userData', cookieOptions).value = userData
     useCookie('accessToken', cookieOptions).value = accessToken

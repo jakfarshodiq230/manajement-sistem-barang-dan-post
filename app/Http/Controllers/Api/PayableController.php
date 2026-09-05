@@ -399,6 +399,13 @@ class PayableController extends Controller
 
             DB::commit();
 
+            // Auto-journal in accounting
+            try {
+                \App\Services\JournalService::journalForPayablePayment($payment);
+            } catch (\Exception $jEx) {
+                \Illuminate\Support\Facades\Log::warning('Auto-journal PayablePayment failed: ' . $jEx->getMessage());
+            }
+
             return response()->json([
                 'message' => 'Pembayaran tagihan bulanan dan barang berhasil dicatat.',
                 'payment' => $payment,

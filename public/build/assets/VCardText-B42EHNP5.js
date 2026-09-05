@@ -1,0 +1,1 @@
+import{aq as s,a7 as r,b as o,a9 as c,aX as n,aa as m}from"./main-D-Ck2Us5.js";const p=c({opacity:[Number,String],...m(),...n()},"VCardText"),x=s()({name:"VCardText",props:p(),setup(a,e){let{slots:t}=e;return r(()=>o(a.tag,{class:["v-card-text",a.class],style:[{"--v-card-text-opacity":a.opacity},a.style]},t)),{}}});export{x as V};

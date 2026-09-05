@@ -105,10 +105,19 @@ onMounted(async () => {
 
 const financialModules = [
   {
+    title: 'Sistem Akuntansi & Buku Besar',
+    subtitle: 'Bagan Akun (COA), Jurnal Umum otomatis, Buku Besar (General Ledger), dan Laporan Neraca Keuangan baku.',
+    icon: 'ri-book-read-line',
+    color: 'primary',
+    to: '/akuntansi',
+    badge: 'Akuntansi PSAK',
+    actionText: 'Buka Pusat Akuntansi',
+  },
+  {
     title: 'Rekap Keuangan & Laba Rugi',
     subtitle: 'Laporan komprehensif omzet, HPP modal, pengeluaran kas kecil, dan laba bersih resmi toko per periode.',
     icon: 'ri-file-chart-line',
-    color: 'primary',
+    color: 'success',
     to: '/audit/rekap',
     badge: 'Laba Rugi',
     actionText: 'Buka Rekap Keuangan',

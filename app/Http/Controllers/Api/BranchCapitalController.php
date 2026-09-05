@@ -293,6 +293,14 @@ class BranchCapitalController extends Controller
             }
         }
 
+        if ($status === 'approved') {
+            try {
+                \App\Services\JournalService::journalForBranchCapital($capital);
+            } catch (\Exception $jEx) {
+                \Log::warning('Auto-journal BranchCapital store failed: ' . $jEx->getMessage());
+            }
+        }
+
         $message = $status === 'approved' 
             ? 'Penyertaan modal berhasil dicatat dan disetujui.' 
             : ($request->type === 'injection' 
@@ -425,6 +433,13 @@ class BranchCapitalController extends Controller
                 'success',
                 'ri-checkbox-circle-line'
             );
+        }
+
+        // Auto-journal in accounting
+        try {
+            \App\Services\JournalService::journalForBranchCapital($capital);
+        } catch (\Exception $jEx) {
+            \Log::warning('Auto-journal BranchCapital approve failed: ' . $jEx->getMessage());
         }
 
         $msg = $capital->type === 'injection' 

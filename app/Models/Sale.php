@@ -60,6 +60,11 @@ class Sale extends Model
         return $this->hasMany(SaleItem::class);
     }
 
+    public function saleItems()
+    {
+        return $this->hasMany(SaleItem::class);
+    }
+
 
 
     public function validator() { return $this->belongsTo(\App\Models\User::class, 'validated_by'); }

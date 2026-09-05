@@ -27,7 +27,9 @@ class UserController extends Controller
             'pin' => 'nullable|string|digits:6',
         ]);
 
-        $user->pos_pin = $pin;
+        $hashedPin = \Illuminate\Support\Facades\Hash::make($pin);
+        $user->pos_pin = $hashedPin;
+        $user->pin = $hashedPin;
         $user->save();
 
         return response()->json([

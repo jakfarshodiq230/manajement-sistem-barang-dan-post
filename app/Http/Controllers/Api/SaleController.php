@@ -299,8 +299,8 @@ class SaleController extends Controller
                     $minNegoPrice = $activeBatch ? $activeBatch->min_nego_price : $productBranch->min_nego_price;
                 }
 
-                if ($item['price'] < $minNegoPrice) {
-                    throw new \Exception("Harga " . $productBranch->product->name . " tidak boleh kurang dari batas minimum Rp " . number_format($minNegoPrice, 0, ',', '.'));
+                if ($minNegoPrice > 0 && $item['price'] < $minNegoPrice && !$request->filled('approved_by')) {
+                    throw new \Exception("Harga " . $productBranch->product->name . " di bawah batas minimum (Rp " . number_format($minNegoPrice, 0, ',', '.') . ") memerlukan otorisasi dan PIN Supervisor.");
                 }
 
                 \App\Models\SaleItem::create([
@@ -435,6 +435,13 @@ class SaleController extends Controller
             }
 
             \Illuminate\Support\Facades\DB::commit();
+
+            // Auto-journal entry in double-entry accounting
+            try {
+                \App\Services\JournalService::journalForSale($sale->fresh(['items']));
+            } catch (\Exception $jEx) {
+                \Illuminate\Support\Facades\Log::warning('Auto-journal Sale failed: ' . $jEx->getMessage());
+            }
 
             return response()->json([
                 'message' => 'Transaksi berhasil',

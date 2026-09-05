@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { paginationMeta } from '@/utils/paginationMeta'
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import { useSnackbarStore } from '@/stores/snackbar'
 
@@ -1259,18 +1260,47 @@ onMounted(async () => {
       </div>
 
       <!-- Pagination -->
-      <VCardText class="d-flex align-center justify-space-between pa-4 border-t">
-        <span class="text-caption text-medium-emphasis">
-          Menampilkan {{ (page - 1) * itemsPerPage + 1 }} - {{ Math.min(page * itemsPerPage, totalItems) }} dari {{ totalItems }} data
-        </span>
-        <VPagination
-          v-model="page"
-          :length="Math.ceil(totalItems / itemsPerPage) || 1"
-          total-visible="5"
-          density="compact"
-          size="small"
-        />
-      </VCardText>
+      <VDivider />
+
+      <div class="d-flex justify-end flex-wrap gap-x-6 px-4 py-2">
+        <div class="d-flex align-center gap-x-2 text-medium-emphasis text-body-2">
+          Baris per halaman:
+          <VSelect
+            v-model="itemsPerPage"
+            class="per-page-select"
+            variant="plain"
+            density="compact"
+            :items="[10, 20, 25, 50, 100]"
+            hide-details
+          />
+        </div>
+
+        <p class="d-flex align-center text-body-2 text-high-emphasis me-2 mb-0">
+          {{ paginationMeta({ page, itemsPerPage }, totalItems) }}
+        </p>
+
+        <div class="d-flex gap-x-2 align-center me-2">
+          <VBtn
+            class="flip-in-rtl"
+            icon="ri-arrow-left-s-line"
+            variant="text"
+            density="comfortable"
+            color="high-emphasis"
+            :disabled="page <= 1"
+            @click="page <= 1 ? page = 1 : page--"
+          />
+
+          <VBtn
+            class="flip-in-rtl"
+            icon="ri-arrow-right-s-line"
+            density="comfortable"
+            variant="text"
+            color="high-emphasis"
+            :disabled="page >= Math.ceil(totalItems / itemsPerPage)"
+            @click="page >= Math.ceil(totalItems / itemsPerPage) ? page = Math.ceil(totalItems / itemsPerPage) : page++"
+          />
+        </div>
+      </div>
     </VCard>
 
     <!-- DRAWER 1: INJEKSI MODAL LANGSUNG (OWNER -> CABANG) -->
@@ -2625,5 +2655,8 @@ onMounted(async () => {
 }
 .text-pre-wrap {
   white-space: pre-wrap;
+}
+.per-page-select {
+  inline-size: 5.5rem;
 }
 </style>

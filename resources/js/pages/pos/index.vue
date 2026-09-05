@@ -2225,6 +2225,7 @@ const startNewTransaction = () => {
 
     <ApprovalDialog
       v-model:is-dialog-visible="isApprovalDialogVisible"
+      :branch-id="activeBranchId"
       @success="handleApprovalSuccess"
       @cancel="handleApprovalCancel"
     />
