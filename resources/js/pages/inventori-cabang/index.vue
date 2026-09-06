@@ -239,14 +239,14 @@ const handleFileUpload = async event => {
 
 
 const tableHeaders = [
-  { title: 'PRODUK', key: 'product.name' },
+  { title: 'PRODUK & SKU', key: 'product.name' },
   { title: 'CABANG', key: 'branch.name' },
   { title: 'HARGA MODAL (HPP)', key: 'cost_price' },
-  { title: 'HARGA JUAL NORMAL', key: 'price' },
+  { title: 'HARGA JUAL POS', key: 'price' },
   { title: 'HARGA NEGO (MINIMAL)', key: 'min_nego_price' },
-  { title: 'PAJAK PENJUALAN POS', key: 'taxes' },
-  { title: 'STOK', key: 'stock' },
-  { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
+  { title: 'PAJAK POS', key: 'taxes' },
+  { title: 'SISA STOK', key: 'stock' },
+  { title: 'AKSI OPERASIONAL', key: 'actions', sortable: false, align: 'center' },
 ]
 
 const filteredItems = computed(() => {
@@ -302,10 +302,10 @@ const confirmDelete = async id => {
     <div class="d-flex flex-column flex-md-row align-start align-md-center justify-space-between gap-4 mb-4">
       <div>
         <h2 class="text-h5 text-md-h4 font-weight-bold mb-1">
-          Inventori & Harga Cabang
+          Inventori & Stok Fisik Cabang
         </h2>
         <p class="text-body-2 text-md-body-1 mb-0 text-medium-emphasis">
-          Atur harga modal, harga jual, dan stok masuk untuk masing-masing cabang.
+          Pusat pendaftaran produk cabang, monitoring stok fisik, mutasi masuk, dan cetak label barcode toko.
         </p>
       </div>
       
@@ -779,19 +779,34 @@ const confirmDelete = async id => {
         </template>
 
         <template #item.actions="{ item }">
-          <div class="d-flex align-center gap-1 py-1">
+          <div class="d-flex align-center gap-1 py-1 justify-center">
+            <!-- Tombol Utama: Cetak Label Barcode -->
             <VBtn
-              v-if="$can('write', 'Inventori Cabang')"
+              v-if="$can('read', 'Inventori Cabang')"
               size="small"
               color="primary"
               variant="tonal"
-              prepend-icon="ri-qr-code-line"
-              class="font-weight-medium rounded-lg px-3"
-              @click="manageBatches(item)"
+              prepend-icon="ri-printer-line"
+              class="font-weight-medium rounded-lg px-2"
+              title="Cetak Label Stiker Barcode & QR"
+              @click="printLabel(item)"
             >
-              Kelola Batch
+              Cetak Label
             </VBtn>
 
+            <!-- Tombol Kelola Batch & Expiry -->
+            <VBtn
+              v-if="$can('write', 'Inventori Cabang')"
+              size="small"
+              color="secondary"
+              variant="tonal"
+              icon="ri-stack-line"
+              class="rounded-lg"
+              title="Kelola Batch & Expiry Date"
+              @click="manageBatches(item)"
+            />
+
+            <!-- Menu Aksi Operasional Tambahan -->
             <VMenu location="bottom end">
               <template #activator="{ props: menuProps }">
                 <VBtn
@@ -803,23 +818,29 @@ const confirmDelete = async id => {
                   class="rounded-lg"
                 />
               </template>
-              <VList density="compact" class="py-1 shadow-sm rounded-lg" min-width="175">
+              <VList density="compact" class="py-1 shadow-sm rounded-lg" min-width="190">
                 <VListItem
                   v-if="$can('write', 'Inventori Cabang')"
                   prepend-icon="ri-download-2-line"
-                  title="Inbound Stok"
+                  title="Inbound Stok Masuk"
                   @click="addStock(item)"
                 />
                 <VListItem
                   v-if="$can('read', 'Inventori Cabang')"
                   prepend-icon="ri-printer-line"
-                  title="Cetak Label QR"
+                  title="Cetak Label Barcode"
                   @click="printLabel(item)"
                 />
                 <VListItem
                   v-if="$can('write', 'Inventori Cabang')"
-                  prepend-icon="ri-pencil-line"
-                  title="Edit Harga & Pajak"
+                  prepend-icon="ri-stack-line"
+                  title="Kelola Batch & Expiry"
+                  @click="manageBatches(item)"
+                />
+                <VListItem
+                  v-if="$can('write', 'Inventori Cabang')"
+                  prepend-icon="ri-settings-4-line"
+                  title="Pengaturan Awal Cabang"
                   @click="editItem(item)"
                 />
                 <VDivider v-if="$can('delete', 'Inventori Cabang')" class="my-1" />
