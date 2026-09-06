@@ -270,6 +270,14 @@ onMounted(() => {
 
           <div class="d-flex align-center gap-3">
             <VBtn
+              variant="tonal"
+              color="secondary"
+              prepend-icon="ri-store-2-line"
+              to="/inventori-cabang"
+            >
+              Lihat Inventori Cabang
+            </VBtn>
+            <VBtn
               color="primary"
               prepend-icon="ri-add-line"
               @click="isAddDrawerVisible = true"

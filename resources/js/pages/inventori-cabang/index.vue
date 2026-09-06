@@ -352,6 +352,16 @@ const confirmDelete = async id => {
           Export
         </VBtn>
         <VBtn
+          color="secondary"
+          variant="tonal"
+          size="small"
+          prepend-icon="ri-price-tag-3-line"
+          class="flex-grow-1 flex-sm-grow-0"
+          to="/price-adjustments"
+        >
+          Penyesuaian Harga Massal
+        </VBtn>
+        <VBtn
           v-if="$can('create', 'Inventori Cabang')"
           color="primary"
           size="small"
@@ -448,20 +458,50 @@ const confirmDelete = async id => {
               </p>
             </div>
           </div>
-          <VBtn
-            size="small"
-            variant="tonal"
-            color="primary"
-            class="rounded-lg"
-            :prepend-icon="isPriceGuideVisible ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'"
-            @click="isPriceGuideVisible = !isPriceGuideVisible"
-          >
-            {{ isPriceGuideVisible ? 'Tutup Catatan' : 'Buka Catatan' }}
-          </VBtn>
+          <div class="d-flex align-center gap-2">
+            <VBtn
+              size="small"
+              color="primary"
+              variant="elevated"
+              class="rounded-lg shadow-xs"
+              prepend-icon="ri-price-tag-3-line"
+              to="/price-adjustments"
+            >
+              Penyesuaian Harga Massal
+            </VBtn>
+            <VBtn
+              size="small"
+              variant="tonal"
+              color="primary"
+              class="rounded-lg"
+              :prepend-icon="isPriceGuideVisible ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'"
+              @click="isPriceGuideVisible = !isPriceGuideVisible"
+            >
+              {{ isPriceGuideVisible ? 'Tutup Catatan' : 'Buka Catatan' }}
+            </VBtn>
+          </div>
         </div>
 
         <VExpandTransition>
           <div v-show="isPriceGuideVisible" class="mt-4 pt-3 border-t">
+            <!-- SOP & Perbedaan Modul Alert -->
+            <div class="pa-3 mb-3 bg-white border border-primary border-opacity-25 rounded-lg">
+              <div class="d-flex align-start gap-3">
+                <VAvatar color="primary" variant="tonal" size="36" rounded="lg" class="mt-1">
+                  <VIcon icon="ri-lightbulb-line" size="20" />
+                </VAvatar>
+                <div class="flex-grow-1">
+                  <div class="text-subtitle-2 font-weight-bold text-high-emphasis">
+                    💡 Kapan Menggunakan Menu Ini vs Menu "Penyesuaian Harga"?
+                  </div>
+                  <div class="text-caption text-medium-emphasis mt-1">
+                    • <strong>Menu Inventori Cabang (Halaman Ini):</strong> Fokus mengelola <strong>stok fisik, batch barang, mutasi masuk, cetak label barcode</strong>, serta pendaftaran awal produk ke cabang toko.<br>
+                    • <strong>Menu <router-link to="/price-adjustments" class="text-primary font-weight-bold">Penyesuaian Harga (Klik di sini)</router-link>:</strong> Digunakan saat ada <strong>kebijakan kenaikan harga dari pabrik / diskon massal 1 kategori</strong> dengan rekam jejak resmi <em>(Audit Trail)</em> dan persetujuan Owner.
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <VRow dense class="g-3">
               <!-- 1. Harga Modal Real (HPP) -->
               <VCol cols="12" md="3">

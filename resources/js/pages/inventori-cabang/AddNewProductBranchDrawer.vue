@@ -261,6 +261,16 @@ const formatCurrency = value => {
               </span>
             </div>
 
+            <VAlert
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="mb-3 rounded-lg text-caption"
+              icon="ri-lightbulb-line"
+            >
+              Pengaturan ini untuk harga standar di cabang. Untuk menaikkan/menurunkan harga banyak barang sekaligus secara resmi, gunakan modul <strong><router-link to="/price-adjustments" class="text-primary font-weight-bold">Penyesuaian Harga ➔</router-link></strong>.
+            </VAlert>
+
             <VRow dense>
               <!-- HPP Real -->
               <VCol cols="12">
