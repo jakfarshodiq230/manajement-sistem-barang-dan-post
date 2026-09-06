@@ -1,16 +1,81 @@
 ---
 deployment:
   tasks:
-    # 1. Tentukan folder target
-    - export DEPLOYPATH_CORE=/home/shoa3397/ms_pos/
-    - export DEPLOYPATH_PUBLIC=/home/shoa3397/public_html/public_pos/
+    # ============================================
+    # 1. KONFIGURASI VARIABEL
+    # ============================================
+    - export DEPLOYPATH_CORE=/home/shoa3397/ms_pos
+    - export DEPLOYPATH_PUBLIC=/home/shoa3397/public_html/public_pos
 
-    # 2. Buat direktori target jika belum ada
-    - /bin/mkdir -p $DEPLOYPATH_CORE
-    - /bin/mkdir -p $DEPLOYPATH_PUBLIC
+    # ============================================
+    # 2. BUILD ASSETS (JIKA MENGGUNAKAN NPM)
+    # ============================================
+    - cd $DEPLOYPATH_CORE
+    - /usr/bin/npm install --production || true
+    - /usr/bin/npm run production || true
 
-    # 3. Salin file core aplikasi (kecuali .git dan folder public) ke ms_pos
-    - /bin/rsync -rav --exclude='.git' --exclude='public' * $DEPLOYPATH_CORE
+    # ============================================
+    # 3. HAPUS FOLDER PUBLIC_POS LAMA
+    # ============================================
+    - /bin/rm -rf $DEPLOYPATH_PUBLIC
 
-    # 4. Salin isi folder public/ ke public_html/public_pos
-    - /bin/rsync -rav public/ $DEPLOYPATH_PUBLIC
+    # ============================================
+    # 4. BUAT SYMBOLIC LINK
+    # ============================================
+    - /bin/ln -s $DEPLOYPATH_CORE/public $DEPLOYPATH_PUBLIC
+
+    # ============================================
+    # 5. SET PERMISSION
+    # ============================================
+    - /bin/chmod -R 755 $DEPLOYPATH_CORE
+    - /bin/chmod -R 755 $DEPLOYPATH_PUBLIC
+    - /bin/chmod -R 775 $DEPLOYPATH_CORE/storage
+    - /bin/chmod -R 775 $DEPLOYPATH_CORE/bootstrap/cache
+
+    # ============================================
+    # 6. INSTALL COMPOSER
+    # ============================================
+    - cd $DEPLOYPATH_CORE
+    - /usr/local/bin/php /usr/local/bin/composer install --no-dev --optimize-autoloader --no-interaction
+
+    # ============================================
+    # 7. MIGRASI DATABASE
+    # ============================================
+    # - cd $DEPLOYPATH_CORE
+    # - /usr/local/bin/php artisan migrate --force
+
+    # ============================================
+    # 8. CLEAR DAN CACHE
+    # ============================================
+    - cd $DEPLOYPATH_CORE
+    - /usr/local/bin/php artisan config:clear
+    - /usr/local/bin/php artisan cache:clear
+    - /usr/local/bin/php artisan view:clear
+    - /usr/local/bin/php artisan optimize:clear
+
+    # ============================================
+    # 9. GENERATE OPTIMIZE
+    # ============================================
+    - cd $DEPLOYPATH_CORE
+    - /usr/local/bin/php artisan config:cache
+    - /usr/local/bin/php artisan route:cache
+    - /usr/local/bin/php artisan view:cache
+    - /usr/local/bin/php artisan optimize
+
+    # ============================================
+    # 10. STORAGE LINK
+    # ============================================
+    - cd $DEPLOYPATH_CORE
+    - /usr/local/bin/php artisan storage:link --force || true
+
+    # ============================================
+    # 11. RESTART QUEUE
+    # ============================================
+    - cd $DEPLOYPATH_CORE
+    - /usr/local/bin/php artisan queue:restart || true
+
+    # ============================================
+    # 12. PERMISSION FINAL
+    # ============================================
+    - /bin/chown -R shoa3397:shoa3397 $DEPLOYPATH_CORE
+    - /bin/chown -R shoa3397:shoa3397 $DEPLOYPATH_PUBLIC
