@@ -2049,7 +2049,7 @@ const printDeliveryNote = () => {
                   SURAT JALAN MUTASI BARANG
                 </h3>
                 <p class="text-caption text-medium-emphasis mb-0 doc-company-sub">
-                  PT. DUMAI MANAJEMEN SISTEM INVENTORI & LOGISTIK
+                  {{ deliveryNoteData.source_branch?.owner?.name || deliveryNoteData.source_branch?.name || 'SISTEM MANAJEMEN INVENTORI & LOGISTIK' }}
                 </p>
               </div>
               <div class="text-right">

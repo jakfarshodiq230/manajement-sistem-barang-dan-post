@@ -2,204 +2,259 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Surat Penetapan Harga - {{ $adjustment->adjustment_number }}</title>
+    <title>SK Penetapan Harga Resmi - {{ $adjustment->adjustment_number }}</title>
     <style>
         @page {
             size: A4 portrait;
-            margin: 12mm 15mm 15mm 15mm;
+            margin: 12mm 14mm 14mm 14mm;
+        }
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
         }
         body {
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            color: #1e293b;
-            font-size: 9pt;
+            color: #0f172a;
+            font-size: 8.5pt;
             line-height: 1.35;
+            margin: 0;
+            padding: 0;
         }
-        .header-table {
+
+        /* 1. Kop Dokumen Resmi */
+        .kop-table {
             width: 100%;
-            border-bottom: 2px solid #0f172a;
+            border-bottom: 2.5px solid #0f172a;
             padding-bottom: 8px;
             margin-bottom: 12px;
         }
-        .company-name {
+        .company-title {
             font-size: 14pt;
             font-weight: bold;
             color: #0f172a;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-        }
-        .company-info {
-            font-size: 8pt;
-            color: #475569;
-        }
-        .doc-title {
-            text-align: center;
-            font-size: 13pt;
-            font-weight: bold;
-            color: #0f172a;
-            text-transform: uppercase;
-            margin-top: 6px;
             margin-bottom: 2px;
+        }
+        .company-desc {
+            font-size: 7.5pt;
+            color: #475569;
+            line-height: 1.35;
+        }
+        .sk-card-title {
+            font-size: 7.5pt;
+            font-weight: bold;
+            color: #1e3a8a;
+            text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        .doc-subtitle {
-            text-align: center;
-            font-size: 9pt;
-            color: #64748b;
-            margin-bottom: 14px;
+        .sk-card-number {
+            font-size: 9.5pt;
+            font-weight: bold;
+            color: #0f172a;
+            margin-top: 1px;
+            letter-spacing: 0.3px;
         }
-        .meta-table {
+        .sk-card-date {
+            font-size: 7pt;
+            color: #64748b;
+            margin-top: 1px;
+        }
+
+        /* 2. Parameter Grid Metadata SK */
+        .meta-box {
             width: 100%;
-            margin-bottom: 14px;
+            border: 1px solid #cbd5e1;
+            background-color: #f8fafc;
+            margin-bottom: 12px;
             border-collapse: collapse;
         }
-        .meta-table td {
-            padding: 3px 6px;
-            font-size: 8.5pt;
-            vertical-align: top;
+        .meta-box td {
+            padding: 5px 8px;
+            font-size: 8pt;
+            vertical-align: middle;
+            border-bottom: 1px solid #e2e8f0;
         }
-        .meta-label {
-            width: 18%;
+        .meta-lbl {
+            width: 17%;
             font-weight: bold;
             color: #475569;
+            font-size: 7.5pt;
+            text-transform: uppercase;
         }
         .meta-sep {
             width: 2%;
+            text-align: center;
+            color: #94a3b8;
         }
         .meta-val {
-            width: 30%;
+            width: 31%;
             color: #0f172a;
         }
-        .status-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 8pt;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        .badge-approved {
-            background-color: #dcfce7;
-            color: #166534;
-            border: 1px solid #86efac;
-        }
-        .badge-draft {
-            background-color: #fef9c3;
-            color: #854d0e;
-            border: 1px solid #fde047;
-        }
+
+        /* 3. KPI Metrics Summary Cards */
         .kpi-table {
             width: 100%;
-            margin-bottom: 14px;
             border-collapse: separate;
             border-spacing: 6px 0;
+            margin-bottom: 12px;
         }
-        .kpi-card {
-            background-color: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 8px;
+        .kpi-cell {
+            width: 25%;
+            border: 1px solid #cbd5e1;
+            background-color: #ffffff;
+            padding: 6px 4px;
             text-align: center;
         }
         .kpi-title {
-            font-size: 7pt;
+            font-size: 6.5pt;
+            font-weight: bold;
             text-transform: uppercase;
             color: #64748b;
-            font-weight: bold;
+            letter-spacing: 0.3px;
         }
-        .kpi-value {
-            font-size: 11pt;
+        .kpi-num {
+            font-size: 10.5pt;
             font-weight: bold;
             color: #0f172a;
             margin-top: 2px;
         }
+
+        /* 4. Table Rincian Produk */
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 15px;
+            margin-bottom: 14px;
         }
         .items-table th {
-            background-color: #0f172a;
+            background-color: #1e293b;
             color: #ffffff;
-            font-size: 8pt;
+            font-size: 7.5pt;
+            font-weight: bold;
             text-transform: uppercase;
-            padding: 6px 5px;
-            text-align: left;
-            border: 1px solid #0f172a;
+            padding: 6px 4px;
+            border: 1px solid #1e293b;
+            letter-spacing: 0.3px;
         }
         .items-table td {
-            padding: 5px 5px;
-            font-size: 8pt;
+            padding: 5px 4px;
+            font-size: 7.5pt;
             border: 1px solid #cbd5e1;
             vertical-align: middle;
         }
-        .items-table tr:nth-child(even) {
+        .row-alt {
             background-color: #f8fafc;
         }
-        .text-end { text-align: right; }
+
+        /* Helpers */
         .text-center { text-align: center; }
-        .font-mono { font-family: 'Courier New', Courier, monospace; }
-        .text-success { color: #16a34a; font-weight: bold; }
-        .text-error { color: #dc2626; font-weight: bold; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .font-bold { font-weight: bold; }
+        .text-primary { color: #1e3a8a; }
+        .text-success { color: #16a34a; }
+        .text-danger { color: #dc2626; }
         .text-muted { color: #64748b; }
+
+        /* Badges */
+        .tag-pill {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 7pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            border-radius: 3px;
+        }
+        .tag-green {
+            background-color: #dcfce7;
+            color: #15803d;
+            border: 1px solid #86efac;
+        }
+        .tag-yellow {
+            background-color: #fef9c3;
+            color: #854d0e;
+            border: 1px solid #fde047;
+        }
+        .tag-red {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        /* 5. Signatures Grid */
         .sig-table {
             width: 100%;
-            margin-top: 20px;
+            border-collapse: separate;
+            border-spacing: 6px 0;
+            margin-top: 10px;
             page-break-inside: avoid;
         }
-        .sig-table td {
+        .sig-box {
             width: 33.33%;
+            border: 1px solid #cbd5e1;
+            background-color: #fafafa;
+            padding: 8px 4px 6px 4px;
             text-align: center;
             vertical-align: top;
-            font-size: 8.5pt;
         }
-        .sig-box {
-            height: 55px;
+        .sig-role {
+            font-size: 7.5pt;
+            font-weight: bold;
+            color: #334155;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+        .sig-qr-container {
+            height: 44px;
+            margin: 2px auto;
         }
         .sig-name {
+            font-size: 8.5pt;
             font-weight: bold;
-            text-decoration: underline;
             color: #0f172a;
+            margin-top: 4px;
+            text-decoration: underline;
         }
         .sig-title {
-            font-size: 7.5pt;
+            font-size: 6.5pt;
             color: #64748b;
         }
-        .footer-note {
-            margin-top: 15px;
-            font-size: 7.5pt;
-            color: #94a3b8;
+
+        /* 6. Footer Legalitas */
+        .footer-table {
+            width: 100%;
+            margin-top: 12px;
             border-top: 1px dashed #cbd5e1;
             padding-top: 5px;
+            font-size: 6.5pt;
+            color: #64748b;
+            page-break-inside: avoid;
         }
     </style>
 </head>
 <body>
 
-    <!-- Header Perusahaan -->
-    <table class="header-table">
+    <!-- 1. KOP SURAT RESMI PERUSAHAAN -->
+    <table class="kop-table">
         <tr>
-            <td style="width: 60%; vertical-align: middle;">
-                <div class="company-name">{{ $owner->company_name ?? $owner->name ?? 'PT. DUMAI BERKAH ABADI' }}</div>
-                <div class="company-info">
-                    {{ $owner->address ?? 'Pusat Distribusi & Operasional Toko Retail' }}<br>
-                    Telepon: {{ $owner->phone ?? '-' }} | Email: {{ $owner->email ?? '-' }}
+            <td style="width: 62%; vertical-align: middle;">
+                <div class="company-title">{{ $companyName }}</div>
+                <div class="company-desc">
+                    {{ $owner->address ?? ($adjustment->branch->address ?? 'Pusat Distribusi & Operasional Retail Terpadu') }}<br>
+                    Telepon: {{ $owner->phone ?? ($adjustment->branch->phone ?? '-') }} &bull; Email: {{ $owner->email ?? ($adjustment->branch->email ?? '-') }}
                 </div>
             </td>
-            <td style="width: 40%; text-align: right; vertical-align: middle;">
+            <td style="width: 38%; text-align: right; vertical-align: middle;">
                 <table style="width: 100%; border-collapse: collapse;">
                     <tr>
-                        <td style="text-align: right; vertical-align: middle; padding-right: 8px;">
-                            <div style="font-size: 7.5pt; color: #64748b; font-weight: bold; text-transform: uppercase;">SK PENETAPAN HARGA RESMI</div>
-                            <div style="font-size: 9.5pt; font-weight: bold; font-family: monospace; color: #0f172a;">
-                                {{ $adjustment->adjustment_number }}
-                            </div>
-                            <div style="font-size: 7pt; color: #16a34a; font-weight: bold; margin-top: 2px;">
-                                [DOKUMEN TERVALIDASI SISTEM]
-                            </div>
+                        <td style="text-align: right; vertical-align: middle; padding-right: 6px;">
+                            <div class="sk-card-title">SK PENETAPAN HARGA RESMI</div>
+                            <div class="sk-card-number">{{ $adjustment->adjustment_number }}</div>
+                            <div class="sk-card-date">Ditetapkan: {{ date('d/m/Y', strtotime($adjustment->created_at)) }}</div>
                         </td>
-                        <td style="width: 50px; text-align: right; vertical-align: middle;">
-                            @if(isset($documentQrCode) && $documentQrCode)
-                                <img src="data:image/svg+xml;base64,{{ $documentQrCode }}" style="width: 48px; height: 48px; border: 1px solid #cbd5e1; padding: 2px; background: #fff;" alt="QR SK" />
+                        <td style="width: 48px; text-align: right; vertical-align: middle;">
+                            @if(!empty($documentQrCode))
+                                <img src="data:image/svg+xml;base64,{{ $documentQrCode }}" style="width: 46px; height: 46px; border: 1px solid #cbd5e1; padding: 1px; background: #fff;" alt="QR SK" />
                             @endif
                         </td>
                     </tr>
@@ -208,190 +263,216 @@
         </tr>
     </table>
 
-    <!-- Judul Dokumen -->
-    <div class="doc-title">SURAT PENETAPAN HARGA JUAL TOKO (PERIODIK)</div>
-    <div class="doc-subtitle">Berlaku Efektif Terhitung Sejak Tanggal: <strong>{{ \Carbon\Carbon::parse($adjustment->effective_date)->isoFormat('D MMMM Y') }}</strong></div>
-
-    <!-- Metadata Dokumen -->
-    <table class="meta-table">
+    <!-- 2. PARAMETER METADATA KEPUTUSAN SK -->
+    <table class="meta-box">
         <tr>
-            <td class="meta-label">No. Dokumen</td>
+            <td class="meta-lbl">Judul Kebijakan</td>
             <td class="meta-sep">:</td>
-            <td class="meta-val font-mono font-weight-bold">{{ $adjustment->adjustment_number }}</td>
-
-            <td class="meta-label">Target Cabang</td>
+            <td class="meta-val font-bold">{{ $adjustment->title }}</td>
+            <td class="meta-lbl">Target Unit / Toko</td>
             <td class="meta-sep">:</td>
-            <td class="meta-val"><strong>{{ $adjustment->branch ? $adjustment->branch->name : 'Semua Cabang Toko (Pusat & Cabang)' }}</strong></td>
+            <td class="meta-val font-bold">{{ $targetBranchName }}</td>
         </tr>
         <tr>
-            <td class="meta-label">Judul Periode</td>
+            <td class="meta-lbl">Tanggal Efektif</td>
             <td class="meta-sep">:</td>
-            <td class="meta-val"><strong>{{ $adjustment->title }}</strong></td>
-
-            <td class="meta-label">Status Dokumen</td>
+            <td class="meta-val font-bold text-primary">{{ date('d F Y', strtotime($adjustment->effective_date)) }}</td>
+            <td class="meta-lbl">Aturan Batch Fisik</td>
             <td class="meta-sep">:</td>
-            <td class="meta-val">
-                <span class="status-badge {{ $adjustment->status === 'approved' ? 'badge-approved' : 'badge-draft' }}">
-                    {{ $adjustment->status === 'approved' ? 'DISETUJUI & BERLAKU' : 'DRAFT USULAN' }}
-                </span>
-            </td>
+            <td class="meta-val">{{ $batchRuleLabel }}</td>
         </tr>
         <tr>
-            <td class="meta-label">Alasan Penyesuaian</td>
-            <td class="meta-sep">:</td>
-            <td class="meta-val">{{ $adjustment->reason ?? 'Penyesuaian Harga Berkala' }}</td>
-
-            <td class="meta-label">Aturan Batch Fisik</td>
+            <td class="meta-lbl">Status Pengesahan</td>
             <td class="meta-sep">:</td>
             <td class="meta-val">
-                <strong style="color: #0369a1;">
-                    {{ ($adjustment->batch_policy ?? 'all_active') === 'all_active' ? 'Seluruh Batch Aktif (Sinkron)' : 'Hanya Batch Baru (Pertahankan Batch Lama)' }}
-                </strong>
+                @if($adjustment->status === 'approved')
+                    <span class="tag-pill tag-green">&#10003; DISETUJUI & DITERAPKAN (SAH)</span>
+                @elseif($adjustment->status === 'draft')
+                    <span class="tag-pill tag-yellow">&#9679; DRAFT USULAN (BELUM SAH)</span>
+                @else
+                    <span class="tag-pill tag-red">&#10007; DITOLAK (REJECTED)</span>
+                @endif
             </td>
+            <td class="meta-lbl">Alasan / Dasar</td>
+            <td class="meta-sep">:</td>
+            <td class="meta-val" style="font-style: italic; color: #475569;">{{ $adjustment->reason ?: 'Penyesuaian berkala harga pasar & margin operasional' }}</td>
         </tr>
     </table>
 
-    <!-- KPI Summary Cards -->
+    <!-- 3. REKAPITULASI METRIK PERUBAHAN HARGA -->
     <table class="kpi-table">
         <tr>
-            <td style="width: 25%;">
-                <div class="kpi-card">
-                    <div class="kpi-title">Total Produk Diubah</div>
-                    <div class="kpi-value">{{ $totalItems }} SKU</div>
-                </div>
+            <td class="kpi-cell">
+                <div class="kpi-title">TOTAL PRODUK</div>
+                <div class="kpi-num text-primary">{{ $totalItems }} <span style="font-size: 7.5pt; font-weight: normal; color: #64748b;">SKU</span></div>
             </td>
-            <td style="width: 25%;">
-                <div class="kpi-card">
-                    <div class="kpi-title">Produk Naik Harga</div>
-                    <div class="kpi-value text-success">+{{ $totalItemsIncreased }} Item</div>
-                </div>
+            <td class="kpi-cell">
+                <div class="kpi-title">PRODUK NAIK HARGA</div>
+                <div class="kpi-num text-success">{{ $totalItemsIncreased }} <span style="font-size: 7.5pt; font-weight: normal; color: #64748b;">SKU</span></div>
             </td>
-            <td style="width: 25%;">
-                <div class="kpi-card">
-                    <div class="kpi-title">Produk Turun / Stabil</div>
-                    <div class="kpi-value text-muted">{{ $totalItemsDecreased }} Item</div>
-                </div>
+            <td class="kpi-cell">
+                <div class="kpi-title">PRODUK TURUN HARGA</div>
+                <div class="kpi-num text-danger">{{ $totalItemsDecreased }} <span style="font-size: 7.5pt; font-weight: normal; color: #64748b;">SKU</span></div>
             </td>
-            <td style="width: 25%;">
-                <div class="kpi-card">
-                    <div class="kpi-title">Total Penyesuaian Nilai</div>
-                    <div class="kpi-value font-mono {{ $totalPriceIncrease >= 0 ? 'text-success' : 'text-error' }}">
-                        {{ $totalPriceIncrease >= 0 ? '+' : '' }}Rp {{ number_format($totalPriceIncrease, 0, ',', '.') }}
-                    </div>
+            <td class="kpi-cell">
+                <div class="kpi-title">AKUMULASI SELISIH</div>
+                <div class="kpi-num {{ $totalPriceIncrease >= 0 ? 'text-success' : 'text-danger' }}">
+                    {{ $totalPriceIncrease >= 0 ? '+' : '' }}Rp {{ number_format($totalPriceIncrease, 0, ',', '.') }}
                 </div>
             </td>
         </tr>
     </table>
 
-    <!-- Tabel Rincian Daftar Harga -->
+    <!-- 4. TABEL RINCIAN PRODUK & STRUKTUR HARGA BARU -->
     <table class="items-table">
         <thead>
             <tr>
-                <th class="text-center" style="width: 22px;">No</th>
-                <th style="width: 70px;">Kode SKU</th>
-                <th class="text-center" style="width: 38px;">QR Barcode</th>
-                <th>Nama Produk & Kategori</th>
-                <th class="text-end" style="width: 75px;">HPP Modal</th>
-                <th class="text-end" style="width: 75px;">Harga Lama</th>
-                <th class="text-end" style="width: 80px;">Harga Baru</th>
-                <th class="text-end" style="width: 65px;">Selisih (Rp)</th>
-                <th class="text-end" style="width: 70px;">Min. Nego</th>
+                <th style="width: 4%; text-align: center;">NO</th>
+                <th style="width: 14%; text-align: center;">SCAN / SKU</th>
+                <th style="width: 29%; text-align: left;">NAMA PRODUK & KATEGORI</th>
+                <th style="width: 7%; text-align: center;">SATUAN</th>
+                <th style="width: 13%; text-align: right;">HARGA LAMA</th>
+                <th style="width: 14%; text-align: right;">HARGA BARU</th>
+                <th style="width: 9%; text-align: right;">MIN. NEGO</th>
+                <th style="width: 10%; text-align: right;">SELISIH</th>
             </tr>
         </thead>
         <tbody>
-            @foreach($adjustment->items as $index => $item)
+            @forelse($adjustment->items as $index => $item)
                 @php
                     $diff = (float)$item->new_price - (float)$item->old_price;
-                    $percent = (float)$item->old_price > 0 ? round(($diff / (float)$item->old_price) * 100, 1) : 0;
+                    $diffPct = $item->old_price > 0 ? ($diff / $item->old_price) * 100 : 0;
+                    $sku = ($item->product && !empty($item->product->sku)) ? $item->product->sku : ('PRD-' . $item->product_id);
+                    $prodName = ($item->product && !empty($item->product->name)) ? $item->product->name : ('Produk #' . $item->product_id);
+                    $catName = ($item->product && $item->product->category && !empty($item->product->category->name)) ? $item->product->category->name : 'Umum';
+                    $unitName = ($item->product && !empty($item->product->unit)) ? $item->product->unit : 'Pcs';
+                    $hasQr = isset($itemQrCodes[$item->id]) && !empty($itemQrCodes[$item->id]);
+                    $isEven = ($index % 2 === 1);
                 @endphp
-                <tr>
-                    <td class="text-center">{{ $index + 1 }}</td>
-                    <td class="font-mono" style="font-size: 7.5pt; font-weight: bold;">{{ $item->product->sku ?? '-' }}</td>
-                    <td class="text-center" style="padding: 2px;">
-                        @if(isset($itemQrCodes[$item->id]))
-                            <img src="data:image/svg+xml;base64,{{ $itemQrCodes[$item->id] }}" style="width: 28px; height: 28px;" alt="QR Item" />
+                <tr class="{{ $isEven ? 'row-alt' : '' }}">
+                    <td class="text-center text-muted">{{ $index + 1 }}</td>
+                    <td class="text-center" style="padding: 3px 2px;">
+                        @if($hasQr)
+                            <img src="data:image/svg+xml;base64,{{ $itemQrCodes[$item->id] }}" style="width: 22px; height: 22px; vertical-align: middle; display: inline-block; margin-right: 3px;" alt="QR" />
+                        @endif
+                        <span class="font-bold" style="font-size: 7.5pt; color: #0f172a; vertical-align: middle;">
+                            {{ $sku }}
+                        </span>
+                        @if($item->product && !empty($item->product->barcode) && $item->product->barcode !== $sku)
+                            <div style="font-size: 6pt; color: #64748b;">
+                                {{ $item->product->barcode }}
+                            </div>
+                        @endif
+                    </td>
+                    <td>
+                        <div class="font-bold" style="color: #0f172a; font-size: 8pt;">
+                            {{ $prodName }}
+                        </div>
+                        <div style="font-size: 6.5pt; color: #64748b; margin-top: 1px;">
+                            {{ $catName }}
+                            @if($item->product && !empty($item->product->brand))
+                                &bull; Merk: {{ $item->product->brand }}
+                            @endif
+                            @if(!empty($item->notes))
+                                &bull; <em>{{ $item->notes }}</em>
+                            @endif
+                        </div>
+                    </td>
+                    <td class="text-center font-bold" style="color: #334155; font-size: 7.5pt;">
+                        {{ $unitName }}
+                    </td>
+                    <td class="text-right text-muted" style="font-size: 7.5pt;">
+                        Rp {{ number_format($item->old_price, 0, ',', '.') }}
+                    </td>
+                    <td class="text-right font-bold" style="color: #0f172a; font-size: 8pt;">
+                        Rp {{ number_format($item->new_price, 0, ',', '.') }}
+                        @if($diff > 0)
+                            <div class="text-success" style="font-size: 6.5pt; font-weight: bold;">+{{ number_format($diffPct, 1) }}% (+Rp {{ number_format($diff, 0, ',', '.') }})</div>
+                        @elseif($diff < 0)
+                            <div class="text-danger" style="font-size: 6.5pt; font-weight: bold;">{{ number_format($diffPct, 1) }}% (-Rp {{ number_format(abs($diff), 0, ',', '.') }})</div>
+                        @else
+                            <div class="text-muted" style="font-size: 6.5pt;">Tetap</div>
+                        @endif
+                    </td>
+                    <td class="text-right" style="color: #b45309; font-weight: 600; font-size: 7.5pt;">
+                        @if(!empty($item->new_min_nego_price) && $item->new_min_nego_price > 0)
+                            Rp {{ number_format($item->new_min_nego_price, 0, ',', '.') }}
                         @else
                             -
                         @endif
                     </td>
-                    <td>
-                        <strong>{{ $item->product->name ?? '-' }}</strong><br>
-                        <span class="text-muted" style="font-size: 7pt;">{{ $item->product->category->name ?? 'Umum' }}</span>
+                    <td class="text-right font-bold" style="font-size: 7.5pt;">
+                        @if($diff > 0)
+                            <span class="text-success">+Rp {{ number_format($diff, 0, ',', '.') }}</span>
+                        @elseif($diff < 0)
+                            <span class="text-danger">-Rp {{ number_format(abs($diff), 0, ',', '.') }}</span>
+                        @else
+                            <span class="text-muted">Rp 0</span>
+                        @endif
                     </td>
-                    <td class="text-end font-mono">Rp {{ number_format($item->new_cost_price, 0, ',', '.') }}</td>
-                    <td class="text-end font-mono text-muted">Rp {{ number_format($item->old_price, 0, ',', '.') }}</td>
-                    <td class="text-end font-mono" style="font-weight: bold; color: #0f172a;">
-                        Rp {{ number_format($item->new_price, 0, ',', '.') }}
-                    </td>
-                    <td class="text-end font-mono {{ $diff > 0 ? 'text-success' : ($diff < 0 ? 'text-error' : 'text-muted') }}">
-                        {{ $diff > 0 ? '+' : '' }}{{ number_format($diff, 0, ',', '.') }}
-                        <div style="font-size: 6.5pt;">({{ $diff > 0 ? '+' : '' }}{{ $percent }}%)</div>
-                    </td>
-                    <td class="text-end font-mono text-muted">Rp {{ number_format($item->new_min_nego_price, 0, ',', '.') }}</td>
                 </tr>
-            @endforeach
+            @empty
+                <tr>
+                    <td colspan="8" class="text-center text-muted" style="padding: 16px;">
+                        Tidak ada rincian produk dalam dokumen penetapan harga ini.
+                    </td>
+                </tr>
+            @endforelse
         </tbody>
     </table>
 
-    <!-- Tanda Tangan & Otorisasi -->
+    <!-- 5. TANDA TANGAN DIGITAL 3 PIHAK OTORISASI RESMI -->
     <table class="sig-table">
         <tr>
-            <td>
-                <div style="font-weight: 600; color: #475569; margin-bottom: 3px;">Dibuat & Dianalisis Oleh:</div>
-                <div class="sig-box" style="padding: 2px 0;">
-                    @if(isset($creatorQrCode) && $creatorQrCode)
-                        <img src="data:image/svg+xml;base64,{{ $creatorQrCode }}" style="width: 45px; height: 45px;" alt="QR TTD Pembuat" />
-                        <div style="font-size: 6pt; color: #16a34a; font-weight: bold;">[TERTANDA DIGITAL]</div>
-                    @else
-                        <div style="height: 45px;"></div>
+            <td class="sig-box">
+                <div class="sig-role">Dibuat / Diusulkan:</div>
+                <div class="sig-qr-container">
+                    @if(!empty($creatorQrCode))
+                        <img src="data:image/svg+xml;base64,{{ $creatorQrCode }}" style="width: 40px; height: 40px;" alt="QR TTD Pembuat" />
                     @endif
                 </div>
-                <div class="sig-name">{{ $adjustment->creator->name ?? 'Staf Administrasi' }}</div>
-                <div class="sig-title">Staf Administrasi / Analis Harga</div>
+                <div style="font-size: 5.5pt; font-weight: bold; color: #2563eb;">[TERTANDA DIGITAL]</div>
+                <div class="sig-name">{{ $creatorName }}</div>
+                <div class="sig-title">Analis Harga / Staf Inventory</div>
             </td>
-            <td>
-                <div style="font-weight: 600; color: #475569; margin-bottom: 3px;">Diperiksa Oleh:</div>
-                <div class="sig-box" style="padding: 2px 0;">
-                    @if(isset($reviewerQrCode) && $reviewerQrCode)
-                        <img src="data:image/svg+xml;base64,{{ $reviewerQrCode }}" style="width: 45px; height: 45px;" alt="QR TTD Pemeriksa" />
-                        <div style="font-size: 6pt; color: #2563eb; font-weight: bold;">[TERVERIFIKASI]</div>
-                    @else
-                        <div style="height: 45px;"></div>
+            <td class="sig-box">
+                <div class="sig-role">Diperiksa / Diverifikasi:</div>
+                <div class="sig-qr-container">
+                    @if(!empty($reviewerQrCode))
+                        <img src="data:image/svg+xml;base64,{{ $reviewerQrCode }}" style="width: 40px; height: 40px;" alt="QR TTD Pemeriksa" />
                     @endif
                 </div>
-                <div class="sig-name">Kepala Bagian Operasional</div>
-                <div class="sig-title">Manajer Operasional Toko</div>
+                <div style="font-size: 5.5pt; font-weight: bold; color: #2563eb;">[TERVERIFIKASI SAH]</div>
+                <div class="sig-name">Kepala Operasional Toko</div>
+                <div class="sig-title">Manajer Operasional Cabang</div>
             </td>
-            <td>
-                <div style="font-weight: 600; color: #475569; margin-bottom: 3px;">Disahkan & Ditetapkan Oleh:</div>
-                <div class="sig-box" style="padding: 2px 0;">
-                    @if(isset($approverQrCode) && $approverQrCode)
-                        <img src="data:image/svg+xml;base64,{{ $approverQrCode }}" style="width: 45px; height: 45px;" alt="QR TTD Pengesah" />
-                        <div style="font-size: 6pt; color: #16a34a; font-weight: bold;">[DISAHKAN RESMI]</div>
-                    @else
-                        <div style="height: 45px;"></div>
+            <td class="sig-box">
+                <div class="sig-role">Disahkan & Ditetapkan:</div>
+                <div class="sig-qr-container">
+                    @if(!empty($approverQrCode))
+                        <img src="data:image/svg+xml;base64,{{ $approverQrCode }}" style="width: 40px; height: 40px;" alt="QR TTD Pengesah" />
                     @endif
                 </div>
-                <div class="sig-name">{{ $adjustment->approver->name ?? $owner->name ?? 'Owner / Direktur' }}</div>
-                <div class="sig-title">Owner / Direksi PT. DUMAI</div>
+                <div style="font-size: 5.5pt; font-weight: bold; color: #16a34a;">[DISAHKAN RESMI]</div>
+                <div class="sig-name">{{ $approverName }}</div>
+                <div class="sig-title">Owner / Direksi {{ $companyName }}</div>
             </td>
         </tr>
     </table>
 
-    <!-- Catatan Kaki & Keabsahan -->
-    <div class="footer-note">
-        <table style="width: 100%;">
-            <tr>
-                <td style="font-size: 7.5pt; color: #64748b;">
-                    * Dokumen ini sah dan mengikat seluruh unit kasir (POS) dan katalog penjualan cabang sejak tanggal efektif.<br>
-                    ID Verifikasi Sistem: <span class="font-mono">{{ $verificationUuid }}</span> | Dicetak pada: {{ $printedAt }}
-                </td>
-                <td style="text-align: right; font-size: 7.5pt; color: #64748b;">
-                    Dokumen Otentik &bull; PT. DUMAI BERKAH ABADI
-                </td>
-            </tr>
-        </table>
-    </div>
+    <!-- 6. CATATAN KAKI KEABSAHAN HUKUM SK -->
+    <table class="footer-table">
+        <tr>
+            <td style="width: 70%; text-align: left; vertical-align: middle;">
+                * Surat Keputusan (SK) ini sah dan mengikat seluruh kasir POS & katalog inventori sejak tanggal efektif.<br>
+                ID Verifikasi Dokumen: <span class="font-bold" style="color: #0f172a;">{{ $verificationUuid }}</span> &bull; Dicetak pada: {{ $printedAt }}
+            </td>
+            <td style="width: 30%; text-align: right; vertical-align: middle;">
+                <strong>DOKUMEN RESMI OTENTIK</strong><br>
+                {{ $companyName }}
+            </td>
+        </tr>
+    </table>
 
 </body>
 </html>

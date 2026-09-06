@@ -177,7 +177,7 @@
     <table class="header-table">
         <tr>
             <td style="width: 55%; vertical-align: top;">
-                <div class="company-name">PT DUMAI MANAJEMEN SISTEM</div>
+                <div class="company-name">{{ $companyName ?? $ownerName ?? config('app.name', 'Perusahaan') }}</div>
                 <div class="branch-info">
                     <strong>Cabang / Unit:</strong> {{ $branchName }}<br>
                     <strong>Sistem:</strong> Akuntansi & Pembukuan Double-Entry Terpadu<br>
@@ -326,7 +326,7 @@
                         SISTEM VERIFIKASI DIGITAL AKUNTANSI
                     </div>
                     <div style="font-size: 7px; color: #64748b; line-height: 1.3;">
-                        Dokumen ini digenerate secara otomatis oleh modul Akuntansi Terpadu PT Dumai. Seluruh saldo debit dan kredit telah divalidasi dengan integritas data double-entry.
+                        Dokumen ini digenerate secara otomatis oleh modul Akuntansi Terpadu {{ $companyName ?? '' }}. Seluruh saldo debit dan kredit telah divalidasi dengan integritas data double-entry.
                     </div>
                 </div>
             </td>

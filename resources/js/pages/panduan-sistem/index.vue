@@ -20,15 +20,16 @@ const setCategory = catId => {
 const categories = [
   { id: 'all', title: 'Semua Panduan', icon: 'ri-apps-2-line' },
   { id: 'master', title: '1. Master Data', icon: 'ri-database-2-line' },
-  { id: 'bank', title: '2. Rekening Bank & QRIS', icon: 'ri-bank-card-line' },
-  { id: 'gudang', title: '3. Gudang & Logistik', icon: 'ri-truck-line' },
-  { id: 'pos', title: '4. Kasir & Transaksi POS', icon: 'ri-shopping-cart-2-line' },
-  { id: 'retur_piutang', title: '5. Retur & Piutang', icon: 'ri-exchange-dollar-line' },
-  { id: 'audit_laporan', title: '6. Audit & Opname', icon: 'ri-archive-stack-line' },
-  { id: 'keuangan', title: '7. Keuangan & Closing', icon: 'ri-file-chart-line' },
-  { id: 'akuntansi', title: '8. Akuntansi & Buku Besar', icon: 'ri-book-read-line' },
-  { id: 'modal_roi', title: '9. Modal & ROI Cabang', icon: 'ri-hand-coin-line' },
-  { id: 'security', title: '10. Keamanan & RBAC', icon: 'ri-shield-keyhole-line' },
+  { id: 'price', title: '2. Penyesuaian Harga & SK', icon: 'ri-price-tag-3-line' },
+  { id: 'bank', title: '3. Rekening Bank & QRIS', icon: 'ri-bank-card-line' },
+  { id: 'gudang', title: '4. Gudang & Logistik', icon: 'ri-truck-line' },
+  { id: 'pos', title: '5. Kasir & Transaksi POS', icon: 'ri-shopping-cart-2-line' },
+  { id: 'retur_piutang', title: '6. Retur & Piutang', icon: 'ri-exchange-dollar-line' },
+  { id: 'audit_laporan', title: '7. Audit & Opname', icon: 'ri-archive-stack-line' },
+  { id: 'keuangan', title: '8. Keuangan & Closing', icon: 'ri-file-chart-line' },
+  { id: 'akuntansi', title: '9. Akuntansi & Buku Besar', icon: 'ri-book-read-line' },
+  { id: 'modal_roi', title: '10. Modal & ROI Cabang', icon: 'ri-hand-coin-line' },
+  { id: 'security', title: '11. Keamanan & RBAC', icon: 'ri-shield-keyhole-line' },
 ]
 
 // Visual Architecture Flow Steps
@@ -43,6 +44,14 @@ const visualFlowSteps = [
   },
   {
     step: 2,
+    title: 'Penetapan Harga & SK Resmi',
+    icon: 'ri-price-tag-3-line',
+    color: 'primary',
+    desc: 'Penyesuaian harga jual & batas nego berkala, kalkulator markup massal, aturan batch, dan SK PDF QR Code.',
+    route: '/price-adjustments',
+  },
+  {
+    step: 3,
     title: 'Rekening Bank & QRIS',
     icon: 'ri-bank-card-line',
     color: 'info',
@@ -50,7 +59,7 @@ const visualFlowSteps = [
     route: '/bank-accounts',
   },
   {
-    step: 3,
+    step: 4,
     title: 'Pengadaan & Gudang',
     icon: 'ri-truck-line',
     color: 'info',
@@ -58,7 +67,7 @@ const visualFlowSteps = [
     route: '/penerimaan-barang',
   },
   {
-    step: 4,
+    step: 5,
     title: 'Kasir POS & Penjualan',
     icon: 'ri-shopping-cart-2-line',
     color: 'success',
@@ -66,7 +75,7 @@ const visualFlowSteps = [
     route: '/pos',
   },
   {
-    step: 5,
+    step: 6,
     title: 'Buku Piutang & Retur',
     icon: 'ri-exchange-dollar-line',
     color: 'warning',
@@ -74,7 +83,7 @@ const visualFlowSteps = [
     route: '/receivables',
   },
   {
-    step: 6,
+    step: 7,
     title: 'Audit & Stock Opname',
     icon: 'ri-archive-stack-line',
     color: 'error',
@@ -82,7 +91,7 @@ const visualFlowSteps = [
     route: '/audit/stock-opname',
   },
   {
-    step: 7,
+    step: 8,
     title: 'Closing Kasir & Rekonsiliasi',
     icon: 'ri-file-chart-line',
     color: 'secondary',
@@ -90,7 +99,7 @@ const visualFlowSteps = [
     route: '/audit/closing-harian',
   },
   {
-    step: 8,
+    step: 9,
     title: 'Sistem Akuntansi & Neraca',
     icon: 'ri-book-read-line',
     color: 'primary',
@@ -98,7 +107,7 @@ const visualFlowSteps = [
     route: '/akuntansi',
   },
   {
-    step: 9,
+    step: 10,
     title: 'Modal & ROI Cabang',
     icon: 'ri-hand-coin-line',
     color: 'warning',
@@ -114,9 +123,15 @@ const guides = [
     category: 'master',
     icon: 'ri-database-2-line',
     color: 'primary',
-    title: '1. Master Data & Inventori Cabang (Struktur 3 Tingkat Harga, Multi-Batch & Pajak POS)',
-    subtitle: 'Fondasi utama katalog inventaris, penetapan harga per batch, batas nego kasir, dan perlakuan PPN',
+    title: '1. Master Data Produk, Profil Perusahaan & Katalog Toko (SKU & Barcode)',
+    subtitle: 'Fondasi utama identitas usaha perusahaan, katalog inventaris, pendaftaran barang, kategori, satuan, dan data supplier/pelanggan',
     steps: [
+      {
+        title: 'Profil Usaha & Manajemen Owner (Holding / Perusahaan Induk)',
+        desc: 'Buka menu Manajemen Owner (/apps/owners). Daftarkan atau perbarui nama badan usaha/perusahaan induk Anda, alamat kantor, email resmi, telepon, dan logo resmi. Nama perusahaan ini secara otomatis menjadi identitas resmi di seluruh dokumen SK penetapan harga, kop laporan akuntansi ERP, struk kasir POS, kwitansi piutang, dan invoice email pelanggan.',
+        link: '/apps/owners',
+        linkText: 'Buka Manajemen Owner',
+      },
       {
         title: 'Kategori Barang & Satuan Produk',
         desc: 'Buka menu Master Data > Kategori Barang. Buat kategori utama (Sembako, Aki & Baterai, Elektronik, dll) dan tentukan satuan barang (Pcs, Dus, Box, Karton). Kategori mempermudah filtering laporan penjualan dan pengelompokan Stock Opname.',
@@ -130,32 +145,69 @@ const guides = [
         linkText: 'Buka Master Produk',
       },
       {
-        title: 'Penetapan Struktur 3 Tingkat Harga & Kelola Multi-Batch',
-        desc: 'Buka menu Inventori Cabang. Setiap produk dan batch fisik memiliki 3 lapis harga:\n• 1. Harga Modal (HPP Real): Modal bersih per unit yang otomatis mencakup diskon supplier dan PPN Masukan 11%.\n• 2. Harga Jual Normal: Harga pricelist kasir. Gunakan tombol pintas kalkulasi cepat Markup (+15%, +20%, +25%, +30%) dari modal.\n• 3. Harga Nego Minimum: Batas harga terendah tawar-menawar kasir.\n• Multi-Batch FIFO: Jika barang memiliki banyak batch dengan modal berbeda, POS otomatis memakai harga Batch Aktif (FIFO/FEFO). Owner dapat menyesuaikan harga setiap batch atau menyamakan seluruh batch melalui tombol "Kelola Batch".',
-        link: '/inventori-cabang',
-        linkText: 'Buka Inventori Cabang',
-      },
-      {
-        title: 'Pengaturan Pajak Penjualan POS (PPN Keluaran Kasir)',
-        desc: 'Di menu Inventori Cabang, tentukan apakah kasir membebankan PPN tambahan ke pembeli:\n• Harga Final (Netto / 0%): Toko menjual harga bersih tanpa membebankan pajak tambahan di struk.\n• + PPN 11%: Kasir akan menambahkan 11% PPN pada struk transaksi ke konsumen akhir.',
-        link: '/inventori-cabang',
-        linkText: 'Atur Pajak POS Cabang',
-      },
-      {
         title: 'Data Supplier & Pelanggan (Credit Limit & Tempo)',
         desc: 'Catat vendor pemasok (untuk Purchase Order) dan data pelanggan tetap. Pada pelanggan, tentukan batas limit kredit (Plafon Piutang) dan termin jatuh tempo.',
         link: '/suppliers',
         linkText: 'Buka Data Supplier',
       },
     ],
-    tips: 'Gunakan tombol "Kelola Batch" di Inventori Cabang untuk mengatur HPP Real, Harga Jual POS, dan Batas Nego untuk masing-masing batch pengiriman supplier.',
+    tips: 'Gunakan menu Manajemen Owner (/apps/owners) jika ingin mengubah nama usaha, alamat, atau logo yang tercetak pada seluruh dokumen PDF dan struk belanja.',
+  },
+  {
+    id: 'penyesuaian-harga',
+    category: 'price',
+    icon: 'ri-price-tag-3-line',
+    color: 'primary',
+    title: '2. Pusat Penyesuaian Harga Periode & SK Resmi (Price Adjustments)',
+    subtitle: 'Pusat kendali penetapan harga jual resmi berkala, batas nego kasir, kalkulator massal, aturan batch fisik, dan penerbitan SK PDF bertanda tangan digital',
+    steps: [
+      {
+        title: 'Pusat Kendali Harga Terpusat vs Inventori Cabang',
+        desc: '• Menu Penyesuaian Harga (/price-adjustments): Pusat kendali tunggal penetapan kebijakan harga toko, pembuatan SK resmi, kalkulasi massal (markup %, diskon %, nominal Rp), dan rekaman audit trail.\n• Menu Inventori Cabang (/inventori-cabang): Fokus operasional fisik cabang untuk melihat jumlah stok rak/gudang, kartu stok mutasi, dan 1-klik cetak label barcode dengan harga terbaru.',
+        link: '/price-adjustments',
+        linkText: 'Buka Penyesuaian Harga',
+      },
+      {
+        title: 'Pembuatan Dokumen SK Penetapan Harga Berkala',
+        desc: 'Buka menu Penyesuaian Harga dan klik tombol "Buat Penyesuaian Harga Baru". Isi Judul Dokumen (misal: "Penyesuaian Harga Q4 2026"), Tanggal Berlaku Efektif, Target Cabang (Semua Cabang / Cabang Spesifik), dan Alasan Perubahan Harga Resmi.',
+        link: '/price-adjustments',
+        linkText: 'Buat SK Harga Baru',
+      },
+      {
+        title: 'Kalkulator Cepat Penyesuaian Harga Massal (Bulk Calculator)',
+        desc: 'Pilih kategori produk dan klik "Muat Kategori" untuk memasukkan puluhan barang sekaligus. Pilih metode kalkulasi:\n• 1. Naikkan Persentase (+%): Menambah harga jual sekian % dari harga lama (misal: naik 5% atau 10%).\n• 2. Turunkan Persentase / Diskon (-%): Menurunkan harga untuk periode promo diskon.\n• 3. Naikkan Nominal (+Rp): Menambah harga flat (misal: semua produk naik Rp 5.000).\n• 4. Turunkan Nominal (-Rp): Mengurangi harga flat.\n• 5. Target Markup Dari HPP (+%): Menghitung harga jual berdasarkan target laba dari modal HPP masuk barang (misal: HPP + 25%).',
+      },
+      {
+        title: 'Aturan Penyesuaian Harga Batch Fisik (Stok yang Ada)',
+        desc: 'Tentukan bagaimana sistem memberlakukan harga baru pada stok fisik yang sedang ada di rak/gudang:\n• 1. Sinkronkan ke Seluruh Batch Aktif (Rekomendasi): Seluruh stok lama yang ada di rak toko otomatis dijual kasir dengan harga baru tanpa perlu update harga per batch satu per satu.\n• 2. Hanya Berlaku untuk Batch Masuk Baru: Stok batch lama tetap menggunakan harga lama sampai terjual habis. Batch barang masuk berikutnya baru menggunakan harga baru.',
+      },
+      {
+        title: 'Input & Edit Harga Manual Bebas (Harga Jual & Min. Nego)',
+        desc: 'Anda dapat mengetik langsung nominal harga baru pada setiap baris produk di tabel. Kolom "MIN. NEGO" otomatis menyarankan batas tawar kasir (95% dari harga jual) dan dapat Anda sesuaikan secara bebas.',
+      },
+      {
+        title: 'Hierarki Harga Kasir & Penanganan Multi-Periode Aktif',
+        desc: 'Jika suatu barang masuk ke dalam 2 atau lebih periode penyesuaian harga yang disetujui (Approved):\n• Kasir POS selalu menggunakan harga dari Dokumen SK yang paling akhir disahkan (terkini).\n• Seluruh dokumen SK periode sebelumnya tetap tersimpan sebagai arsip audit resmi tanpa hilang/rusak.\n• Riwayat pergantian harga dari waktu ke waktu tercatat kronologis di tab "Log Riwayat Perubahan Harga".',
+        link: '/pos',
+        linkText: 'Ke Kasir POS',
+      },
+      {
+        title: 'Penerbitan Dokumen SK PDF Resmi (QR Code Keaslian & TTD Digital)',
+        desc: 'Klik tombol "Cetak PDF Resmi" pada dokumen. Sistem menghasilkan berkas PDF SK Penetapan Harga berstandar legalitas perusahaan yang dilengkapi:\n• QR Code Verifikasi SK Resmi di header kanan atas.\n• QR Barcode per SKU produk di setiap baris tabel.\n• 3 QR Code Tanda Tangan Digital Resmi (Analis/Pembuat, Ka. Operasional Toko, dan Direksi / Owner Perusahaan).',
+      },
+      {
+        title: 'Pengeditan Dokumen Draft (Tombol Edit Usulan)',
+        desc: 'Dokumen penyesuaian harga yang masih berstatus DRAFT dapat diedit kembali kapan saja dengan menekan tombol "Edit Usulan" (ikon pensil), baik untuk menambah/menghapus produk maupun mengganti nominal harga sebelum disahkan.',
+      },
+    ],
+    tips: 'Centang opsi "Langsung Sahkan & Terapkan Harga ke Kasir" saat membuat dokumen agar kasir POS seketika menjual dengan harga baru secara serentak.',
   },
   {
     id: 'master-bank',
     category: 'bank',
     icon: 'ri-bank-card-line',
     color: 'info',
-    title: '2. Modul Rekening Bank, Multi-Bank Owner & Barcode QRIS',
+    title: '3. Modul Rekening Bank, Multi-Bank Owner & Barcode QRIS',
     subtitle: 'Manajemen rekening bank penampung (BCA, Mandiri, BRI, QRIS), saldo berjalan, dan pelacakan mutasi bon per cabang',
     steps: [
       {
@@ -188,7 +240,7 @@ const guides = [
     category: 'gudang',
     icon: 'ri-truck-line',
     color: 'info',
-    title: '3. Pengadaan Barang (PO), Penerimaan Gudang & Kalkulasi HPP Real',
+    title: '4. Pengadaan Barang (PO), Penerimaan Gudang & Kalkulasi HPP Real',
     subtitle: 'Alur pesanan pembelian (PO) fisik, verifikasi faktur gudang, diskon bertingkat D1..D5, kode SCC aki, dan mutasi stok',
     steps: [
       {
@@ -225,7 +277,7 @@ const guides = [
     category: 'pos',
     icon: 'ri-shopping-cart-2-line',
     color: 'success',
-    title: '4. Operasional Transaksi Kasir (POS), Diskon Total & Otorisasi Nego',
+    title: '5. Operasional Transaksi Kasir (POS), Diskon Total & Otorisasi Nego',
     subtitle: 'Proses checkout cepat, scan barcode, diskon total faktur, otorisasi PIN supervisor, dan cetak struk',
     steps: [
       {
@@ -262,7 +314,7 @@ const guides = [
     category: 'retur_piutang',
     icon: 'ri-arrow-go-back-line',
     color: 'error',
-    title: '5. Manajemen Retur Barang (Penjualan & Pembelian)',
+    title: '6. Manajemen Retur Barang (Penjualan & Pembelian)',
     subtitle: 'SOP pengembalian barang rusak/cacat dan penyesuaian otomatis stok inventaris',
     steps: [
       {
@@ -287,7 +339,7 @@ const guides = [
     category: 'retur_piutang',
     icon: 'ri-wallet-3-line',
     color: 'warning',
-    title: '6. Buku Piutang Usaha, Pengiriman Email Tagihan & Kwitansi Otomatis',
+    title: '7. Buku Piutang Usaha, Pengiriman Email Tagihan & Kwitansi Otomatis',
     subtitle: 'Pelacakan nota tempo kasbon, pengiriman invoice ke email pelanggan, kwitansi cicilan otomatis, dan pengingat jatuh tempo',
     steps: [
       {
@@ -320,7 +372,7 @@ const guides = [
     category: 'audit_laporan',
     icon: 'ri-archive-stack-line',
     color: 'primary',
-    title: '7. Stock Opname & Cycle Counting (Audit Fisik vs Sistem)',
+    title: '8. Stock Opname & Cycle Counting (Audit Fisik vs Sistem)',
     subtitle: 'Metodologi audit parsial per kategori dan cabang tanpa menghentikan operasional toko',
     steps: [
       {
@@ -347,7 +399,7 @@ const guides = [
     category: 'keuangan',
     icon: 'ri-safe-2-line',
     color: 'success',
-    title: '8. Closing Harian Kasir & Penguncian Transaksi (Transaction Lock)',
+    title: '9. Closing Harian Kasir & Penguncian Transaksi (Transaction Lock)',
     subtitle: 'Rekonsiliasi uang fisik di laci kasir dan pencegahan kecurangan kas',
     steps: [
       {
@@ -372,7 +424,7 @@ const guides = [
     category: 'akuntansi',
     icon: 'ri-book-read-line',
     color: 'primary',
-    title: '9. Modul Akuntansi Terpadu (Double-Entry, COA, Jurnal Umum, Buku Besar & Neraca)',
+    title: '10. Modul Akuntansi Terpadu (Double-Entry, COA, Jurnal Umum, Buku Besar & Neraca)',
     subtitle: 'Sistem pembukuan otomatis berstandar akuntansi Indonesia (SAK) dengan auto-journaling POS, HPP, hutang piutang, dan neraca real-time',
     steps: [
       {
@@ -429,7 +481,7 @@ const guides = [
     category: 'keuangan',
     icon: 'ri-file-chart-line',
     color: 'warning',
-    title: '10. Laporan Laba Rugi, HPP FIFO/FEFO & Rekap Tahunan PDF',
+    title: '11. Laporan Laba Rugi, HPP FIFO/FEFO & Rekap Tahunan PDF',
     subtitle: 'Laporan keuangan ringkasan omzet, HPP modal aktual, laba bersih, dan arus kas',
     steps: [
       {
@@ -456,7 +508,7 @@ const guides = [
     category: 'modal_roi',
     icon: 'ri-hand-coin-line',
     color: 'warning',
-    title: '11. Manajemen Modal, Notifikasi Email Owner & Pengembalian ROI Cabang',
+    title: '12. Manajemen Modal, Notifikasi Email Owner & Pengembalian ROI Cabang',
     subtitle: 'Alur terpadu penyertaan modal Owner, pengajuan dana proposal PDF, setoran laba, dan pengiriman laporan rekap ke email Owner',
     steps: [
       {
@@ -495,7 +547,7 @@ const guides = [
     category: 'security',
     icon: 'ri-shield-keyhole-line',
     color: 'primary',
-    title: '12. Manajemen Hak Akses Murni Database (RBAC) & Penugasan Multi-Cabang',
+    title: '13. Manajemen Hak Akses Murni Database (RBAC) & Penugasan Multi-Cabang',
     subtitle: 'Pengaturan otorisasi granular Spatie RBAC, penugasan peran per toko, dan PIN keamanan supervisor',
     steps: [
       {
@@ -526,7 +578,7 @@ const guides = [
     category: 'security',
     icon: 'ri-notification-3-line',
     color: 'warning',
-    title: '13. Notifikasi Real-Time (Cabang & Jabatan) & Akselerasi Redis',
+    title: '14. Notifikasi Real-Time (Cabang & Jabatan) & Akselerasi Redis',
     subtitle: 'Notifikasi otomatis per cabang/jabatan untuk approval modal, selisih closing kasir, mutasi stok, dan ancaman keamanan',
     steps: [
       {

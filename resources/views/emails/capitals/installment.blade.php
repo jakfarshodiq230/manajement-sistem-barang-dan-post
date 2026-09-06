@@ -35,7 +35,7 @@
 
     <div class="content">
       <p style="font-size: 15px; margin-top: 0;">
-        Kepada Yth. <strong>Owner / Manajemen PT. DUMAI</strong>,
+        Kepada Yth. <strong>Owner / Manajemen {{ $capital->branch->owner->name ?? config('app.name', 'Perusahaan') }}</strong>,
       </p>
       <p style="font-size: 14px; color: #475569; line-height: 1.5;">
         Laporan setoran pengembalian / cicilan modal cabang telah tercatat pada sistem dengan rincian sebagai berikut:
@@ -101,8 +101,8 @@
     </div>
 
     <div class="footer">
-      Sistem Manajemen Finansial & Modal Toko PT. DUMAI.<br>
-      © {{ date('Y') }} PT. DUMAI. Seluruh hak cipta dilindungi.
+      Sistem Manajemen Finansial & Modal Toko {{ $capital->branch->owner->name ?? config('app.name', 'Perusahaan') }}.<br>
+      © {{ date('Y') }} {{ $capital->branch->owner->name ?? config('app.name', 'Perusahaan') }}. Seluruh hak cipta dilindungi.
     </div>
   </div>
 </body>

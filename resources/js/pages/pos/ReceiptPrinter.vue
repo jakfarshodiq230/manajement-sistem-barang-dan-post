@@ -231,7 +231,7 @@ defineExpose({ print })
     <div v-if="props.printFormat === 'continuous_form'" class="dotmatrix-wrapper">
       <div class="dotmatrix-header">
         <div class="dotmatrix-store">
-          <div class="dotmatrix-store-name">{{ branch?.owner?.name || branch?.name || 'PT. DUMAI INVENTORI' }}</div>
+          <div class="dotmatrix-store-name">{{ branch?.owner?.name || branch?.name || 'TOKO' }}</div>
           <div class="dotmatrix-store-sub">{{ branch?.address || 'Alamat Toko' }}</div>
           <div class="dotmatrix-store-sub">TELP: {{ branch?.contact || '-' }}</div>
         </div>

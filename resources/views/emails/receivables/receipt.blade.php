@@ -29,7 +29,7 @@
   <div class="container">
     <div class="header">
       <h1>KWITANSI PEMBAYARAN PIUTANG</h1>
-      <p>PT. DUMAI MANAJEMEN SISTEM POS & LOGISTIK</p>
+      <p>{{ $companyName ?? $payment->receivable->sale->branch->owner->name ?? $payment->receivable->sale->branch->name ?? config('app.name', 'SISTEM POS') }}</p>
     </div>
 
     <div class="content">
@@ -103,8 +103,8 @@
     </div>
 
     <div class="footer">
-      Sistem Kasir POS & Manajemen Piutang PT. DUMAI.<br>
-      © {{ date('Y') }} PT. DUMAI. Seluruh hak cipta dilindungi.
+      Sistem Kasir POS & Manajemen Piutang {{ $companyName ?? $payment->receivable->sale->branch->owner->name ?? config('app.name', 'Perusahaan') }}.<br>
+      © {{ date('Y') }} {{ $companyName ?? $payment->receivable->sale->branch->owner->name ?? config('app.name', 'Perusahaan') }}. Seluruh hak cipta dilindungi.
     </div>
   </div>
 </body>

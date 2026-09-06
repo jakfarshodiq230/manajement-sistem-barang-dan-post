@@ -13,6 +13,7 @@ use App\Models\PayablePayment;
 use App\Models\ReceivablePayment;
 use App\Models\PettyCash;
 use App\Models\Branch;
+use App\Models\Owner;
 use App\Services\JournalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -818,6 +819,7 @@ class AccountingController extends Controller
         }
 
         $branchName = 'Semua Cabang';
+        list($owner, $companyName) = $this->getOwnerAndCompanyName($branchId);
         if ($branchId && $branchId !== 'all') {
             $branchObj = Branch::find($branchId);
             if ($branchObj) $branchName = $branchObj->name;
@@ -838,7 +840,7 @@ class AccountingController extends Controller
 
         $docPayload = "LEMBAR PENGESAHAN DOKUMEN JURNAL RESMI\n"
             . "======================================\n"
-            . "Sistem        : PT Dumai Akuntansi ERP\n"
+            . "Sistem        : " . $companyName . " Akuntansi ERP\n"
             . "Unit          : " . $branchName . "\n"
             . "Total Jurnal  : " . count($journals) . " Transaksi\n"
             . "Total Debit   : Rp " . number_format($totalDebit, 0, ',', '.') . "\n"
@@ -850,13 +852,15 @@ class AccountingController extends Controller
             'startDate' => date('d/m/Y', strtotime($startDate)),
             'endDate' => date('d/m/Y', strtotime($endDate)),
             'branchName' => $branchName,
+            'companyName' => $companyName,
+            'owner' => $owner,
             'journals' => $journals,
             'totalJournals' => count($journals),
             'totalDebit' => $totalDebit,
             'totalCredit' => $totalCredit,
             'userName' => $userName,
             'userRole' => $userRole,
-            'ownerName' => 'Direksi & Owner PT Dumai',
+            'ownerName' => 'Direksi & Owner ' . $companyName,
             'signerQrCode' => $signerQrCode,
             'documentQrCode' => $documentQrCode,
         ];
@@ -947,6 +951,7 @@ class AccountingController extends Controller
         }
 
         $branchName = 'Semua Cabang';
+        list($owner, $companyName) = $this->getOwnerAndCompanyName($branchId);
         if ($branchId && $branchId !== 'all') {
             $branchObj = Branch::find($branchId);
             if ($branchObj) $branchName = $branchObj->name;
@@ -968,7 +973,7 @@ class AccountingController extends Controller
 
         $docPayload = "LEMBAR PENGESAHAN BUKU BESAR RESMI\n"
             . "==================================\n"
-            . "Sistem        : PT Dumai Akuntansi ERP\n"
+            . "Sistem        : " . $companyName . " Akuntansi ERP\n"
             . "Akun          : " . $account->code . " (" . $account->name . ")\n"
             . "Total Debit   : Rp " . number_format($totalDebit, 0, ',', '.') . "\n"
             . "Total Kredit  : Rp " . number_format($totalCredit, 0, ',', '.') . "\n"
@@ -981,6 +986,8 @@ class AccountingController extends Controller
             'startDate' => date('d/m/Y', strtotime($startDate)),
             'endDate' => date('d/m/Y', strtotime($endDate)),
             'branchName' => $branchName,
+            'companyName' => $companyName,
+            'owner' => $owner,
             'beginningBalance' => $beginningBalance,
             'endingBalance' => $runningBalance,
             'totalDebit' => $totalDebit,
@@ -988,7 +995,7 @@ class AccountingController extends Controller
             'transactions' => $transactions,
             'userName' => $userName,
             'userRole' => $userRole,
-            'ownerName' => 'Direksi & Owner PT Dumai',
+            'ownerName' => 'Direksi & Owner ' . $companyName,
             'signerQrCode' => $signerQrCode,
             'documentQrCode' => $documentQrCode,
         ];
@@ -1049,6 +1056,8 @@ class AccountingController extends Controller
             ];
         }
 
+        list($owner, $companyName) = $this->getOwnerAndCompanyName();
+
         $user = auth()->user();
         $userName = $user ? $user->name : 'Administrator';
         $userRole = ($user && $user->role) ? $user->role->name : 'Akuntan / Finance';
@@ -1064,7 +1073,7 @@ class AccountingController extends Controller
 
         $docPayload = "LEMBAR PENGESAHAN MASTER BAGAN AKUN (COA)\n"
             . "========================================\n"
-            . "Sistem        : PT Dumai Akuntansi ERP\n"
+            . "Sistem        : " . $companyName . " Akuntansi ERP\n"
             . "Total Akun    : " . count($accounts) . " Rekening\n"
             . "Status        : RESMI & TERDAFTAR";
         $documentQrCode = base64_encode(QrCode::format('svg')->size(70)->generate($docPayload));
@@ -1072,9 +1081,11 @@ class AccountingController extends Controller
         $pdfData = [
             'accounts' => $accounts,
             'counts' => $counts,
+            'companyName' => $companyName,
+            'owner' => $owner,
             'userName' => $userName,
             'userRole' => $userRole,
-            'ownerName' => 'Direksi & Owner PT Dumai',
+            'ownerName' => 'Direksi & Owner ' . $companyName,
             'signerQrCode' => $signerQrCode,
             'documentQrCode' => $documentQrCode,
         ];
@@ -1145,6 +1156,7 @@ class AccountingController extends Controller
         $netIncome = $grossProfit - $totalExpense;
 
         $branchName = 'Semua Cabang';
+        list($owner, $companyName) = $this->getOwnerAndCompanyName($branchId);
         if ($branchId && $branchId !== 'all') {
             $branchObj = Branch::find($branchId);
             if ($branchObj) $branchName = $branchObj->name;
@@ -1165,7 +1177,7 @@ class AccountingController extends Controller
 
         $docPayload = "LEMBAR PENGESAHAN LAPORAN KEUANGAN RESMI\n"
             . "========================================\n"
-            . "Sistem        : PT Dumai Akuntansi ERP\n"
+            . "Sistem        : " . $companyName . " Akuntansi ERP\n"
             . "Total Aktiva  : Rp " . number_format($totalAssets, 0, ',', '.') . "\n"
             . "Total Pasiva  : Rp " . number_format($totalLiabilities + $totalEquity, 0, ',', '.') . "\n"
             . "Laba Bersih   : Rp " . number_format($netIncome, 0, ',', '.') . "\n"
@@ -1176,6 +1188,8 @@ class AccountingController extends Controller
             'startDate' => date('d/m/Y', strtotime($startDate)),
             'endDate' => date('d/m/Y', strtotime($endDate)),
             'branchName' => $branchName,
+            'companyName' => $companyName,
+            'owner' => $owner,
             'trialBalance' => $trialBalance,
             'totalAssets' => $totalAssets,
             'totalLiabilities' => $totalLiabilities,
@@ -1187,7 +1201,7 @@ class AccountingController extends Controller
             'netIncome' => $netIncome,
             'userName' => $userName,
             'userRole' => $userRole,
-            'ownerName' => 'Direksi & Owner PT Dumai',
+            'ownerName' => 'Direksi & Owner ' . $companyName,
             'signerQrCode' => $signerQrCode,
             'documentQrCode' => $documentQrCode,
         ];
@@ -1196,5 +1210,25 @@ class AccountingController extends Controller
         $pdf->setPaper('a4', 'portrait');
 
         return $pdf->download('Laporan_Keuangan_' . date('Ymd', strtotime($startDate)) . '_' . date('Ymd', strtotime($endDate)) . '.pdf');
+    }
+
+    /**
+     * Helper to get Owner and Company Name dynamically
+     */
+    private function getOwnerAndCompanyName($branchId = null)
+    {
+        $owner = null;
+        $branchObj = null;
+        if ($branchId && $branchId !== 'all') {
+            $branchObj = Branch::with('owner')->find($branchId);
+            if ($branchObj && $branchObj->owner) {
+                $owner = $branchObj->owner;
+            }
+        }
+        if (!$owner) {
+            $owner = Owner::whereNull('parent_id')->first() ?? Owner::first();
+        }
+        $companyName = $owner?->name ?? ($branchObj?->name ?? config('app.name', 'Perusahaan'));
+        return [$owner, $companyName];
     }
 }

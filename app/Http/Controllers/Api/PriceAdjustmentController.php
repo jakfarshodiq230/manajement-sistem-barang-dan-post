@@ -459,34 +459,43 @@ class PriceAdjustmentController extends Controller
     public function exportPdf(Request $request, $id)
     {
         $adjustment = PriceAdjustment::with([
-            'branch',
+            'branch.owner',
             'creator',
             'approver',
             'items.product.category',
         ])->findOrFail($id);
 
-        $owner = Owner::first();
+        $branch = $adjustment->branch;
+        $owner = ($branch && $branch->owner)
+            ? $branch->owner
+            : (Owner::whereNull('parent_id')->first() ?: Owner::first());
+
+        $companyName = ($owner && !empty($owner->name)) 
+            ? $owner->name 
+            : (($branch && !empty($branch->name)) ? $branch->name : config('app.name', 'Perusahaan'));
 
         // Calculate summary statistics
         $totalItems = $adjustment->items->count();
         $totalPriceIncrease = 0;
         $totalItemsIncreased = 0;
         $totalItemsDecreased = 0;
+        $totalItemsUnchanged = 0;
 
         foreach ($adjustment->items as $item) {
             $diff = (float)$item->new_price - (float)$item->old_price;
             if ($diff > 0) $totalItemsIncreased++;
             elseif ($diff < 0) $totalItemsDecreased++;
+            else $totalItemsUnchanged++;
             $totalPriceIncrease += $diff;
         }
 
         $verificationUuid = Str::uuid()->toString();
         $targetBranchName = $adjustment->branch ? $adjustment->branch->name : 'Seluruh Cabang (Pusat & Cabang)';
-        $batchRuleLabel = ($adjustment->batch_policy ?? 'all_active') === 'all_active' ? 'Seluruh Batch Aktif' : 'Hanya Batch Baru';
+        $batchRuleLabel = ($adjustment->batch_policy ?? 'all_active') === 'all_active' ? 'Seluruh Batch Aktif di Toko' : 'Hanya Berlaku untuk Batch Masuk Baru';
 
         // 1. QR Code Verifikasi Dokumen SK Resmi
         $docVerifyPayload = "VERIFIKASI SK PENETAPAN HARGA RESMI\n"
-            . "PT. DUMAI BERKAH ABADI\n"
+            . $companyName . "\n"
             . "----------------------------------------\n"
             . "No. SK        : " . $adjustment->adjustment_number . "\n"
             . "Judul SK      : " . $adjustment->title . "\n"
@@ -500,7 +509,7 @@ class PriceAdjustmentController extends Controller
         $documentQrCode = base64_encode(QrCode::format('svg')->size(70)->generate($docVerifyPayload));
 
         // 2. QR Code TTD Digital Pembuat (Analis / Staf Admin)
-        $creatorName = $adjustment->creator->name ?? 'Staf Administrasi';
+        $creatorName = $adjustment->creator ? $adjustment->creator->name : 'Staf Administrasi';
         $creatorPayload = "TANDA TANGAN DIGITAL RESMI - ANALIS HARGA\n"
             . "----------------------------------------\n"
             . "Penandatangan : " . $creatorName . "\n"
@@ -520,11 +529,13 @@ class PriceAdjustmentController extends Controller
         $reviewerQrCode = base64_encode(QrCode::format('svg')->size(55)->generate($reviewerPayload));
 
         // 4. QR Code TTD Digital Pengesah (Owner / Direktur)
-        $approverName = $adjustment->approver->name ?? ($owner->name ?? 'Direktur / Owner');
+        $approverName = ($adjustment->approver && !empty($adjustment->approver->name)) 
+            ? $adjustment->approver->name 
+            : (($owner && !empty($owner->name)) ? $owner->name : 'Direktur / Owner');
         $approverPayload = "PENGESAHAN TANDA TANGAN DIGITAL RESMI\n"
             . "----------------------------------------\n"
             . "Pengesah      : " . $approverName . "\n"
-            . "Jabatan       : Owner / Direksi PT. DUMAI\n"
+            . "Jabatan       : Owner / Direksi " . $companyName . "\n"
             . "No. SK        : " . $adjustment->adjustment_number . "\n"
             . "Waktu Sah     : " . ($adjustment->approved_at ? $adjustment->approved_at->format('d/m/Y H:i:s') : now()->format('d/m/Y H:i:s')) . "\n"
             . "Status        : DISAHKAN & DITETAPKAN (APPROVED)";
@@ -533,21 +544,28 @@ class PriceAdjustmentController extends Controller
         // 5. QR Code per Item Produk (Scan Barcode/QR Data Barang)
         $itemQrCodes = [];
         foreach ($adjustment->items as $item) {
-            $sku = $item->product->sku ?? ('PRD-' . $item->product_id);
-            $itemPayload = "MS.POS - " . ($item->product->name ?? 'Produk') . "\n"
+            $sku = ($item->product && !empty($item->product->sku)) ? $item->product->sku : ('PRD-' . $item->product_id);
+            $prodName = ($item->product && !empty($item->product->name)) ? $item->product->name : 'Produk';
+            $itemPayload = $companyName . " - " . $prodName . "\n"
                 . "SKU   : " . $sku . "\n"
                 . "Harga : Rp " . number_format($item->new_price, 0, ',', '.') . "\n"
                 . "SK No : " . $adjustment->adjustment_number;
-            $itemQrCodes[$item->id] = base64_encode(QrCode::format('svg')->size(32)->generate($itemPayload));
+            $itemQrCodes[$item->id] = base64_encode(QrCode::format('svg')->size(30)->generate($itemPayload));
         }
 
         $pdf = Pdf::loadView('pdf.price_adjustment', [
             'adjustment' => $adjustment,
             'owner' => $owner,
+            'companyName' => $companyName,
+            'targetBranchName' => $targetBranchName,
+            'batchRuleLabel' => $batchRuleLabel,
             'totalItems' => $totalItems,
             'totalPriceIncrease' => $totalPriceIncrease,
             'totalItemsIncreased' => $totalItemsIncreased,
             'totalItemsDecreased' => $totalItemsDecreased,
+            'totalItemsUnchanged' => $totalItemsUnchanged,
+            'creatorName' => $creatorName,
+            'approverName' => $approverName,
             'printedAt' => now()->format('d/m/Y H:i:s'),
             'verificationUuid' => $verificationUuid,
             'documentQrCode' => $documentQrCode,

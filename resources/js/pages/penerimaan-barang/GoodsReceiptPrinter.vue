@@ -644,18 +644,18 @@ defineExpose({
                     <td style="width: 60px; font-weight: bold;">Kepada</td>
                     <td style="width: 10px;">:</td>
                     <td>
-                      <strong style="font-size: 11px;">{{ (currentBranch.owner?.name || 'PT. PAGARUYUNG MITRA PERSADA').toUpperCase() }}</strong>
+                      <strong style="font-size: 11px;">{{ (currentBranch.owner?.name || currentBranch.name || 'PERUSAHAAN').toUpperCase() }}</strong>
                     </td>
                   </tr>
                   <tr>
                     <td></td>
                     <td></td>
-                    <td>{{ currentBranch.address || 'JALAN LINTAS KILOMETER 18' }}</td>
+                    <td>{{ currentBranch.address || '-' }}</td>
                   </tr>
                   <tr>
                     <td></td>
                     <td></td>
-                    <td>{{ (currentBranch.city || 'DURI').toUpperCase() }} ({{ currentBranch.code || '10.040.02552.01' }})</td>
+                    <td>{{ (currentBranch.city || '-').toUpperCase() }} {{ currentBranch.code ? `(${currentBranch.code})` : '' }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -719,7 +719,7 @@ defineExpose({
             <!-- Kolom Kiri: Keterangan, User/Waktu, QR dan Kolom TTD -->
             <td style="width: 58%; vertical-align: top; padding-right: 12px;">
               <div style="font-size: 9.5px; margin-bottom: 2px;">
-                * Ket.: {{ goodsReceipt.notes || 'MO CASH KRM PARLIN PAGARUYUNG HANGTUAH DURI' }}
+                * Ket.: {{ goodsReceipt.notes || '-' }}
               </div>
               <div style="font-size: 9px; color: #333; margin-bottom: 6px;">
                 * sudah termasuk PPN &nbsp;&nbsp;&nbsp;&nbsp; {{ receiverName }} ({{ dayjs(goodsReceipt.created_at || new Date()).format('HH:mm:ss') }}) &nbsp;&nbsp; Via : SLS

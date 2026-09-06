@@ -119,7 +119,7 @@ const getTransferStatusBadge = status => {
           DOKUMEN MUTASI VALID & TERVERIFIKASI
         </h2>
         <p class="text-caption text-medium-emphasis mb-2">
-          Surat Jalan resmi tercatat dalam sistem terpusat PT. Dumai Manajemen Barang
+          Surat Jalan resmi tercatat dalam sistem manajemen inventori & logistik terpusat
         </p>
         <VChip
           :color="getTransferStatusBadge(docData.status).color"

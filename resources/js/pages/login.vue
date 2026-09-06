@@ -194,7 +194,7 @@ const onSubmit = () => {
         <!-- Footer Note -->
         <div class="mt-6 pt-4 border-t text-center">
           <div class="text-caption text-disabled" style="font-size: 12px;">
-            © 2026 PT. DUMAI • Seluruh Hak Cipta Dilindungi
+            © {{ new Date().getFullYear() }} Manajemen Barang & POS • Seluruh Hak Cipta Dilindungi
           </div>
         </div>
       </VCard>

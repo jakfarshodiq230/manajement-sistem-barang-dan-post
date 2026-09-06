@@ -993,7 +993,7 @@ onMounted(() => {
               <div class="mb-1 text-caption font-weight-bold">Atas Nama Rekening</div>
               <VTextField
                 v-model="formAccountName"
-                placeholder="Contoh: PT. DUMAI BERKAH ABADI"
+                placeholder="Contoh: PT. Nama Usaha Anda"
                 density="compact"
                 variant="outlined"
                 hide-details

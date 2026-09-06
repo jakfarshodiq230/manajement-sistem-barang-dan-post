@@ -156,15 +156,18 @@ class EmailNotificationService
                 return $u->email && ($u->can('manage all') || $u->can('Modal & ROI Cabang Approve') || $u->can('Dashboard Keuntungan Read'));
             });
 
-            $email = $ownerUser ? $ownerUser->email : env('MAIL_FROM_ADDRESS', 'owner@pt-dumai.com');
+            $email = $ownerUser ? $ownerUser->email : env('MAIL_FROM_ADDRESS', 'noreply@' . (request()->getHost() ?: 'localhost'));
         }
+
+        $owner = $capital->branch?->owner ?? Owner::whereNull('parent_id')->first() ?? Owner::first();
+        $ownerTitle = 'Owner / Direksi ' . ($owner?->name ?? config('app.name', 'Perusahaan'));
 
         $mailable = new CapitalInstallmentAlertMail($capital);
 
         return self::dispatchWithLog(
             $mailable,
             $email,
-            'Owner / Direksi PT. DUMAI',
+            $ownerTitle,
             'capital_installment',
             BranchCapital::class,
             (string) $capital->id,
@@ -186,15 +189,18 @@ class EmailNotificationService
                 return $u->email && ($u->can('manage all') || $u->can('Modal & ROI Cabang Approve') || $u->can('Dashboard Keuntungan Read'));
             });
 
-            $email = $ownerUser ? $ownerUser->email : env('MAIL_FROM_ADDRESS', 'owner@pt-dumai.com');
+            $email = $ownerUser ? $ownerUser->email : env('MAIL_FROM_ADDRESS', 'owner@' . (parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST) ?? 'localhost'));
         }
+
+        $owner = Owner::whereNull('parent_id')->first() ?? Owner::first();
+        $ownerTitle = 'Owner / Direksi ' . ($owner?->name ?? config('app.name', 'Perusahaan'));
 
         $mailable = new CapitalSummaryReportMail($summary);
 
         return self::dispatchWithLog(
             $mailable,
             $email,
-            'Owner / Direksi PT. DUMAI',
+            $ownerTitle,
             'capital_summary',
             'App\Models\CapitalSummary',
             'summary-' . date('Y-m-d'),

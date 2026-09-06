@@ -2267,7 +2267,7 @@ const startNewTransaction = () => {
                     {{ selectedBankAccount.account_number }}
                   </div>
                   <div class="text-caption text-medium-emphasis">
-                    a.n. {{ selectedBankAccount?.account_name || branches.find(b => b.id === activeBranchId)?.owner?.name || 'PT. DUMAI' }}
+                    a.n. {{ selectedBankAccount?.account_name || branches.find(b => b.id === activeBranchId)?.owner?.name || branches.find(b => b.id === activeBranchId)?.name || 'Perusahaan' }}
                   </div>
                 </div>
               </template>

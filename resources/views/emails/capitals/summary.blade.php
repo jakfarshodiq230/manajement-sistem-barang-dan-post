@@ -34,7 +34,7 @@
 
     <div class="content">
       <p style="font-size: 15px; margin-top: 0;">
-        Kepada Yth. <strong>Owner / Direksi PT. DUMAI</strong>,
+        Kepada Yth. <strong>Owner / Direksi {{ $ownerName ?? config('app.name', 'Perusahaan') }}</strong>,
       </p>
       <p style="font-size: 14px; color: #475569; line-height: 1.5;">
         Berikut adalah ikhtisar real-time performa penyaluran modal usaha dan progres pengembalian (Payback ROI) per tanggal <strong>{{ date('d/m/Y') }}</strong>:
@@ -89,8 +89,8 @@
     </div>
 
     <div class="footer">
-      Executive Financial Monitoring Report PT. DUMAI.<br>
-      © {{ date('Y') }} PT. DUMAI. Seluruh hak cipta dilindungi.
+      Executive Financial Monitoring Report {{ $ownerName ?? config('app.name', 'Perusahaan') }}.<br>
+      © {{ date('Y') }} {{ $ownerName ?? config('app.name', 'Perusahaan') }}. Seluruh hak cipta dilindungi.
     </div>
   </div>
 </body>

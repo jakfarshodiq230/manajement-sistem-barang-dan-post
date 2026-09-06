@@ -137,7 +137,7 @@ onMounted(() => {
               Pusat Laporan & Analitik (Reports Hub)
             </h3>
             <p class="text-body-1 text-medium-emphasis mb-0">
-              Pusat rekap laporan finansial, mutasi rekening bank, inventori barang, closing audit, dan piutang PT. DUMAI.
+              Pusat rekap laporan finansial, mutasi rekening bank, inventori barang, closing audit, dan piutang perusahaan.
             </p>
           </div>
         </div>

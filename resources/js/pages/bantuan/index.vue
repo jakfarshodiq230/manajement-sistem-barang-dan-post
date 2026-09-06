@@ -16,14 +16,15 @@ const activePanel = ref([0, 1, 2])
 const workflowCategories = [
   { id: 'all', title: 'Semua Alur', icon: 'ri-apps-2-line' },
   { id: 'master', title: '1. Master Data', icon: 'ri-database-2-line' },
-  { id: 'bank', title: '2. Rekening Bank & QRIS', icon: 'ri-bank-card-line' },
-  { id: 'gudang', title: '3. Pengadaan & Gudang', icon: 'ri-truck-line' },
-  { id: 'pos', title: '4. Kasir & Transaksi', icon: 'ri-shopping-cart-2-line' },
-  { id: 'piutang_retur', title: '5. Piutang & Retur', icon: 'ri-exchange-dollar-line' },
-  { id: 'opname', title: '6. Opname & Audit Stok', icon: 'ri-archive-stack-line' },
-  { id: 'laporan', title: '7. Laporan & Keuangan', icon: 'ri-file-chart-line' },
-  { id: 'akuntansi', title: '8. Akuntansi & Neraca', icon: 'ri-book-read-line' },
-  { id: 'modal_roi', title: '9. Modal & ROI Cabang', icon: 'ri-hand-coin-line' },
+  { id: 'price', title: '2. Penyesuaian Harga & SK', icon: 'ri-price-tag-3-line' },
+  { id: 'bank', title: '3. Rekening Bank & QRIS', icon: 'ri-bank-card-line' },
+  { id: 'gudang', title: '4. Pengadaan & Gudang', icon: 'ri-truck-line' },
+  { id: 'pos', title: '5. Kasir & Transaksi', icon: 'ri-shopping-cart-2-line' },
+  { id: 'piutang_retur', title: '6. Piutang & Retur', icon: 'ri-exchange-dollar-line' },
+  { id: 'opname', title: '7. Opname & Audit Stok', icon: 'ri-archive-stack-line' },
+  { id: 'laporan', title: '8. Laporan & Keuangan', icon: 'ri-file-chart-line' },
+  { id: 'akuntansi', title: '9. Akuntansi & Neraca', icon: 'ri-book-read-line' },
+  { id: 'modal_roi', title: '10. Modal & ROI Cabang', icon: 'ri-hand-coin-line' },
 ]
 
 // 1. Alur Sistem Lengkap & Step-by-Step
@@ -33,29 +34,29 @@ const systemWorkflows = [
     category: 'master',
     icon: 'ri-database-2-line',
     color: 'primary',
-    title: 'Tahap 1: Inisialisasi Master Data & Inventori Cabang (3 Tingkat Harga & Multi-Batch)',
-    subtitle: 'Langkah awal mempersiapkan kategori, master produk SKU, struktur harga per batch, supplier, dan pelanggan.',
+    title: 'Tahap 1: Inisialisasi Profil Usaha (Owner), Kategori & Katalog Produk (SKU)',
+    subtitle: 'Langkah awal mengatur nama usaha/perusahaan induk, kategori produk, master barang, satuan, supplier, dan pelanggan.',
     steps: [
       {
         no: 1,
+        title: 'Atur Profil & Nama Usaha Utama di Manajemen Owner',
+        desc: 'Buka menu Manajemen Owner (/apps/owners). Masukkan nama usaha besar / perusahaan induk Anda, alamat kantor, email, telepon, dan logo. Seluruh dokumen SK harga, invoice email, struk kasir, dan laporan akuntansi otomatis menggunakan nama dan profil yang Anda atur di sini.',
+        link: '/apps/owners',
+        linkText: 'Buka Manajemen Owner',
+      },
+      {
+        no: 2,
         title: 'Buat Kategori Barang & Satuan',
         desc: 'Buka menu Kategori Barang. Buat kategori utama (misal: Sembako, Aki Baterai, Elektronik) dan tentukan satuan produk standar (Pcs, Dus, Box, Karton). Kategori mempermudah filter laporan dan audit stock opname.',
         link: '/kategori-barang',
         linkText: 'Buka Kategori Barang',
       },
       {
-        no: 2,
+        no: 3,
         title: 'Daftarkan Master Data Produk & Barcode SKU',
         desc: 'Buka Master Data Produk. Masukkan nama barang, SKU/Barcode unik, kategori, satuan, metode stok (FIFO/FEFO/LIFO), dan isi konversi kemasan (misal: 1 Dus = 24 Pcs).',
         link: '/master-data-produk',
         linkText: 'Buka Master Produk',
-      },
-      {
-        no: 3,
-        title: 'Atur 3 Tingkat Harga & Kelola Multi-Batch di Inventori Cabang',
-        desc: 'Buka menu Inventori Cabang. Setiap produk dan batch fisik memiliki 3 lapis harga:\n• 1. Harga Modal (HPP Real): Otomatis mencakup diskon supplier bertingkat dan PPN Masukan 11%.\n• 2. Harga Jual Normal: Gunakan tombol kalkulasi markup cepat (+15%, +20%, +25%, +30%).\n• 3. Harga Nego Minimum: Batas harga terendah kasir.\n• Multi-Batch FIFO: POS otomatis memakai harga Batch Aktif (FIFO/FEFO). Owner dapat menyesuaikan harga modal & jual per batch melalui tombol "Kelola Batch".',
-        link: '/inventori-cabang',
-        linkText: 'Buka Inventori Cabang',
       },
       {
         no: 4,
@@ -65,14 +66,56 @@ const systemWorkflows = [
         linkText: 'Buka Supplier & Pelanggan',
       },
     ],
-    tips: 'Gunakan tombol "Kelola Batch" di panel Inventori Cabang untuk mengatur HPP Real, Harga Jual POS, dan Batas Nego untuk masing-masing batch pengiriman supplier.',
+    tips: 'Nama perusahaan dan logo yang diinput di menu Manajemen Owner (/apps/owners) otomatis menjadi kop resmi di seluruh dokumen PDF sistem.',
+  },
+  {
+    id: 'wf-price',
+    category: 'price',
+    icon: 'ri-price-tag-3-line',
+    color: 'primary',
+    title: 'Tahap 2: Pusat Penyesuaian Harga Berkala & Penerbitan SK Dokumen Resmi',
+    subtitle: 'Penetapan harga jual pricelist berkala, batas nego kasir, kalkulator massal, aturan batch fisik, dan penerbitan SK PDF bertanda tangan digital.',
+    steps: [
+      {
+        no: 1,
+        title: 'Pusat Kendali Harga Terpusat vs Inventori Cabang',
+        desc: '• Penyesuaian Harga (/price-adjustments): Tempat merumuskan kebijakan harga berkala (misal: tiap 3 bulan / kenaikan pabrik), kalkulator massal, dan legalitas SK audit.\n• Inventori Cabang (/inventori-cabang): Tempat melihat stok fisik rak/gudang dan 1-klik cetak label barcode.',
+        link: '/price-adjustments',
+        linkText: 'Buka Penyesuaian Harga',
+      },
+      {
+        no: 2,
+        title: 'Buat Dokumen SK & Gunakan Kalkulator Cepat (Bulk Calculator)',
+        desc: 'Buka menu Penyesuaian Harga > Buat Penyesuaian Harga Baru. Muat kategori produk, lalu pilih rumus perubahan: Naikkan % harga lama, Diskon %, Naik/Turun Nominal Rp, atau Target Markup % dari HPP modal.',
+        link: '/price-adjustments',
+        linkText: 'Buat SK Harga Baru',
+      },
+      {
+        no: 3,
+        title: 'Pilih Aturan Harga Batch Fisik (Stok yang Ada)',
+        desc: 'Pilih opsi "Sinkronkan ke Seluruh Batch Aktif" agar stok lama di rak otomatis dijual kasir dengan harga baru tanpa perlu update per batch satu per satu, atau "Hanya Batch Baru" jika ingin menghabiskan stok lama di harga lama.',
+      },
+      {
+        no: 4,
+        title: 'Ketik Bebas & Sesuaikan Batas Min. Nego Kasir',
+        desc: 'Anda dapat mengedit harga jual dan batas nego minimum kapan saja pada tabel. Sistem otomatis mengunci kasir agar tidak menjual di bawah batas tawar tersebut.',
+      },
+      {
+        no: 5,
+        title: 'Penerbitan SK PDF Resmi & Integrasi Real-Time Kasir',
+        desc: 'Klik tombol "Cetak PDF Resmi" untuk mengunduh SK Penetapan Harga lengkap dengan QR Code Keaslian SK, QR Barcode per produk, dan 3 QR TTD Digital Sah. Begitu berstatus Disetujui (Approved), kasir POS langsung menerapkan harga baru secara serentak.',
+        link: '/pos',
+        linkText: 'Ke Kasir POS',
+      },
+    ],
+    tips: 'Jika dokumen masih berupa DRAFT usulan, klik tombol "Edit Usulan" untuk merevisi produk atau harga sebelum disahkan oleh pimpinan.',
   },
   {
     id: 'wf-bank',
     category: 'bank',
     icon: 'ri-bank-card-line',
     color: 'info',
-    title: 'Tahap 2: Manajemen Rekening Bank, Multi-Bank & Barcode QRIS',
+    title: 'Tahap 3: Manajemen Rekening Bank, Multi-Bank & Barcode QRIS',
     subtitle: 'Pengelolaan daftar rekening bank penampung (BCA, Mandiri, BRI, QRIS), saldo berjalan, serta integrasi POS dan Closing Harian.',
     steps: [
       {
@@ -109,7 +152,7 @@ const systemWorkflows = [
     category: 'gudang',
     icon: 'ri-truck-line',
     color: 'info',
-    title: 'Tahap 3: Pengadaan (PO), Penerimaan Gudang (Diskon D1..D5) & Mutasi',
+    title: 'Tahap 4: Pengadaan (PO), Penerimaan Gudang (Diskon D1..D5) & Mutasi',
     subtitle: 'Alur pasokan dari Purchase Order kuantitas fisik, verifikasi faktur gudang, diskon bertingkat hingga 5 level, dan nomor batch/SCC.',
     steps: [
       {
@@ -146,7 +189,7 @@ const systemWorkflows = [
     category: 'pos',
     icon: 'ri-shopping-cart-2-line',
     color: 'success',
-    title: 'Tahap 4: Operasional Kasir (POS), Diskon Total & Otorisasi Nego',
+    title: 'Tahap 5: Operasional Kasir (POS), Diskon Total & Otorisasi Nego',
     subtitle: 'Panduan kasir dari buka shift kas, scan transaksi, diskon total bon, otorisasi nego batas bawah, hingga cetak struk.',
     steps: [
       {
@@ -185,7 +228,7 @@ const systemWorkflows = [
     category: 'piutang_retur',
     icon: 'ri-exchange-dollar-line',
     color: 'warning',
-    title: 'Tahap 5: Pengelolaan Buku Piutang, Notifikasi Email & Retur Barang',
+    title: 'Tahap 6: Pengelolaan Buku Piutang, Notifikasi Email & Retur Barang',
     subtitle: 'Pencatatan tagihan pelanggan tempo, pengiriman invoice & kwitansi email otomatis, serta retur barang.',
     steps: [
       {
@@ -229,7 +272,7 @@ const systemWorkflows = [
     category: 'opname',
     icon: 'ri-archive-stack-line',
     color: 'error',
-    title: 'Tahap 6: Audit Stok & Stock Opname Berkala (Cycle Counting)',
+    title: 'Tahap 7: Audit Stok & Stock Opname Berkala (Cycle Counting)',
     subtitle: 'Prosedur rekonsiliasi jumlah fisik barang di gudang dengan catatan sistem untuk mendeteksi selisih dan barang rusak.',
     steps: [
       {
@@ -261,7 +304,7 @@ const systemWorkflows = [
     category: 'laporan',
     icon: 'ri-file-chart-line',
     color: 'secondary',
-    title: 'Tahap 7: Laporan Finansial, Laba Rugi & Tutup Buku Harian',
+    title: 'Tahap 8: Laporan Finansial, Laba Rugi & Tutup Buku Harian',
     subtitle: 'Pemantauan omzet penjualan, HPP, laba bersih, arus kas, dan ekspor laporan resmi.',
     steps: [
       {
@@ -293,7 +336,7 @@ const systemWorkflows = [
     category: 'akuntansi',
     icon: 'ri-book-read-line',
     color: 'primary',
-    title: 'Tahap 8: Sistem Akuntansi & Pembukuan Otomatis (COA, Jurnal, Buku Besar & Neraca)',
+    title: 'Tahap 9: Sistem Akuntansi & Pembukuan Otomatis (COA, Jurnal, Buku Besar & Neraca)',
     subtitle: 'Panduan lengkap pembukuan double-entry otomatis berstandar SAK, Bagan Akun (COA), Jurnal Penyesuaian, Buku Besar, Neraca Saldo, dan Neraca Keuangan.',
     steps: [
       {
@@ -346,7 +389,7 @@ const systemWorkflows = [
     category: 'modal_roi',
     icon: 'ri-hand-coin-line',
     color: 'warning',
-    title: 'Tahap 9: Manajemen Modal, Permohonan Dana (PDF) & Pengembalian ROI Cabang',
+    title: 'Tahap 10: Manajemen Modal, Permohonan Dana (PDF) & Pengembalian ROI Cabang',
     subtitle: 'Alur komprehensif investasi modal Owner, pengajuan dana toko dengan proposal PDF, otorisasi transfer, dan pengembalian dividen/laba closing shift.',
     steps: [
       {
@@ -391,6 +434,42 @@ const systemWorkflows = [
 
 // 2. Tanya Jawab Populer (FAQ) & Solusi Kendala
 const faqs = [
+  {
+    id: 101,
+    category: 'price',
+    question: 'Bagaimana jika suatu barang masuk ke dalam 2 atau lebih periode penyesuaian harga yang aktif bersamaan?',
+    answer: 'Sistem menerapkan aturan hierarki berbasis status dan kronologis waktu:\n1. Kasir POS selalu menggunakan harga dari Dokumen SK Disetujui (Approved) yang paling akhir disahkan (terkini).\n2. Seluruh dokumen SK periode sebelumnya tidak akan hilang atau terhapus, melainkan tetap tersimpan aman di database sebagai arsip historis dan jejak audit (audit trail) resmi perusahaan.\n3. Anda dapat melihat kronologis perubahan harga produk dari waktu ke waktu pada tab "Log Riwayat Perubahan Harga" di menu Penyesuaian Harga.',
+  },
+  {
+    id: 102,
+    category: 'price',
+    question: 'Apakah seluruh modul (POS Kasir, Penerimaan Gudang, Inventori, dan Laporan Keuangan) otomatis terintegrasi saat harga disesuaikan?',
+    answer: 'Ya, seluruh sistem 100% terintegrasi secara instan (real-time):\n• Kasir POS: Otomatis memuat harga jual baru dan batas nego baru seketika dokumen SK disetujui.\n• Penerimaan Barang Gudang: Barang masuk baru tetap dicatat berdasarkan harga faktur supplier aktual (HPP Real) dan langsung membentuk batch baru.\n• Inventori Cabang: Menyajikan stok fisik dan tombol cetak label barcode dengan harga terupdate.\n• Laporan Keuangan & Laba Rugi: Menghitung laba berdasarkan HPP historis batch (FIFO/FEFO) dikurangi harga jual aktual saat transaksi terjadi, sehingga pembukuan akuntansi masa lalu tidak terganggu dan tetap akurat.',
+  },
+  {
+    id: 103,
+    category: 'price',
+    question: 'Apa perbedaan aturan penyesuaian harga batch: "Sinkronkan ke Seluruh Batch Aktif" vs "Hanya Batch Masuk Baru"?',
+    answer: '• Sinkronkan ke Seluruh Batch Aktif (Sangat Direkomendasikan): Seluruh stok fisik yang sedang ada di rak toko otomatis dijual kasir dengan harga baru tanpa perlu mengubah data batch lama satu per satu. Sangat cocok untuk penyesuaian harga inflasi, kenaikan tarif toko, atau pricelist baru pabrik.\n• Hanya Berlaku untuk Batch Masuk Baru: Stok batch fisik lama tetap dijual dengan harga lama sampai habis. Hanya stok yang masuk melalui penerimaan barang berikutnya yang menggunakan harga baru.',
+  },
+  {
+    id: 104,
+    category: 'price',
+    question: 'Bagaimana cara mencetak dokumen SK Penetapan Harga resmi PDF yang dilengkapi Barcode SKU dan QR Code Tanda Tangan Digital?',
+    answer: 'Buka menu Penyesuaian Harga (/price-adjustments), klik ikon "Cetak Dokumen SK Resmi" (tombol PDF merah di tabel atau di modal rincian):\n• Sistem otomatis men-generate file PDF legalitas bertanda tangan digital resmi perusahaan.\n• Dilengkapi QR Code Verifikasi Dokumen SK di header kanan atas.\n• Dilengkapi Barcode/QR Code per SKU produk di setiap baris tabel barang.\n• Dilengkapi 3 QR Code Tanda Tangan Digital Sah: Analis/Pembuat Usulan, Kepala Operasional Toko, dan Direksi / Owner.',
+  },
+  {
+    id: 105,
+    category: 'price',
+    question: 'Bagaimana cara merevisi atau mengedit usulan harga jika dokumen masih berstatus DRAFT?',
+    answer: 'Untuk dokumen yang belum disetujui (status DRAFT):\n1. Klik tombol "Edit Usulan" (ikon pensil di tabel atau di dalam modal rincian).\n2. Drawer form akan terbuka dengan seluruh data dan daftar produk terisi otomatis.\n3. Anda dapat menambah produk baru, menghapus produk, mengubah nominal harga jual / batas nego, maupun mengubah kalkulator massal.\n4. Klik "Simpan Perubahan Draft" untuk menyimpan revisi, atau centang opsi "Langsung Sahkan" jika usulan sudah final.',
+  },
+  {
+    id: 106,
+    category: 'master',
+    question: 'Di mana saya bisa mengubah nama perusahaan utama dan logonya?',
+    answer: 'Seluruh identitas nama usaha besar, holding, atau badan usaha dikelola secara terpusat di menu Manajemen Owner (/apps/owners):\n1. Buka menu Manajemen Owner (/apps/owners).\n2. Klik tombol "Edit" pada nama owner/perusahaan utama.\n3. Ubah Nama Perusahaan, Alamat Kantor, Nomor Kontak, Email, serta unggah Logo resmi baru.\n4. Klik "Simpan Perubahan".\nSeketika itu juga, seluruh dokumen SK Penetapan Harga PDF, laporan Akuntansi (Jurnal, Buku Besar, Neraca), struk kasir POS, tanda terima piutang, dan email invoice otomatis menampilkan nama dan logo baru Anda secara dinamis.',
+  },
   {
     id: 1,
     category: 'gudang',

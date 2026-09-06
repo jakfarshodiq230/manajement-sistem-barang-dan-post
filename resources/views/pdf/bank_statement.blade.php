@@ -196,11 +196,11 @@
         <tr>
             <td style="width: 58%; vertical-align: top;">
                 <div class="company-name">
-                    {{ $branch->owner->name ?? ($branch->name ?? 'PT. PAGARUYUNG MITRA PERSADA') }}
+                    {{ $branch->owner->name ?? ($branch->name ?? config('app.name', 'Perusahaan')) }}
                 </div>
                 <div class="branch-info">
-                    {{ $branch->name ?? 'Cabang Utama' }} &bull; {{ $branch->address ?? 'Jl. Jendral Sudirman No. 128, Dumai' }}<br>
-                    Telp: {{ $branch->phone ?? '(0765) 31234' }} | Email: {{ $branch->email ?? 'finance@pagaruyung.com' }}
+                    {{ $branch->name ?? 'Cabang Utama' }} &bull; {{ $branch->address ?? '-' }}<br>
+                    Telp: {{ $branch->phone ?? '-' }} | Email: {{ $branch->email ?? '-' }}
                 </div>
             </td>
             <td style="width: 42%; vertical-align: top; text-align: right;">

@@ -501,10 +501,10 @@ defineExpose({
           <tr>
             <td style="width: 58%; vertical-align: top;">
               <div class="store-name">
-                {{ currentBranch.owner?.name || 'PT. PAGARUYUNG MITRA PERSADA' }}
+                {{ currentBranch.owner?.name || currentBranch.name || 'PERUSAHAAN' }}
               </div>
               <div class="store-address">
-                <strong>{{ currentBranch.name || 'Cabang Utama' }}</strong> - {{ currentBranch.address || 'Jalan Lintas Kilometer 18' }}
+                <strong>{{ currentBranch.name || 'Cabang Toko' }}</strong> - {{ currentBranch.address || '-' }}
               </div>
               <div class="store-address" v-if="currentBranch.phone">
                 Telp: {{ currentBranch.phone }}

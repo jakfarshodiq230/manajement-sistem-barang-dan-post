@@ -33,7 +33,7 @@
   <div class="container">
     <div class="header">
       <h1>SURAT TAGIHAN PIUTANG</h1>
-      <p>PT. DUMAI MANAJEMEN SISTEM POS & LOGISTIK</p>
+      <p>{{ $companyName ?? $receivable->sale->branch->owner->name ?? $receivable->sale->branch->name ?? config('app.name', 'SISTEM POS') }}</p>
     </div>
 
     <div class="content">
@@ -107,9 +107,8 @@
       <div class="bank-box">
         <strong style="color: #15803d; font-size: 13px; display: block; margin-bottom: 4px;">Informasi Rekening Pembayaran Toko:</strong>
         <p style="margin: 0; font-size: 13px; color: #166534; line-height: 1.5;">
-          Bank: <strong>BCA / Mandiri</strong><br>
-          A/N: <strong>PT. DUMAI LOGISTIK TERPADU</strong><br>
-          No. Rekening: <strong>123-456-7890</strong>
+          A/N: <strong>{{ $receivable->sale->branch->owner->name ?? $receivable->sale->branch->name ?? config('app.name', 'Toko Retail') }}</strong><br>
+          Silakan hubungi kasir/admin untuk nomor rekening pembayaran resmi cabang terkait.
         </p>
       </div>
 
@@ -120,7 +119,7 @@
 
     <div class="footer">
       Email ini dikirim secara otomatis oleh Sistem Kasir & Manajemen Piutang POS.<br>
-      © {{ date('Y') }} PT. DUMAI. Seluruh hak cipta dilindungi.
+      © {{ date('Y') }} {{ $companyName ?? $receivable->sale->branch->owner->name ?? config('app.name', 'Perusahaan') }}. Seluruh hak cipta dilindungi.
     </div>
   </div>
 </body>

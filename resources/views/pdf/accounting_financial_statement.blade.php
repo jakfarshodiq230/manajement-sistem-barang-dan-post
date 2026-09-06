@@ -171,7 +171,7 @@
     <table class="header-table">
         <tr>
             <td style="width: 55%; vertical-align: top;">
-                <div class="company-name">PT DUMAI MANAJEMEN SISTEM</div>
+                <div class="company-name">{{ $companyName ?? $ownerName ?? config('app.name', 'Perusahaan') }}</div>
                 <div class="branch-info">
                     <strong>Cabang / Unit:</strong> {{ $branchName }}<br>
                     <strong>Sistem:</strong> Akuntansi & Pembukuan Double-Entry Terpadu<br>

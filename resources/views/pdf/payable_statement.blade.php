@@ -98,7 +98,7 @@
             <table style="width: 100%;">
                 <tr>
                     <td style="width: 70px; font-weight: bold;">KEPADA</td>
-                    <td>: <strong>{{ strtoupper($owner->name ?? $branch->name ?? 'PT. PAGARUYUNG MITRA PERSADA') }}</strong></td>
+                    <td>: <strong>{{ strtoupper($owner->name ?? $branch->name ?? config('app.name', 'Perusahaan')) }}</strong></td>
                 </tr>
                 <tr>
                     <td style="font-weight: bold;">CABANG</td>
