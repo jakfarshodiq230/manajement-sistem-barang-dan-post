@@ -159,13 +159,16 @@ class AuthController extends Controller
             'pin' => 'required|string',
             'user_id' => 'nullable|exists:users,id',
             'branch_id' => 'nullable|exists:branches,id',
+            'purpose' => 'nullable|string|in:approval,unlock',
         ]);
+
+        $purpose = $request->input('purpose', 'approval');
 
         $approver = null;
         if ($request->filled('user_id')) {
             $approver = \App\Models\User::find($request->user_id);
             if (!$approver) {
-                return response()->json(['message' => 'Data otorisator tidak ditemukan.'], 404);
+                return response()->json(['message' => 'Data pengguna / otorisator tidak ditemukan.'], 404);
             }
         } else {
             $approver = $request->user();
@@ -175,7 +178,6 @@ class AuthController extends Controller
             return response()->json(['message' => 'Sesi login tidak valid'], 401);
         }
 
-        // 1. Check if approver is ONLY a cashier (Kasir cannot authorize supervisor overrides)
         $roleNames = \Illuminate\Support\Facades\DB::table('model_has_roles')
             ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
             ->where('model_has_roles.model_id', $approver->id)
@@ -188,11 +190,14 @@ class AuthController extends Controller
             $roleNames = $approver->getRoleNames()->map(fn($r) => strtolower(trim($r)))->toArray();
         }
 
-        $isOnlyCashier = !empty($roleNames) && count($roleNames) === 1 && in_array('kasir', $roleNames);
-        if ($isOnlyCashier) {
-            return response()->json([
-                'message' => 'Pengguna ' . $approver->name . ' berstatus Kasir dan tidak memiliki wewenang otorisasi supervisor!'
-            ], 403);
+        // 1. For supervisor approvals, Kasir cannot authorize supervisor overrides
+        if ($purpose === 'approval') {
+            $isOnlyCashier = !empty($roleNames) && count($roleNames) === 1 && in_array('kasir', $roleNames);
+            if ($isOnlyCashier) {
+                return response()->json([
+                    'message' => 'Pengguna ' . $approver->name . ' berstatus Kasir dan tidak memiliki wewenang otorisasi supervisor!'
+                ], 403);
+            }
         }
 
         // 2. Check branch assignment if branch_id is provided
@@ -211,7 +216,7 @@ class AuthController extends Controller
 
                 if (!$isAssignedToBranch) {
                     return response()->json([
-                        'message' => 'Otorisator ' . $approver->name . ' tidak ditugaskan pada cabang ini!'
+                        'message' => 'Pengguna ' . $approver->name . ' tidak ditugaskan pada cabang ini!'
                     ], 403);
                 }
             }
@@ -220,20 +225,21 @@ class AuthController extends Controller
         $pinInput = trim((string) $request->pin);
         if (!$approver->pos_pin && !$approver->pin) {
             return response()->json([
-                'message' => 'PIN otorisasi untuk ' . $approver->name . ' belum diatur. Harap atur PIN terlebih dahulu di Pengaturan Pengguna.'
+                'message' => 'PIN untuk ' . $approver->name . ' belum diatur. Harap buat PIN terlebih dahulu di Pengaturan Pengguna.'
             ], 400);
         }
 
         if (!$approver->verifyPosPin($pinInput)) {
             return response()->json([
-                'message' => 'PIN salah. Masukkan PIN yang benar untuk ' . $approver->name . '.'
+                'message' => 'PIN salah! Masukkan PIN yang benar untuk ' . $approver->name . '.'
             ], 422);
         }
 
         return response()->json([
-            'message' => 'Otorisasi Berhasil',
+            'message' => $purpose === 'unlock' ? 'Kunci Layar Berhasil Dibuka' : 'Otorisasi Berhasil',
             'approver_id' => $approver->id,
             'approver_name' => $approver->name,
+            'purpose' => $purpose,
         ]);
     }
 }

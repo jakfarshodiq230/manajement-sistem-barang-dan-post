@@ -4,6 +4,7 @@ import { useSnackbarStore } from '@/stores/snackbar'
 import ApprovalDialog from './ApprovalDialog.vue'
 import ReceiptPrinter from './ReceiptPrinter.vue'
 import AddNewCustomerDrawer from '../customers/AddNewCustomerDrawer.vue'
+import PosLockScreen from './PosLockScreen.vue'
 
 const router = useRouter()
 const ability = useAbility()
@@ -11,10 +12,55 @@ const ability = useAbility()
 const logout = async () => {
   useCookie('accessToken').value = null
   useCookie('userData').value = null
+  sessionStorage.removeItem('pos_screen_locked')
   await router.push('/login')
   localStorage.removeItem('userAbilityRules')
   ability.update([])
 }
+
+// =================== AUTO-LOCK & SCREEN LOCK ===================
+const isScreenLocked = ref(sessionStorage.getItem('pos_screen_locked') === 'true')
+const idleTimeoutMinutes = ref(Number(localStorage.getItem('pos_idle_timeout_min') ?? 2)) // default 2 mins, 0 = disabled
+let idleTimer = null
+
+const activeBranchName = computed(() => {
+  if (!activeBranchId.value || branches.value.length === 0) return 'Cabang POS'
+  const b = branches.value.find(item => item.id === activeBranchId.value)
+  return b ? b.name : 'Cabang POS'
+})
+
+const resetIdleTimer = () => {
+  if (idleTimer) clearTimeout(idleTimer)
+  if (isScreenLocked.value) return
+  if (idleTimeoutMinutes.value > 0) {
+    idleTimer = setTimeout(() => {
+      lockScreen()
+    }, idleTimeoutMinutes.value * 60 * 1000)
+  }
+}
+
+const lockScreen = () => {
+  isScreenLocked.value = true
+  sessionStorage.setItem('pos_screen_locked', 'true')
+  if (idleTimer) clearTimeout(idleTimer)
+}
+
+const unlockScreen = () => {
+  isScreenLocked.value = false
+  sessionStorage.removeItem('pos_screen_locked')
+  resetIdleTimer()
+  setTimeout(() => {
+    focusSearchInput()
+  }, 100)
+}
+
+const onUserActivity = () => {
+  if (!isScreenLocked.value) {
+    resetIdleTimer()
+  }
+}
+
+const activityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll']
 
 const products = ref([])
 const categories = ref([])
@@ -640,11 +686,22 @@ const handleSearchEnter = async () => {
 }
 
 const handleKeyDown = event => {
-  const isFunctionKey = ['F1', 'F2', 'F3', 'F4', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'Escape'].includes(event.key)
+  if (isScreenLocked.value) {
+    return
+  }
+
+  const isFunctionKey = ['F1', 'F2', 'F3', 'F4', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12', 'Escape'].includes(event.key)
   
   if (isFunctionKey) {
     event.preventDefault()
     event.stopPropagation()
+  }
+
+  // F12: Kunci Layar POS Manual
+  if (event.key === 'F12') {
+    lockScreen()
+    snackbar.show('Layar POS dikunci', 'info')
+    return
   }
 
   // F11 / F10: Toggle Layar Penuh (Fullscreen)
@@ -743,11 +800,15 @@ onMounted(() => {
   fetchData()
   window.addEventListener('keydown', handleKeyDown)
   document.addEventListener('fullscreenchange', onFullscreenChange)
+  activityEvents.forEach(evt => window.addEventListener(evt, onUserActivity, { passive: true }))
+  resetIdleTimer()
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
+  activityEvents.forEach(evt => window.removeEventListener(evt, onUserActivity))
+  if (idleTimer) clearTimeout(idleTimer)
 })
 
 let searchTimeout
@@ -1263,6 +1324,17 @@ const startNewTransaction = () => {
           <span class="d-none d-md-inline">{{ isFullscreen ? 'Keluar Fullscreen' : 'Fullscreen' }}</span>
         </button>
 
+        <!-- Kunci Layar Manual Button -->
+        <button
+          type="button"
+          class="pos-top-pill"
+          title="Kunci Layar Kasir POS (F12)"
+          @click="lockScreen"
+        >
+          <VIcon icon="ri-lock-line" size="16" class="text-warning" />
+          <span class="d-none d-md-inline">Kunci (F12)</span>
+        </button>
+
         <!-- Branch Selector -->
         <VAutocomplete
           v-model="activeBranchId"
@@ -1289,6 +1361,13 @@ const startNewTransaction = () => {
             />
           </template>
           <VList density="compact">
+            <VListItem
+              prepend-icon="ri-lock-line"
+              @click="lockScreen"
+            >
+              <VListItemTitle>Kunci Layar (F12)</VListItemTitle>
+            </VListItem>
+            <VDivider class="my-1" />
             <VListItem
               prepend-icon="ri-qr-code-line"
               @click="showCatalogQR"
@@ -1740,6 +1819,10 @@ const startNewTransaction = () => {
         <div class="pos-shortcut-badge cursor-pointer" title="Tekan F11 untuk Layar Penuh" @click="toggleFullscreen">
           <span class="pos-kbd-key text-teal-600 bg-teal-subtle">F11</span>
           <span>Layar Penuh</span>
+        </div>
+        <div class="pos-shortcut-badge cursor-pointer" title="Tekan F12 untuk Kunci Layar Kasir" @click="lockScreen">
+          <span class="pos-kbd-key text-warning bg-warning-subtle">F12</span>
+          <span>Kunci Layar</span>
         </div>
         <div class="pos-shortcut-badge cursor-pointer" title="Tekan ESC untuk membatalkan" @click="cart.length > 0 ? clearCart() : router.push({ name: 'dashboards-analytics' })">
           <span class="pos-kbd-key text-slate-600 bg-slate-subtle">ESC</span>
@@ -2771,6 +2854,18 @@ const startNewTransaction = () => {
       v-model:is-drawer-open="isAddCustomerDrawerVisible"
       :selected-customer="null"
       @save-data="saveCustomer"
+    />
+
+    <!-- Pos Auto-Lock Overlay Screen -->
+    <PosLockScreen
+      :is-locked="isScreenLocked"
+      :user-data="userData"
+      :active-branch-name="activeBranchName"
+      :has-active-shift="hasActiveShift"
+      :cart-count="cart.reduce((sum, item) => sum + (item.qty || 1), 0)"
+      :cart-total="totalAmount"
+      @unlock="unlockScreen"
+      @logout="logout"
     />
   </div>
 </template>

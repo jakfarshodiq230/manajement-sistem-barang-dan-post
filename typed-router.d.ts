@@ -193,6 +193,7 @@ declare module 'vue-router/auto-routes' {
     'pengaturan-struk': RouteRecordInfo<'pengaturan-struk', '/pengaturan-struk', Record<never, never>, Record<never, never>>,
     'pos': RouteRecordInfo<'pos', '/pos', Record<never, never>, Record<never, never>>,
     'pos-approval-dialog': RouteRecordInfo<'pos-approval-dialog', '/pos/ApprovalDialog', Record<never, never>, Record<never, never>>,
+    'pos-pos-lock-screen': RouteRecordInfo<'pos-pos-lock-screen', '/pos/PosLockScreen', Record<never, never>, Record<never, never>>,
     'pos-receipt-printer': RouteRecordInfo<'pos-receipt-printer', '/pos/ReceiptPrinter', Record<never, never>, Record<never, never>>,
     'price-adjustments': RouteRecordInfo<'price-adjustments', '/price-adjustments', Record<never, never>, Record<never, never>>,
     'price-adjustments-add-new-adjustment-drawer': RouteRecordInfo<'price-adjustments-add-new-adjustment-drawer', '/price-adjustments/AddNewAdjustmentDrawer', Record<never, never>, Record<never, never>>,
