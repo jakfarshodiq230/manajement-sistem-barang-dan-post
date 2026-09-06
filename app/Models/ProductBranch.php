@@ -24,8 +24,24 @@ class ProductBranch extends Model
 
     public function getActiveBatchAttribute()
     {
-        $stockMethod = $this->product->stock_method ?? 'fifo';
-        
+        if ($this->relationLoaded('productBatches')) {
+            $batches = $this->productBatches->where('qty', '>', 0);
+            $stockMethod = $this->relationLoaded('product') ? ($this->product->stock_method ?? 'fifo') : 'fifo';
+            if ($stockMethod === 'fefo') {
+                return $batches->sortBy('expiration_date')->first();
+            } elseif ($stockMethod === 'lifo') {
+                return $batches->sortByDesc('entry_date')->first();
+            }
+            return $batches->sortBy('entry_date')->first();
+        }
+
+        $stockMethod = 'fifo';
+        if ($this->relationLoaded('product')) {
+            $stockMethod = $this->product->stock_method ?? 'fifo';
+        } elseif ($this->product_id) {
+            $stockMethod = \Illuminate\Support\Facades\DB::table('products')->where('id', $this->product_id)->value('stock_method') ?? 'fifo';
+        }
+
         $query = $this->productBatches()->where('qty', '>', 0);
         
         if ($stockMethod === 'fefo') {

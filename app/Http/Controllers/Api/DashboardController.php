@@ -89,13 +89,15 @@ class DashboardController extends Controller
             ->sum('discount') ?? 0;
 
         // Monthly Income Chart Data (12 Months)
+        $salesPerMonth = Sale::where('status', 'completed')
+            ->whereYear('date', $thisYear)
+            ->selectRaw('MONTH(date) as month_num, SUM(total_amount) as total')
+            ->groupByRaw('MONTH(date)')
+            ->pluck('total', 'month_num');
+
         $monthlyIncomeChart = [];
         for ($m = 1; $m <= 12; $m++) {
-            $monthIncome = Sale::where('status', 'completed')
-                ->whereMonth('date', $m)
-                ->whereYear('date', $thisYear)
-                ->sum('total_amount');
-            $monthlyIncomeChart[] = (float)$monthIncome;
+            $monthlyIncomeChart[] = (float) ($salesPerMonth[$m] ?? 0);
         }
 
         return response()->json([
@@ -176,15 +178,15 @@ class DashboardController extends Controller
                 $dateStr = $d->format('Y-m-d');
                 $dSales = (clone $query)->whereDate('date', $dateStr)->get();
                 
-                $revenue = $dSales->sum('total_amount');
-                $cogs = 0;
-                foreach ($dSales as $sale) {
-                    $cogs += DB::table('sale_items')->where('sale_id', $sale->id)->sum(DB::raw('cost_price * qty'));
-                }
+                $revenue = (float) $dSales->sum('total_amount');
+                $dSaleIds = $dSales->pluck('id');
+                $cogs = $dSaleIds->isNotEmpty()
+                    ? (float) DB::table('sale_items')->whereIn('sale_id', $dSaleIds)->sum(DB::raw('cost_price * qty'))
+                    : 0;
                 
                 $chartData[] = [
                     'date' => $d->format('D, d M'),
-                    'revenue' => (float)$revenue,
+                    'revenue' => $revenue,
                     'profit' => (float)($revenue - $cogs)
                 ];
             }
@@ -207,15 +209,15 @@ class DashboardController extends Controller
                 $y = $d->year;
                 
                 $mSales = (clone $query)->whereMonth('date', $m)->whereYear('date', $y)->get();
-                $revenue = $mSales->sum('total_amount');
-                $cogs = 0;
-                foreach ($mSales as $sale) {
-                    $cogs += DB::table('sale_items')->where('sale_id', $sale->id)->sum(DB::raw('cost_price * qty'));
-                }
+                $revenue = (float) $mSales->sum('total_amount');
+                $mSaleIds = $mSales->pluck('id');
+                $cogs = $mSaleIds->isNotEmpty()
+                    ? (float) DB::table('sale_items')->whereIn('sale_id', $mSaleIds)->sum(DB::raw('cost_price * qty'))
+                    : 0;
 
                 $chartData[] = [
                     'date' => $d->format('M Y'),
-                    'revenue' => (float)$revenue,
+                    'revenue' => $revenue,
                     'profit' => (float)($revenue - $cogs)
                 ];
             }
@@ -237,15 +239,15 @@ class DashboardController extends Controller
                 $y = $d->year;
                 
                 $mSales = (clone $query)->whereYear('date', $y)->get();
-                $revenue = $mSales->sum('total_amount');
-                $cogs = 0;
-                foreach ($mSales as $sale) {
-                    $cogs += DB::table('sale_items')->where('sale_id', $sale->id)->sum(DB::raw('cost_price * qty'));
-                }
+                $revenue = (float) $mSales->sum('total_amount');
+                $mSaleIds = $mSales->pluck('id');
+                $cogs = $mSaleIds->isNotEmpty()
+                    ? (float) DB::table('sale_items')->whereIn('sale_id', $mSaleIds)->sum(DB::raw('cost_price * qty'))
+                    : 0;
 
                 $chartData[] = [
                     'date' => $d->format('Y'),
-                    'revenue' => (float)$revenue,
+                    'revenue' => $revenue,
                     'profit' => (float)($revenue - $cogs)
                 ];
             }
@@ -255,20 +257,19 @@ class DashboardController extends Controller
         $pastSales = $pastQuery->get();
 
         $curCount = $currentSales->count();
-        $curRevenue = $currentSales->sum('total_amount');
-        
-        $curCogs = 0;
-        foreach ($currentSales as $s) {
-            $curCogs += DB::table('sale_items')->where('sale_id', $s->id)->sum(DB::raw('cost_price * qty'));
-        }
+        $curRevenue = (float) $currentSales->sum('total_amount');
+        $curSaleIds = $currentSales->pluck('id');
+        $curCogs = $curSaleIds->isNotEmpty()
+            ? (float) DB::table('sale_items')->whereIn('sale_id', $curSaleIds)->sum(DB::raw('cost_price * qty'))
+            : 0;
         $curProfit = $curRevenue - $curCogs;
 
         $pastCount = $pastSales->count();
-        $pastRevenue = $pastSales->sum('total_amount');
-        $pastCogs = 0;
-        foreach ($pastSales as $s) {
-            $pastCogs += DB::table('sale_items')->where('sale_id', $s->id)->sum(DB::raw('cost_price * qty'));
-        }
+        $pastRevenue = (float) $pastSales->sum('total_amount');
+        $pastSaleIds = $pastSales->pluck('id');
+        $pastCogs = $pastSaleIds->isNotEmpty()
+            ? (float) DB::table('sale_items')->whereIn('sale_id', $pastSaleIds)->sum(DB::raw('cost_price * qty'))
+            : 0;
         $pastProfit = $pastRevenue - $pastCogs;
 
         $calcGrowth = function($cur, $past) {

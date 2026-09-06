@@ -47,45 +47,85 @@ class Product extends Model
 
     public function getPriceAttribute()
     {
-        $user = auth()->user();
-        if ($user && !empty($user->branch_id)) {
-            $pb = $this->productBranches->where('branch_id', $user->branch_id)->first();
-            if ($pb) return (float) $pb->price;
+        if ($this->relationLoaded('productBranches')) {
+            $user = auth()->user();
+            if ($user && !empty($user->branch_id)) {
+                $pb = $this->productBranches->where('branch_id', $user->branch_id)->first();
+                if ($pb) return (float) $pb->price;
+            }
+            $pb = $this->productBranches->first();
+            return $pb ? (float) $pb->price : 0;
         }
-        $pb = $this->productBranches->first();
-        return $pb ? (float) $pb->price : 0;
+
+        $user = auth()->user();
+        $query = \Illuminate\Support\Facades\DB::table('product_branches')->where('product_id', $this->id);
+        if ($user && !empty($user->branch_id)) {
+            $val = (clone $query)->where('branch_id', $user->branch_id)->value('price');
+            if ($val !== null) return (float) $val;
+        }
+        return (float) ($query->value('price') ?? 0);
     }
 
     public function getCostPriceAttribute()
     {
-        $user = auth()->user();
-        if ($user && !empty($user->branch_id)) {
-            $pb = $this->productBranches->where('branch_id', $user->branch_id)->first();
-            if ($pb) return (float) $pb->cost_price;
+        if ($this->relationLoaded('productBranches')) {
+            $user = auth()->user();
+            if ($user && !empty($user->branch_id)) {
+                $pb = $this->productBranches->where('branch_id', $user->branch_id)->first();
+                if ($pb) return (float) $pb->cost_price;
+            }
+            $pb = $this->productBranches->first();
+            return $pb ? (float) $pb->cost_price : 0;
         }
-        $pb = $this->productBranches->first();
-        return $pb ? (float) $pb->cost_price : 0;
+
+        $user = auth()->user();
+        $query = \Illuminate\Support\Facades\DB::table('product_branches')->where('product_id', $this->id);
+        if ($user && !empty($user->branch_id)) {
+            $val = (clone $query)->where('branch_id', $user->branch_id)->value('cost_price');
+            if ($val !== null) return (float) $val;
+        }
+        return (float) ($query->value('cost_price') ?? 0);
     }
 
     public function getMinNegoPriceAttribute()
     {
-        $user = auth()->user();
-        if ($user && !empty($user->branch_id)) {
-            $pb = $this->productBranches->where('branch_id', $user->branch_id)->first();
-            if ($pb) return (float) $pb->min_nego_price;
+        if ($this->relationLoaded('productBranches')) {
+            $user = auth()->user();
+            if ($user && !empty($user->branch_id)) {
+                $pb = $this->productBranches->where('branch_id', $user->branch_id)->first();
+                if ($pb) return (float) $pb->min_nego_price;
+            }
+            $pb = $this->productBranches->first();
+            return $pb ? (float) $pb->min_nego_price : 0;
         }
-        $pb = $this->productBranches->first();
-        return $pb ? (float) $pb->min_nego_price : 0;
+
+        $user = auth()->user();
+        $query = \Illuminate\Support\Facades\DB::table('product_branches')->where('product_id', $this->id);
+        if ($user && !empty($user->branch_id)) {
+            $val = (clone $query)->where('branch_id', $user->branch_id)->value('min_nego_price');
+            if ($val !== null) return (float) $val;
+        }
+        return (float) ($query->value('min_nego_price') ?? 0);
     }
 
     public function getStockAttribute()
     {
-        $user = auth()->user();
-        if ($user && !empty($user->branch_id)) {
-            $pb = $this->productBranches->where('branch_id', $user->branch_id)->first();
-            if ($pb) return (int) $pb->stock;
+        if ($this->relationLoaded('productBranches')) {
+            $user = auth()->user();
+            if ($user && !empty($user->branch_id)) {
+                $pb = $this->productBranches->where('branch_id', $user->branch_id)->first();
+                if ($pb) return (int) $pb->stock;
+            }
+            return (int) $this->productBranches->sum('stock');
         }
-        return (int) $this->productBranches->sum('stock');
+
+        $user = auth()->user();
+        $query = \Illuminate\Support\Facades\DB::table('product_branches')->where('product_id', $this->id);
+        if ($user && !empty($user->branch_id)) {
+            $val = (clone $query)->where('branch_id', $user->branch_id)->value('stock');
+            if ($val !== null) return (int) $val;
+        }
+        return (int) ($query->sum('stock') ?? 0);
     }
 
     public function getActivitylogOptions(): \Spatie\Activitylog\LogOptions

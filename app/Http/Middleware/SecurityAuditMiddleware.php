@@ -19,23 +19,30 @@ class SecurityAuditMiddleware
     {
         $ip = $this->getClientIp($request);
 
-        // 1. Check if IP is in Blacklist
-        $blocked = BlockedIp::where('ip_address', $ip)
-            ->where(function ($q) {
-                $q->whereNull('blocked_until')
-                  ->orWhere('blocked_until', '>', Carbon::now());
-            })
-            ->first();
+        // 1. Check if IP is in Blacklist (Cached for 60 seconds to avoid DB queries on every request)
+        try {
+            $blockedIps = \Illuminate\Support\Facades\Cache::remember('security_blocked_ips_list', 60, function () {
+                return BlockedIp::whereNull('blocked_until')
+                    ->orWhere('blocked_until', '>', Carbon::now())
+                    ->pluck('ip_address')
+                    ->toArray();
+            });
+        } catch (\Throwable $e) {
+            $blockedIps = [];
+        }
 
-        if ($blocked) {
-            $blocked->increment('attempts_count');
+        if (in_array($ip, $blockedIps)) {
+            $blocked = BlockedIp::where('ip_address', $ip)->first();
+            if ($blocked) {
+                $blocked->increment('attempts_count');
+            }
 
             // Log the blocked attempt
             try {
                 SecurityAccessLog::create([
                     'user_id'          => Auth::id() ?? null,
                     'ip_address'       => $ip,
-                    'user_agent'       => $request->header('User-Agent'),
+                    'user_agent'       => substr((string) $request->header('User-Agent'), 0, 500),
                     'device_type'      => $this->getDeviceType($request->header('User-Agent')),
                     'operating_system' => $this->getOperatingSystem($request->header('User-Agent')),
                     'browser'          => $this->getBrowser($request->header('User-Agent')),
@@ -43,7 +50,7 @@ class SecurityAuditMiddleware
                     'endpoint'         => substr($request->fullUrl(), 0, 500),
                     'method'           => $request->method(),
                     'status_code'      => 403,
-                    'payload'          => json_encode(['blocked_reason' => $blocked->reason]),
+                    'payload'          => json_encode(['blocked_reason' => $blocked ? $blocked->reason : 'Blocked']),
                     'risk_level'       => 'critical',
                     'threat_tags'      => ['banned_ip_attempt', 'auto_blocked'],
                     'is_blocked'       => true,
@@ -64,9 +71,9 @@ class SecurityAuditMiddleware
         // Proceed with request
         $response = $next($request);
 
-        // 3. Post-execution logging (Only for relevant API & Auth paths, ignore assets)
+        // 3. Post-execution logging (Only for mutations, threats, auth events, or errors)
         $path = $request->path();
-        if ($this->shouldLogRequest($path, $request)) {
+        if ($this->shouldLogRequest($path, $request, $response, $threatAnalysis)) {
             $this->logSecurityEvent($request, $response, $ip, $threatAnalysis);
         }
 
@@ -142,9 +149,9 @@ class SecurityAuditMiddleware
     /**
      * Check if request should be recorded
      */
-    protected function shouldLogRequest(string $path, Request $request): bool
+    protected function shouldLogRequest(string $path, Request $request, Response $response, array $threatAnalysis): bool
     {
-        // Ignore static assets
+        // Ignore static assets & build files
         if (preg_match('/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|map)$/i', $path)) {
             return false;
         }
@@ -153,8 +160,29 @@ class SecurityAuditMiddleware
             return false;
         }
 
-        // Log all API requests, Auth routes, or non-GET requests
-        return str_starts_with($path, 'api/') || $request->isMethod('POST') || $request->isMethod('PUT') || $request->isMethod('DELETE');
+        // 1. Always log security threats or attack patterns
+        if ($threatAnalysis['risk'] !== 'low' || !empty($threatAnalysis['tags'])) {
+            return true;
+        }
+
+        // 2. Always log error responses (401 unauthorized, 403 forbidden, 500 error)
+        $statusCode = $response->getStatusCode();
+        if ($statusCode === 401 || $statusCode === 403 || $statusCode >= 500) {
+            return true;
+        }
+
+        // 3. Always log auth routes (login, logout, password reset)
+        if (str_contains($path, 'auth/login') || str_contains($path, 'login') || str_contains($path, 'logout')) {
+            return true;
+        }
+
+        // 4. Always log data mutation requests (POST, PUT, DELETE, PATCH)
+        if ($request->isMethod('POST') || $request->isMethod('PUT') || $request->isMethod('DELETE') || $request->isMethod('PATCH')) {
+            return true;
+        }
+
+        // Harmless routine GET requests (200 OK) are NOT logged to prevent DB bloat & performance lag
+        return false;
     }
 
     /**
