@@ -281,7 +281,7 @@ class StockOpnameController extends Controller
 
         $authorized = false;
         foreach ($managers as $manager) {
-            if ($manager->pos_pin && ($manager->pos_pin === $pin || \Illuminate\Support\Facades\Hash::check($pin, $manager->pos_pin))) {
+            if ($manager->verifyPosPin($pin)) {
                 $authorized = true;
                 break;
             }

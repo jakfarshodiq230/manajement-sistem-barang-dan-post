@@ -27,9 +27,7 @@ class UserController extends Controller
             'pin' => 'nullable|string|digits:6',
         ]);
 
-        $hashedPin = \Illuminate\Support\Facades\Hash::make($pin);
-        $user->pos_pin = $hashedPin;
-        $user->pin = $hashedPin;
+        $user->setEncryptedPin($pin);
         $user->save();
 
         return response()->json([
@@ -152,7 +150,7 @@ class UserController extends Controller
 
             return [
                 'id' => $user->id,
-                'pos_pin' => $user->pos_pin,
+                'pos_pin' => $user->getDecryptedPin(),
                 'fullName' => $user->name,
                 'username' => strtolower(str_replace(' ', '', $user->name)),
                 'email' => $user->email,
@@ -341,11 +339,12 @@ class UserController extends Controller
             $updateData['password'] = Hash::make($request->password);
         }
 
-        if ($request->filled('pos_pin')) {
-            $updateData['pos_pin'] = $request->pos_pin;
-        }
-
         $user->update($updateData);
+
+        if ($request->filled('pos_pin')) {
+            $user->setEncryptedPin($request->pos_pin);
+            $user->save();
+        }
 
         // Sync primary role if specified
         if ($request->has('role')) {

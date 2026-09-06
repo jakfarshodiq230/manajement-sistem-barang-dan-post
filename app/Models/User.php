@@ -105,4 +105,82 @@ class User extends Authenticatable
             return false;
         }
     }
+
+    /**
+     * Decrypt reversible PIN for display to authorized admin
+     */
+    public function getDecryptedPin(): ?string
+    {
+        $raw = $this->pos_pin ?: $this->pin;
+        if (empty($raw)) {
+            return null;
+        }
+
+        // 1. Try Laravel Crypt decryption
+        try {
+            return \Illuminate\Support\Facades\Crypt::decryptString($raw);
+        } catch (\Throwable $e) {
+            // 2. If it's an unhashed plain 4-8 digit string (legacy)
+            if (preg_match('/^\d{4,8}$/', trim($raw))) {
+                return trim($raw);
+            }
+            // 3. If it's an unrecoverable one-way hash ($2y$...), return null so admin can regenerate
+            return null;
+        }
+    }
+
+    /**
+     * Store PIN encrypted using Laravel Crypt
+     */
+    public function setEncryptedPin(?string $pin): void
+    {
+        if (empty($pin)) {
+            $this->pos_pin = null;
+            $this->pin = null;
+        } else {
+            $encrypted = \Illuminate\Support\Facades\Crypt::encryptString(trim($pin));
+            $this->pos_pin = $encrypted;
+            $this->pin = $encrypted;
+        }
+    }
+
+    /**
+     * Verify PIN against encrypted, hashed, or plain value
+     */
+    public function verifyPosPin(string $pinInput): bool
+    {
+        $pinInput = trim($pinInput);
+        $raw = $this->pos_pin ?: $this->pin;
+        if (empty($raw) || empty($pinInput)) {
+            return false;
+        }
+
+        // 1. Try Laravel Crypt decryption
+        try {
+            $decrypted = \Illuminate\Support\Facades\Crypt::decryptString($raw);
+            if ($decrypted === $pinInput) {
+                return true;
+            }
+        } catch (\Throwable $e) {
+            // Not a Crypt string
+        }
+
+        // 2. Try Bcrypt check (legacy one-way hash)
+        if (\Illuminate\Support\Facades\Hash::check($pinInput, $raw)) {
+            // Auto-upgrade to Crypt reversible encryption
+            $this->setEncryptedPin($pinInput);
+            $this->save();
+            return true;
+        }
+
+        // 3. Try plain text comparison (legacy)
+        if ($raw === $pinInput) {
+            // Auto-upgrade to Crypt reversible encryption
+            $this->setEncryptedPin($pinInput);
+            $this->save();
+            return true;
+        }
+
+        return false;
+    }
 }

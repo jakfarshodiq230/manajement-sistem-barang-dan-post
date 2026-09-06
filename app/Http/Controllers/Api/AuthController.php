@@ -144,12 +144,13 @@ class AuthController extends Controller
         ]);
 
         $user = $request->user();
-        $hashedPin = \Illuminate\Support\Facades\Hash::make($request->pin);
-        $user->pos_pin = $hashedPin;
-        $user->pin = $hashedPin;
+        $user->setEncryptedPin($request->pin);
         $user->save();
 
-        return response()->json(['message' => 'PIN berhasil diperbarui']);
+        return response()->json([
+            'message' => 'PIN berhasil diperbarui',
+            'pin' => $request->pin
+        ]);
     }
 
     public function verifyPin(Request $request)
@@ -217,29 +218,13 @@ class AuthController extends Controller
         }
 
         $pinInput = trim((string) $request->pin);
-        $savedPin = trim((string) ($approver->pos_pin ?: $approver->pin ?: ''));
-
-        if (!$savedPin) {
+        if (!$approver->pos_pin && !$approver->pin) {
             return response()->json([
                 'message' => 'PIN otorisasi untuk ' . $approver->name . ' belum diatur. Harap atur PIN terlebih dahulu di Pengaturan Pengguna.'
             ], 400);
         }
 
-        $isValid = false;
-        // 1. Hash check (Bcrypt)
-        if (\Illuminate\Support\Facades\Hash::check($pinInput, $savedPin)) {
-            $isValid = true;
-        }
-        // 2. Direct string match for legacy unhashed PINs, then auto-upgrade to hash
-        elseif ($pinInput === $savedPin) {
-            $isValid = true;
-            $hashedPin = \Illuminate\Support\Facades\Hash::make($pinInput);
-            $approver->pos_pin = $hashedPin;
-            $approver->pin = $hashedPin;
-            $approver->save();
-        }
-
-        if (!$isValid) {
+        if (!$approver->verifyPosPin($pinInput)) {
             return response()->json([
                 'message' => 'PIN salah. Masukkan PIN yang benar untuk ' . $approver->name . '.'
             ], 422);
