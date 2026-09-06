@@ -13,6 +13,7 @@ use App\Models\Branch;
 use App\Models\Owner;
 use App\Services\RedisCacheService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -79,6 +80,7 @@ class PriceAdjustmentController extends Controller
             'effective_date' => 'required|date',
             'branch_id' => 'nullable|exists:branches,id',
             'reason' => 'nullable|string|max:255',
+            'batch_policy' => 'nullable|string|in:all_active,new_only',
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
@@ -98,6 +100,7 @@ class PriceAdjustmentController extends Controller
                 'title' => $validated['title'],
                 'effective_date' => $validated['effective_date'],
                 'reason' => $validated['reason'] ?? 'Penyesuaian Harga Berkala',
+                'batch_policy' => $validated['batch_policy'] ?? 'all_active',
                 'status' => 'draft',
                 'total_items' => count($validated['items']),
                 'created_by' => $user ? $user->id : null,
@@ -163,6 +166,92 @@ class PriceAdjustmentController extends Controller
             'success' => true,
             'data' => $adjustment,
         ]);
+    }
+
+    /**
+     * Update the specified price adjustment (only if in draft status).
+     */
+    public function update(Request $request, $id)
+    {
+        $adjustment = PriceAdjustment::findOrFail($id);
+
+        if ($adjustment->status !== 'draft') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hanya dokumen berstatus DRAFT yang dapat diedit.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'effective_date' => 'required|date',
+            'branch_id' => 'nullable|exists:branches,id',
+            'reason' => 'nullable|string|max:255',
+            'batch_policy' => 'nullable|string|in:all_active,new_only',
+            'notes' => 'nullable|string',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.new_cost_price' => 'nullable|numeric|min:0',
+            'items.*.new_price' => 'required|numeric|min:0',
+            'items.*.new_min_nego_price' => 'nullable|numeric|min:0',
+            'apply_immediately' => 'nullable|boolean',
+        ]);
+
+        return DB::transaction(function () use ($adjustment, $validated, $request) {
+            $user = $request->user();
+
+            $adjustment->update([
+                'branch_id' => $validated['branch_id'] ?? null,
+                'title' => $validated['title'],
+                'effective_date' => $validated['effective_date'],
+                'reason' => $validated['reason'] ?? $adjustment->reason,
+                'batch_policy' => $validated['batch_policy'] ?? ($adjustment->batch_policy ?? 'all_active'),
+                'total_items' => count($validated['items']),
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            // Delete existing items and recreate
+            PriceAdjustmentItem::where('price_adjustment_id', $adjustment->id)->delete();
+
+            foreach ($validated['items'] as $itemData) {
+                $productId = $itemData['product_id'];
+                $branchId = $validated['branch_id'] ?? null;
+
+                $pb = null;
+                if ($branchId) {
+                    $pb = ProductBranch::where('branch_id', $branchId)->where('product_id', $productId)->first();
+                } else {
+                    $pb = ProductBranch::where('product_id', $productId)->first();
+                }
+
+                $oldCostPrice = $itemData['old_cost_price'] ?? ($pb ? (float)$pb->cost_price : 0);
+                $oldPrice = $itemData['old_price'] ?? ($pb ? (float)$pb->price : 0);
+                $oldMinNego = $itemData['old_min_nego_price'] ?? ($pb ? (float)$pb->min_nego_price : 0);
+
+                PriceAdjustmentItem::create([
+                    'price_adjustment_id' => $adjustment->id,
+                    'product_id' => $productId,
+                    'product_branch_id' => $pb ? $pb->id : null,
+                    'old_cost_price' => $oldCostPrice,
+                    'new_cost_price' => $itemData['new_cost_price'] ?? $oldCostPrice,
+                    'old_price' => $oldPrice,
+                    'new_price' => $itemData['new_price'],
+                    'old_min_nego_price' => $oldMinNego,
+                    'new_min_nego_price' => $itemData['new_min_nego_price'] ?? ($itemData['new_price'] * 0.95),
+                    'notes' => $itemData['notes'] ?? null,
+                ]);
+            }
+
+            if (!empty($validated['apply_immediately']) && $validated['apply_immediately'] === true) {
+                $this->executeApply($adjustment, $user);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Dokumen penyesuaian harga berhasil diperbarui',
+                'data' => $adjustment->load('items.product.category', 'branch'),
+            ]);
+        });
     }
 
     /**
@@ -243,13 +332,15 @@ class PriceAdjustmentController extends Controller
                     'min_nego_price' => $newMinNego > 0 ? $newMinNego : $pb->min_nego_price,
                 ]);
 
-                // Update active batches
-                ProductBatch::where('product_branch_id', $pb->id)
-                    ->where('qty', '>', 0)
-                    ->update([
-                        'price' => $newPrice,
-                        'min_nego_price' => $newMinNego > 0 ? $newMinNego : $pb->min_nego_price,
-                    ]);
+                // Update active batches based on batch_policy
+                if (($adjustment->batch_policy ?? 'all_active') === 'all_active') {
+                    ProductBatch::where('product_branch_id', $pb->id)
+                        ->where('qty', '>', 0)
+                        ->update([
+                            'price' => $newPrice,
+                            'min_nego_price' => $newMinNego > 0 ? $newMinNego : $pb->min_nego_price,
+                        ]);
+                }
 
                 // Record audit log into price_histories
                 PriceHistory::create([
@@ -389,6 +480,67 @@ class PriceAdjustmentController extends Controller
             $totalPriceIncrease += $diff;
         }
 
+        $verificationUuid = Str::uuid()->toString();
+        $targetBranchName = $adjustment->branch ? $adjustment->branch->name : 'Seluruh Cabang (Pusat & Cabang)';
+        $batchRuleLabel = ($adjustment->batch_policy ?? 'all_active') === 'all_active' ? 'Seluruh Batch Aktif' : 'Hanya Batch Baru';
+
+        // 1. QR Code Verifikasi Dokumen SK Resmi
+        $docVerifyPayload = "VERIFIKASI SK PENETAPAN HARGA RESMI\n"
+            . "PT. DUMAI BERKAH ABADI\n"
+            . "----------------------------------------\n"
+            . "No. SK        : " . $adjustment->adjustment_number . "\n"
+            . "Judul SK      : " . $adjustment->title . "\n"
+            . "Tgl Efektif   : " . date('d/m/Y', strtotime($adjustment->effective_date)) . "\n"
+            . "Target Cabang : " . $targetBranchName . "\n"
+            . "Total Produk  : " . $totalItems . " SKU\n"
+            . "Aturan Batch  : " . $batchRuleLabel . "\n"
+            . "Status SK     : " . strtoupper($adjustment->status) . " (TERVALIDASI RESMI)\n"
+            . "ID Verifikasi : " . $verificationUuid . "\n"
+            . "Waktu Cetak   : " . now()->format('d/m/Y H:i:s');
+        $documentQrCode = base64_encode(QrCode::format('svg')->size(70)->generate($docVerifyPayload));
+
+        // 2. QR Code TTD Digital Pembuat (Analis / Staf Admin)
+        $creatorName = $adjustment->creator->name ?? 'Staf Administrasi';
+        $creatorPayload = "TANDA TANGAN DIGITAL RESMI - ANALIS HARGA\n"
+            . "----------------------------------------\n"
+            . "Penandatangan : " . $creatorName . "\n"
+            . "Peran / Posisi: Staf Administrasi / Analis Harga\n"
+            . "Dokumen SK    : " . $adjustment->adjustment_number . "\n"
+            . "Waktu Dibuat  : " . $adjustment->created_at->format('d/m/Y H:i:s') . "\n"
+            . "Status TTD    : TERTANDA DIGITAL SAH";
+        $creatorQrCode = base64_encode(QrCode::format('svg')->size(55)->generate($creatorPayload));
+
+        // 3. QR Code TTD Digital Pemeriksa (Ka. Operasional)
+        $reviewerPayload = "TANDA TANGAN DIGITAL RESMI - PEMERIKSA\n"
+            . "----------------------------------------\n"
+            . "Pemeriksa     : Kepala Bagian Operasional Toko\n"
+            . "Dokumen SK    : " . $adjustment->adjustment_number . "\n"
+            . "Hasil Periksa : STRUKTUR HARGA & MARGIN SESUAI\n"
+            . "Status TTD    : TERVERIFIKASI RESMI";
+        $reviewerQrCode = base64_encode(QrCode::format('svg')->size(55)->generate($reviewerPayload));
+
+        // 4. QR Code TTD Digital Pengesah (Owner / Direktur)
+        $approverName = $adjustment->approver->name ?? ($owner->name ?? 'Direktur / Owner');
+        $approverPayload = "PENGESAHAN TANDA TANGAN DIGITAL RESMI\n"
+            . "----------------------------------------\n"
+            . "Pengesah      : " . $approverName . "\n"
+            . "Jabatan       : Owner / Direksi PT. DUMAI\n"
+            . "No. SK        : " . $adjustment->adjustment_number . "\n"
+            . "Waktu Sah     : " . ($adjustment->approved_at ? $adjustment->approved_at->format('d/m/Y H:i:s') : now()->format('d/m/Y H:i:s')) . "\n"
+            . "Status        : DISAHKAN & DITETAPKAN (APPROVED)";
+        $approverQrCode = base64_encode(QrCode::format('svg')->size(55)->generate($approverPayload));
+
+        // 5. QR Code per Item Produk (Scan Barcode/QR Data Barang)
+        $itemQrCodes = [];
+        foreach ($adjustment->items as $item) {
+            $sku = $item->product->sku ?? ('PRD-' . $item->product_id);
+            $itemPayload = "MS.POS - " . ($item->product->name ?? 'Produk') . "\n"
+                . "SKU   : " . $sku . "\n"
+                . "Harga : Rp " . number_format($item->new_price, 0, ',', '.') . "\n"
+                . "SK No : " . $adjustment->adjustment_number;
+            $itemQrCodes[$item->id] = base64_encode(QrCode::format('svg')->size(32)->generate($itemPayload));
+        }
+
         $pdf = Pdf::loadView('pdf.price_adjustment', [
             'adjustment' => $adjustment,
             'owner' => $owner,
@@ -397,7 +549,12 @@ class PriceAdjustmentController extends Controller
             'totalItemsIncreased' => $totalItemsIncreased,
             'totalItemsDecreased' => $totalItemsDecreased,
             'printedAt' => now()->format('d/m/Y H:i:s'),
-            'verificationUuid' => Str::uuid()->toString(),
+            'verificationUuid' => $verificationUuid,
+            'documentQrCode' => $documentQrCode,
+            'creatorQrCode' => $creatorQrCode,
+            'reviewerQrCode' => $reviewerQrCode,
+            'approverQrCode' => $approverQrCode,
+            'itemQrCodes' => $itemQrCodes,
         ])->setPaper('a4', 'portrait');
 
         $filename = "SK_Penetapan_Harga_{$adjustment->adjustment_number}.pdf";

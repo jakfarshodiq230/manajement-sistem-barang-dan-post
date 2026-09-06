@@ -178,18 +178,32 @@
     <!-- Header Perusahaan -->
     <table class="header-table">
         <tr>
-            <td style="width: 70%; vertical-align: middle;">
+            <td style="width: 60%; vertical-align: middle;">
                 <div class="company-name">{{ $owner->company_name ?? $owner->name ?? 'PT. DUMAI BERKAH ABADI' }}</div>
                 <div class="company-info">
                     {{ $owner->address ?? 'Pusat Distribusi & Operasional Toko Retail' }}<br>
                     Telepon: {{ $owner->phone ?? '-' }} | Email: {{ $owner->email ?? '-' }}
                 </div>
             </td>
-            <td style="width: 30%; text-align: right; vertical-align: middle;">
-                <div style="font-size: 8pt; color: #64748b;">DOKUMEN PENETAPAN HARGA</div>
-                <div style="font-size: 10pt; font-weight: bold; font-family: monospace; color: #0f172a;">
-                    {{ $adjustment->adjustment_number }}
-                </div>
+            <td style="width: 40%; text-align: right; vertical-align: middle;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="text-align: right; vertical-align: middle; padding-right: 8px;">
+                            <div style="font-size: 7.5pt; color: #64748b; font-weight: bold; text-transform: uppercase;">SK PENETAPAN HARGA RESMI</div>
+                            <div style="font-size: 9.5pt; font-weight: bold; font-family: monospace; color: #0f172a;">
+                                {{ $adjustment->adjustment_number }}
+                            </div>
+                            <div style="font-size: 7pt; color: #16a34a; font-weight: bold; margin-top: 2px;">
+                                [DOKUMEN TERVALIDASI SISTEM]
+                            </div>
+                        </td>
+                        <td style="width: 50px; text-align: right; vertical-align: middle;">
+                            @if(isset($documentQrCode) && $documentQrCode)
+                                <img src="data:image/svg+xml;base64,{{ $documentQrCode }}" style="width: 48px; height: 48px; border: 1px solid #cbd5e1; padding: 2px; background: #fff;" alt="QR SK" />
+                            @endif
+                        </td>
+                    </tr>
+                </table>
             </td>
         </tr>
     </table>
@@ -227,9 +241,13 @@
             <td class="meta-sep">:</td>
             <td class="meta-val">{{ $adjustment->reason ?? 'Penyesuaian Harga Berkala' }}</td>
 
-            <td class="meta-label">Dibuat Oleh</td>
+            <td class="meta-label">Aturan Batch Fisik</td>
             <td class="meta-sep">:</td>
-            <td class="meta-val">{{ $adjustment->creator->name ?? 'Administrator' }} ({{ $adjustment->created_at->format('d/m/Y') }})</td>
+            <td class="meta-val">
+                <strong style="color: #0369a1;">
+                    {{ ($adjustment->batch_policy ?? 'all_active') === 'all_active' ? 'Seluruh Batch Aktif (Sinkron)' : 'Hanya Batch Baru (Pertahankan Batch Lama)' }}
+                </strong>
+            </td>
         </tr>
     </table>
 
@@ -269,14 +287,15 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th class="text-center" style="width: 25px;">No</th>
-                <th style="width: 80px;">Kode SKU</th>
+                <th class="text-center" style="width: 22px;">No</th>
+                <th style="width: 70px;">Kode SKU</th>
+                <th class="text-center" style="width: 38px;">QR Barcode</th>
                 <th>Nama Produk & Kategori</th>
                 <th class="text-end" style="width: 75px;">HPP Modal</th>
-                <th class="text-end" style="width: 80px;">Harga Lama</th>
-                <th class="text-end" style="width: 85px;">Harga Baru</th>
-                <th class="text-end" style="width: 70px;">Selisih (Rp)</th>
-                <th class="text-end" style="width: 75px;">Min. Nego</th>
+                <th class="text-end" style="width: 75px;">Harga Lama</th>
+                <th class="text-end" style="width: 80px;">Harga Baru</th>
+                <th class="text-end" style="width: 65px;">Selisih (Rp)</th>
+                <th class="text-end" style="width: 70px;">Min. Nego</th>
             </tr>
         </thead>
         <tbody>
@@ -287,7 +306,14 @@
                 @endphp
                 <tr>
                     <td class="text-center">{{ $index + 1 }}</td>
-                    <td class="font-mono">{{ $item->product->sku ?? '-' }}</td>
+                    <td class="font-mono" style="font-size: 7.5pt; font-weight: bold;">{{ $item->product->sku ?? '-' }}</td>
+                    <td class="text-center" style="padding: 2px;">
+                        @if(isset($itemQrCodes[$item->id]))
+                            <img src="data:image/svg+xml;base64,{{ $itemQrCodes[$item->id] }}" style="width: 28px; height: 28px;" alt="QR Item" />
+                        @else
+                            -
+                        @endif
+                    </td>
                     <td>
                         <strong>{{ $item->product->name ?? '-' }}</strong><br>
                         <span class="text-muted" style="font-size: 7pt;">{{ $item->product->category->name ?? 'Umum' }}</span>
@@ -311,20 +337,41 @@
     <table class="sig-table">
         <tr>
             <td>
-                <div>Dibuat & Dianalisis Oleh:</div>
-                <div class="sig-box"></div>
+                <div style="font-weight: 600; color: #475569; margin-bottom: 3px;">Dibuat & Dianalisis Oleh:</div>
+                <div class="sig-box" style="padding: 2px 0;">
+                    @if(isset($creatorQrCode) && $creatorQrCode)
+                        <img src="data:image/svg+xml;base64,{{ $creatorQrCode }}" style="width: 45px; height: 45px;" alt="QR TTD Pembuat" />
+                        <div style="font-size: 6pt; color: #16a34a; font-weight: bold;">[TERTANDA DIGITAL]</div>
+                    @else
+                        <div style="height: 45px;"></div>
+                    @endif
+                </div>
                 <div class="sig-name">{{ $adjustment->creator->name ?? 'Staf Administrasi' }}</div>
                 <div class="sig-title">Staf Administrasi / Analis Harga</div>
             </td>
             <td>
-                <div>Diperiksa Oleh:</div>
-                <div class="sig-box"></div>
+                <div style="font-weight: 600; color: #475569; margin-bottom: 3px;">Diperiksa Oleh:</div>
+                <div class="sig-box" style="padding: 2px 0;">
+                    @if(isset($reviewerQrCode) && $reviewerQrCode)
+                        <img src="data:image/svg+xml;base64,{{ $reviewerQrCode }}" style="width: 45px; height: 45px;" alt="QR TTD Pemeriksa" />
+                        <div style="font-size: 6pt; color: #2563eb; font-weight: bold;">[TERVERIFIKASI]</div>
+                    @else
+                        <div style="height: 45px;"></div>
+                    @endif
+                </div>
                 <div class="sig-name">Kepala Bagian Operasional</div>
                 <div class="sig-title">Manajer Operasional Toko</div>
             </td>
             <td>
-                <div>Disahkan & Ditetapkan Oleh:</div>
-                <div class="sig-box"></div>
+                <div style="font-weight: 600; color: #475569; margin-bottom: 3px;">Disahkan & Ditetapkan Oleh:</div>
+                <div class="sig-box" style="padding: 2px 0;">
+                    @if(isset($approverQrCode) && $approverQrCode)
+                        <img src="data:image/svg+xml;base64,{{ $approverQrCode }}" style="width: 45px; height: 45px;" alt="QR TTD Pengesah" />
+                        <div style="font-size: 6pt; color: #16a34a; font-weight: bold;">[DISAHKAN RESMI]</div>
+                    @else
+                        <div style="height: 45px;"></div>
+                    @endif
+                </div>
                 <div class="sig-name">{{ $adjustment->approver->name ?? $owner->name ?? 'Owner / Direktur' }}</div>
                 <div class="sig-title">Owner / Direksi PT. DUMAI</div>
             </td>
@@ -340,7 +387,7 @@
                     ID Verifikasi Sistem: <span class="font-mono">{{ $verificationUuid }}</span> | Dicetak pada: {{ $printedAt }}
                 </td>
                 <td style="text-align: right; font-size: 7.5pt; color: #64748b;">
-                    Halaman 1 dari 1
+                    Dokumen Otentik &bull; PT. DUMAI BERKAH ABADI
                 </td>
             </tr>
         </table>

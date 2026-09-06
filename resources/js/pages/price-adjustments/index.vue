@@ -35,6 +35,7 @@ const itemsPerPageDoc = ref(10)
 const isAddDrawerVisible = ref(false)
 const isDetailDialogVisible = ref(false)
 const selectedAdjustmentId = ref(null)
+const editingAdjustment = ref(null)
 
 const docHeaders = [
   { title: 'NO. DOKUMEN / SK', key: 'adjustment_number', sortable: false },
@@ -191,6 +192,27 @@ watch(activeTab, tab => {
 })
 
 // Actions
+const openCreateDrawer = () => {
+  editingAdjustment.value = null
+  isAddDrawerVisible.value = true
+}
+
+const editDraft = async item => {
+  try {
+    const res = await $api(`/apps/price-adjustments/${item.id}`)
+    editingAdjustment.value = res.data
+    isAddDrawerVisible.value = true
+  } catch (e) {
+    console.error(e)
+    snackbar.showSnackbar('Gagal memuat dokumen untuk diedit', 'error')
+  }
+}
+
+const handleEditFromDetail = adj => {
+  isDetailDialogVisible.value = false
+  editDraft(adj)
+}
+
 const viewDetail = item => {
   selectedAdjustmentId.value = item.id
   isDetailDialogVisible.value = true
@@ -280,7 +302,7 @@ onMounted(() => {
             <VBtn
               color="primary"
               prepend-icon="ri-add-line"
-              @click="isAddDrawerVisible = true"
+              @click="openCreateDrawer"
             >
               Buat Penyesuaian Harga Baru
             </VBtn>
@@ -448,6 +470,16 @@ onMounted(() => {
               />
 
               <VBtn
+                v-if="item.status === 'draft'"
+                icon="ri-edit-line"
+                size="small"
+                variant="text"
+                color="primary"
+                title="Edit Usulan Draft"
+                @click="editDraft(item)"
+              />
+
+              <VBtn
                 icon="ri-file-pdf-2-line"
                 size="small"
                 variant="text"
@@ -480,14 +512,14 @@ onMounted(() => {
     </div>
 
     <!-- TAB 2: RIWAYAT PERUBAHAN HARGA (AUDIT TRAIL) -->
-    <div v-if="activeTab === 'history'">
+    <div v-else-if="activeTab === 'history'">
       <!-- Filter Toolbar -->
       <VCard elevation="0" class="border rounded-lg mb-4 pa-4 bg-var-theme-surface">
         <VRow dense align="center">
           <VCol cols="12" sm="4">
             <VTextField
               v-model="searchHistory"
-              placeholder="Cari Nama Produk / SKU / No. Dokumen / Alasan..."
+              placeholder="Cari SKU / Nama Produk / No. SK..."
               prepend-inner-icon="ri-search-line"
               density="compact"
               variant="outlined"
@@ -499,10 +531,10 @@ onMounted(() => {
           <VCol cols="12" sm="3">
             <VSelect
               v-model="selectedHistoryBranch"
-              :items="[{ id: 'all', name: 'Semua Cabang' }, ...branches]"
+              :items="[{ id: 'all', name: 'Semua Cabang Toko' }, ...branches]"
               item-title="name"
               item-value="id"
-              label="Filter Cabang"
+              label="Cabang"
               density="compact"
               variant="outlined"
               hide-details
@@ -520,7 +552,7 @@ onMounted(() => {
             />
           </VCol>
 
-          <VCol cols="12" sm="2">
+          <VCol cols="12" sm="3">
             <VTextField
               v-model="historyEndDate"
               type="date"
@@ -528,16 +560,6 @@ onMounted(() => {
               density="compact"
               variant="outlined"
               hide-details
-            />
-          </VCol>
-
-          <VCol cols="12" sm="1">
-            <VBtn
-              icon="ri-refresh-line"
-              variant="tonal"
-              color="secondary"
-              density="compact"
-              @click="fetchHistories"
             />
           </VCol>
         </VRow>
@@ -557,12 +579,15 @@ onMounted(() => {
         >
           <!-- Tanggal Efektif -->
           <template #item.effective_date="{ item }">
-            <div class="font-weight-medium text-body-2">{{ formatDate(item.effective_date) }}</div>
+            <div class="font-weight-medium text-body-2">
+              {{ formatDate(item.effective_date) }}
+            </div>
+            <div class="text-caption text-medium-emphasis">Tercatat: {{ formatDate(item.created_at) }}</div>
           </template>
 
           <!-- No. Dokumen -->
           <template #item.adjustment_number="{ item }">
-            <span class="font-mono text-caption text-primary font-weight-bold">
+            <span class="font-mono text-caption font-weight-bold text-secondary">
               {{ item.adjustment_number || '-' }}
             </span>
           </template>
@@ -571,27 +596,27 @@ onMounted(() => {
           <template #item.product="{ item }">
             <div class="font-weight-bold text-body-2">{{ item.product?.name || '-' }}</div>
             <div class="text-caption font-mono text-medium-emphasis">
-              {{ item.product?.sku || '-' }} • {{ item.product?.category?.name || 'Umum' }}
+              {{ item.product?.sku || '-' }} &bull; {{ item.product?.category?.name || 'Umum' }}
             </div>
           </template>
 
           <!-- Cabang -->
           <template #item.branch="{ item }">
-            <VChip size="x-small" variant="tonal" color="info">
-              {{ item.branch?.name || 'Semua Cabang' }}
+            <VChip size="small" variant="tonal" color="info">
+              {{ item.branch ? item.branch.name : 'Semua Cabang' }}
             </VChip>
           </template>
 
           <!-- HPP Modal -->
           <template #item.cost_price="{ item }">
-            <div class="font-mono text-caption text-medium-emphasis">
-              {{ formatCurrency(item.new_cost_price) }}
+            <div class="font-mono text-body-2 text-medium-emphasis">
+              {{ formatCurrency(item.new_cost_price || item.old_cost_price) }}
             </div>
           </template>
 
           <!-- Harga Lama -->
           <template #item.old_price="{ item }">
-            <div class="font-mono text-caption text-medium-emphasis">
+            <div class="font-mono text-body-2 text-medium-emphasis text-decoration-line-through">
               {{ formatCurrency(item.old_price) }}
             </div>
           </template>
@@ -642,9 +667,10 @@ onMounted(() => {
       </VCard>
     </div>
 
-    <!-- Add Drawer Component -->
+    <!-- Add / Edit Drawer Component -->
     <AddNewAdjustmentDrawer
       v-model:is-drawer-open="isAddDrawerVisible"
+      :adjustment-to-edit="editingAdjustment"
       :branches="branches"
       :categories="categories"
       @saved="fetchDocuments"
@@ -655,6 +681,7 @@ onMounted(() => {
       v-model:is-dialog-visible="isDetailDialogVisible"
       :adjustment-id="selectedAdjustmentId"
       @applied="onAdjustmentApplied"
+      @edit="handleEditFromDetail"
     />
   </div>
 </template>

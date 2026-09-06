@@ -8,6 +8,10 @@ const props = defineProps({
     type: Boolean,
     required: true,
   },
+  adjustmentToEdit: {
+    type: Object,
+    default: null,
+  },
   branches: {
     type: Array,
     default: () => [],
@@ -35,18 +39,47 @@ const title = ref('')
 const effectiveDate = ref(new Date().toISOString().substring(0, 10))
 const selectedBranch = ref('all')
 const reason = ref('Kenaikan Harga Resmi Supplier')
+const batchPolicy = ref('all_active') // 'all_active' or 'new_only'
 const notes = ref('')
 const applyImmediately = ref(true)
 
 // Bulk Calculator State
 const selectedCategory = ref(null)
-const bulkType = ref('percent') // 'percent', 'nominal', 'margin_from_cost'
+const bulkType = ref('percent_up') // 'percent_up', 'percent_down', 'nominal_up', 'nominal_down', 'margin_from_cost'
 const bulkValue = ref(5)
 
 // Product Selection and Item Rows
 const searchProduct = ref('')
 const searchResults = ref([])
 const items = ref([])
+
+// Item Table Pagination & Filter State
+const itemSearch = ref('')
+const itemPage = ref(1)
+const itemPerPage = ref(10)
+
+const filteredItems = computed(() => {
+  if (!itemSearch.value) return items.value
+  const q = itemSearch.value.toLowerCase().trim()
+  return items.value.filter(i => 
+    i.name?.toLowerCase().includes(q) || 
+    i.sku?.toLowerCase().includes(q) ||
+    i.category_name?.toLowerCase().includes(q)
+  )
+})
+
+const totalItemPages = computed(() => {
+  return Math.ceil(filteredItems.value.length / itemPerPage.value) || 1
+})
+
+const paginatedItems = computed(() => {
+  const start = (itemPage.value - 1) * itemPerPage.value
+  return filteredItems.value.slice(start, start + itemPerPage.value)
+})
+
+watch(itemSearch, () => {
+  itemPage.value = 1
+})
 
 const reasonOptions = [
   'Kenaikan Harga Resmi Supplier / Pabrik',
@@ -68,7 +101,14 @@ const formatRupiahNumber = val => {
 }
 
 const parseRupiahInput = val => {
-  if (!val) return 0
+  if (val === null || val === undefined || val === '') return 0
+  if (typeof val === 'object') {
+    if (val.target && val.target.value !== undefined) {
+      val = val.target.value
+    } else {
+      return 0
+    }
+  }
   const clean = String(val).replace(/[^0-9]/g, '')
   return clean ? Number(clean) : 0
 }
@@ -83,15 +123,50 @@ const formatCurrency = val => {
 
 // Reset form
 const resetForm = () => {
-  title.value = `Penyesuaian Harga Periode ${new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}`
-  effectiveDate.value = new Date().toISOString().substring(0, 10)
-  selectedBranch.value = 'all'
-  reason.value = 'Kenaikan Harga Resmi Supplier / Pabrik'
-  notes.value = ''
-  applyImmediately.value = true
-  items.value = []
+  if (props.adjustmentToEdit) {
+    const adj = props.adjustmentToEdit
+    title.value = adj.title || ''
+    effectiveDate.value = adj.effective_date ? String(adj.effective_date).substring(0, 10) : new Date().toISOString().substring(0, 10)
+    selectedBranch.value = adj.branch_id || 'all'
+    reason.value = adj.reason || 'Kenaikan Harga Resmi Supplier / Pabrik'
+    batchPolicy.value = adj.batch_policy || 'all_active'
+    notes.value = adj.notes || ''
+    applyImmediately.value = false
+
+    items.value = (adj.items || []).map(i => {
+      const prod = i.product || {}
+      return {
+        product_id: i.product_id,
+        sku: prod.sku || prod.code || '-',
+        name: prod.name || '-',
+        category_name: prod.category?.name || 'Umum',
+        active_batches_count: 0,
+        old_cost_price: Number(i.old_cost_price || 0),
+        new_cost_price: Number(i.new_cost_price || i.old_cost_price || 0),
+        old_price: Number(i.old_price || 0),
+        new_price: Number(i.new_price || 0),
+        new_price_display: formatRupiahNumber(Number(i.new_price || 0)),
+        old_min_nego_price: Number(i.old_min_nego_price || 0),
+        new_min_nego_price: Number(i.new_min_nego_price || 0),
+        new_min_nego_display: formatRupiahNumber(Number(i.new_min_nego_price || 0)),
+        is_nego_customized: true,
+        notes: i.notes || '',
+      }
+    })
+  } else {
+    title.value = `Penyesuaian Harga Periode ${new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}`
+    effectiveDate.value = new Date().toISOString().substring(0, 10)
+    selectedBranch.value = 'all'
+    reason.value = 'Kenaikan Harga Resmi Supplier / Pabrik'
+    batchPolicy.value = 'all_active'
+    notes.value = ''
+    applyImmediately.value = true
+    items.value = []
+  }
   searchProduct.value = ''
   searchResults.value = []
+  itemSearch.value = ''
+  itemPage.value = 1
 }
 
 watch(() => props.isDrawerOpen, val => {
@@ -133,6 +208,7 @@ const resolveProductPrice = product => {
   let price = Number(product.price || 0)
   let cost = Number(product.cost_price || product.unit_cost || 0)
   let minNego = Number(product.min_nego_price || 0)
+  let activeBatchesCount = 0
 
   if (selectedBranch.value && selectedBranch.value !== 'all' && pbs.length > 0) {
     const matchedPb = pbs.find(pb => String(pb.branch_id) === String(selectedBranch.value))
@@ -140,6 +216,7 @@ const resolveProductPrice = product => {
       if (Number(matchedPb.price) > 0) price = Number(matchedPb.price)
       if (Number(matchedPb.cost_price) > 0) cost = Number(matchedPb.cost_price)
       if (Number(matchedPb.min_nego_price) > 0) minNego = Number(matchedPb.min_nego_price)
+      activeBatchesCount = matchedPb.product_batches ? matchedPb.product_batches.filter(b => b.qty > 0).length : 0
     }
   }
 
@@ -152,21 +229,30 @@ const resolveProductPrice = product => {
     }
   }
 
+  if (activeBatchesCount === 0 && pbs.length > 0) {
+    pbs.forEach(pb => {
+      if (pb.product_batches) {
+        activeBatchesCount += pb.product_batches.filter(b => b.qty > 0).length
+      }
+    })
+  }
+
   if (minNego === 0 && price > 0) {
     minNego = Math.round(price * 0.95)
   }
 
-  return { price, cost, minNego }
+  return { price, cost, minNego, activeBatchesCount }
 }
 
 const addProductToItems = product => {
-  const { price: defaultPrice, cost: defaultCost, minNego: defaultMinNego } = resolveProductPrice(product)
+  const { price: defaultPrice, cost: defaultCost, minNego: defaultMinNego, activeBatchesCount } = resolveProductPrice(product)
 
   items.value.push({
     product_id: product.id,
     sku: product.sku || product.code,
     name: product.name,
     category_name: product.category?.name || 'Umum',
+    active_batches_count: activeBatchesCount,
     old_cost_price: defaultCost,
     new_cost_price: defaultCost,
     old_price: defaultPrice,
@@ -216,28 +302,38 @@ const loadProductsByCategory = async () => {
   }
 }
 
-const removeItem = index => {
-  items.value.splice(index, 1)
-}
-
-// Handle price input changes
-const onNewPriceInput = (item, event) => {
-  const val = event.target.value
-  const num = parseRupiahInput(val)
-  item.new_price = num
-  item.new_price_display = num ? formatRupiahNumber(num) : ''
-  // Auto suggest min nego price as 95% of new price if not customized
-  if (!item.is_nego_customized) {
-    item.new_min_nego_price = Math.round(num * 0.95)
-    item.new_min_nego_display = formatRupiahNumber(item.new_min_nego_price)
+const removeItem = item => {
+  const index = items.value.indexOf(item)
+  if (index > -1) {
+    items.value.splice(index, 1)
   }
 }
 
-const onNewMinNegoInput = (item, event) => {
-  const val = event.target.value
+// Handle price input changes
+const onNewPriceInput = (item, valOrEvent) => {
+  let val = valOrEvent
+  if (valOrEvent && typeof valOrEvent === 'object' && valOrEvent.target) {
+    val = valOrEvent.target.value
+  }
+  const num = parseRupiahInput(val)
+  item.new_price = num
+  item.new_price_display = num > 0 ? formatRupiahNumber(num) : (val === '' ? '' : '0')
+
+  // Auto suggest min nego price as 95% of new price if not customized
+  if (!item.is_nego_customized) {
+    item.new_min_nego_price = Math.round(num * 0.95)
+    item.new_min_nego_display = item.new_min_nego_price > 0 ? formatRupiahNumber(item.new_min_nego_price) : ''
+  }
+}
+
+const onNewMinNegoInput = (item, valOrEvent) => {
+  let val = valOrEvent
+  if (valOrEvent && typeof valOrEvent === 'object' && valOrEvent.target) {
+    val = valOrEvent.target.value
+  }
   const num = parseRupiahInput(val)
   item.new_min_nego_price = num
-  item.new_min_nego_display = num ? formatRupiahNumber(num) : ''
+  item.new_min_nego_display = num > 0 ? formatRupiahNumber(num) : (val === '' ? '' : '0')
   item.is_nego_customized = true
 }
 
@@ -310,6 +406,7 @@ const onSubmit = async () => {
       effective_date: effectiveDate.value,
       branch_id: selectedBranch.value !== 'all' ? selectedBranch.value : null,
       reason: reason.value,
+      batch_policy: batchPolicy.value,
       notes: notes.value,
       apply_immediately: applyImmediately.value,
       items: items.value.map(i => ({
@@ -324,23 +421,27 @@ const onSubmit = async () => {
       })),
     }
 
-    const res = await $api('/apps/price-adjustments', {
-      method: 'POST',
+    const isEdit = !!props.adjustmentToEdit?.id
+    const endpoint = isEdit ? `/apps/price-adjustments/${props.adjustmentToEdit.id}` : '/apps/price-adjustments'
+    const method = isEdit ? 'PUT' : 'POST'
+
+    const res = await $api(endpoint, {
+      method,
       body: payload,
     })
 
     if (res.success) {
       snackbar.showSnackbar(
-        applyImmediately.value
-          ? 'Penyesuaian harga berhasil disimpan dan disahkan ke kasir!'
-          : 'Draft penyesuaian harga berhasil disimpan.',
+        isEdit
+          ? (applyImmediately.value ? 'Penyesuaian harga berhasil diperbarui dan disahkan ke kasir!' : 'Perubahan draft penyesuaian harga berhasil disimpan.')
+          : (applyImmediately.value ? 'Penyesuaian harga berhasil disimpan dan disahkan ke kasir!' : 'Draft penyesuaian harga berhasil disimpan.'),
         'success'
       )
       emit('saved')
       handleClose()
     }
   } catch (err) {
-    console.error('Error creating price adjustment:', err)
+    console.error('Error saving price adjustment:', err)
     snackbar.showSnackbar(err?.response?._data?.message || 'Gagal menyimpan penyesuaian harga.', 'error')
   } finally {
     isSaving.value = false
@@ -365,7 +466,7 @@ const onSubmit = async () => {
         </VAvatar>
         <div>
           <h6 class="text-h6 font-weight-bold text-high-emphasis">
-            Buat Penyesuaian Harga Periode
+            {{ props.adjustmentToEdit ? `Edit Dokumen Penyesuaian (${props.adjustmentToEdit.adjustment_number})` : 'Buat Penyesuaian Harga Periode' }}
           </h6>
           <p class="text-caption text-medium-emphasis mb-0">
             Tetapkan harga jual resmi & batas nego baru untuk periode tertentu dengan rekam jejak audit.
@@ -425,6 +526,48 @@ const onSubmit = async () => {
                 variant="outlined"
                 :rules="[v => !!v || 'Alasan wajib diisi']"
               />
+            </VCol>
+
+            <!-- Aturan Harga Batch Fisik -->
+            <VCol cols="12">
+              <VCard elevation="0" class="border rounded-lg pa-4 bg-var-theme-surface">
+                <div class="d-flex align-center gap-2 mb-2">
+                  <VIcon icon="ri-stack-line" color="primary" size="20" />
+                  <span class="font-weight-bold text-subtitle-2">Aturan Penyesuaian Harga Batch Fisik (Stok yang Ada)</span>
+                </div>
+                <p class="text-caption text-medium-emphasis mb-3">
+                  Tentukan bagaimana harga baru ini diterapkan pada batch stok fisik yang saat ini ada di gudang & rak toko:
+                </p>
+
+                <VRadioGroup v-model="batchPolicy" inline hide-details class="gap-4">
+                  <VRadio value="all_active">
+                    <template #label>
+                      <div class="py-1">
+                        <div class="text-body-2 font-weight-medium text-high-emphasis d-flex align-center gap-1">
+                          <span>Sinkronkan ke Seluruh Batch Aktif</span>
+                          <VChip size="x-small" color="success" variant="tonal">Rekomendasi</VChip>
+                        </div>
+                        <div class="text-caption text-medium-emphasis">
+                          Stok lama otomatis dijual kasir dengan harga baru tanpa perlu update harga manual per batch.
+                        </div>
+                      </div>
+                    </template>
+                  </VRadio>
+
+                  <VRadio value="new_only" class="mt-2 mt-md-0">
+                    <template #label>
+                      <div class="py-1">
+                        <div class="text-body-2 font-weight-medium text-high-emphasis">
+                          Hanya Berlaku untuk Batch Masuk Baru
+                        </div>
+                        <div class="text-caption text-medium-emphasis">
+                          Stok batch lama tetap di harga lama sampai terjual habis. Batch baru menggunakan harga ini.
+                        </div>
+                      </div>
+                    </template>
+                  </VRadio>
+                </VRadioGroup>
+              </VCard>
             </VCol>
 
             <!-- Catatan Memo -->
@@ -557,20 +700,38 @@ const onSubmit = async () => {
 
             <!-- Product Items Table -->
             <VCol cols="12">
-              <div class="d-flex align-center justify-space-between mb-2">
-                <span class="font-weight-bold text-subtitle-2">
-                  Daftar Produk Disesuaikan ({{ items.length }} SKU)
-                </span>
-                <VBtn
-                  v-if="items.length > 0"
-                  variant="text"
-                  color="error"
-                  size="small"
-                  prepend-icon="ri-delete-bin-line"
-                  @click="items = []"
-                >
-                  Kosongkan Daftar
-                </VBtn>
+              <div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-2">
+                <div class="d-flex align-center gap-2">
+                  <span class="font-weight-bold text-subtitle-2">
+                    Daftar Produk Disesuaikan ({{ items.length }} SKU)
+                  </span>
+                  <VChip v-if="itemSearch && filteredItems.length !== items.length" size="x-small" color="primary" variant="tonal">
+                    Filter: {{ filteredItems.length }} ditemukan
+                  </VChip>
+                </div>
+                <div class="d-flex align-center gap-2">
+                  <VTextField
+                    v-if="items.length > 5"
+                    v-model="itemSearch"
+                    placeholder="Filter di tabel..."
+                    density="compact"
+                    variant="outlined"
+                    prepend-inner-icon="ri-filter-3-line"
+                    hide-details
+                    style="inline-size: 200px;"
+                    clearable
+                  />
+                  <VBtn
+                    v-if="items.length > 0"
+                    variant="text"
+                    color="error"
+                    size="small"
+                    prepend-icon="ri-delete-bin-line"
+                    @click="items = []"
+                  >
+                    Kosongkan Daftar
+                  </VBtn>
+                </div>
               </div>
 
               <div class="border rounded-lg overflow-hidden shadow-xs">
@@ -579,6 +740,7 @@ const onSubmit = async () => {
                     <tr>
                       <th class="text-caption font-weight-bold" style="inline-size: 40px;">NO</th>
                       <th class="text-caption font-weight-bold" style="min-inline-size: 200px;">PRODUK & SKU</th>
+                      <th class="text-caption font-weight-bold text-center" style="min-inline-size: 100px;">BATCH AKTIF</th>
                       <th class="text-caption font-weight-bold text-end" style="min-inline-size: 110px;">HARGA LAMA</th>
                       <th class="text-caption font-weight-bold text-end" style="min-inline-size: 170px;">HARGA BARU (JUAL) *</th>
                       <th class="text-caption font-weight-bold text-end" style="min-inline-size: 110px;">SELISIH</th>
@@ -588,20 +750,38 @@ const onSubmit = async () => {
                   </thead>
                   <tbody>
                     <tr v-if="items.length === 0">
-                      <td colspan="7" class="text-center py-8 text-medium-emphasis">
+                      <td colspan="8" class="text-center py-8 text-medium-emphasis">
                         <VIcon icon="ri-price-tag-3-line" size="32" class="mb-2 text-disabled d-block mx-auto" />
                         Belum ada produk yang dimasukkan ke dokumen penyesuaian harga ini.
                       </td>
                     </tr>
-                    <tr v-for="(item, idx) in items" :key="item.product_id">
-                      <td class="text-center font-mono text-caption text-medium-emphasis">{{ idx + 1 }}</td>
+                    <tr v-else-if="paginatedItems.length === 0">
+                      <td colspan="8" class="text-center py-6 text-medium-emphasis">
+                        Tidak ada produk yang cocok dengan pencarian filter "{{ itemSearch }}".
+                      </td>
+                    </tr>
+                    <tr v-for="(item, idx) in paginatedItems" :key="item.product_id">
+                      <td class="text-center font-mono text-caption text-medium-emphasis">
+                        {{ (itemPage - 1) * itemPerPage + idx + 1 }}
+                      </td>
                       <td class="py-2">
-                        <div class="font-weight-bold text-body-2 text-truncate" style="max-inline-size: 240px;" :title="item.name">
+                        <div class="font-weight-bold text-body-2 text-truncate" style="max-inline-size: 220px;" :title="item.name">
                           {{ item.name }}
                         </div>
                         <div class="text-caption font-mono text-medium-emphasis">
                           {{ item.sku }} • {{ item.category_name }}
                         </div>
+                      </td>
+                      <td class="text-center">
+                        <VChip
+                          size="x-small"
+                          :color="item.active_batches_count > 0 ? 'info' : 'secondary'"
+                          variant="tonal"
+                          class="font-weight-medium"
+                        >
+                          <VIcon icon="ri-stack-line" size="12" class="me-1" />
+                          {{ item.active_batches_count }} Batch
+                        </VChip>
                       </td>
                       <td class="text-end font-mono text-body-2 text-medium-emphasis">
                         {{ formatCurrency(item.old_price) }}
@@ -615,6 +795,7 @@ const onSubmit = async () => {
                           class="font-mono font-weight-bold price-input"
                           style="min-inline-size: 155px;"
                           hide-details
+                          @update:model-value="val => onNewPriceInput(item, val)"
                           @input="e => onNewPriceInput(item, e)"
                         />
                       </td>
@@ -636,6 +817,7 @@ const onSubmit = async () => {
                           class="font-mono price-input"
                           style="min-inline-size: 145px;"
                           hide-details
+                          @update:model-value="val => onNewMinNegoInput(item, val)"
                           @input="e => onNewMinNegoInput(item, e)"
                         />
                       </td>
@@ -646,12 +828,39 @@ const onSubmit = async () => {
                           variant="text"
                           color="error"
                           title="Hapus produk"
-                          @click="removeItem(idx)"
+                          @click="removeItem(item)"
                         />
                       </td>
                     </tr>
                   </tbody>
                 </VTable>
+
+                <!-- Table Pagination Bar -->
+                <div v-if="filteredItems.length > 0" class="d-flex flex-wrap align-center justify-space-between gap-2 pa-3 bg-var-theme-surface border-t">
+                  <div class="d-flex align-center gap-2">
+                    <span class="text-caption text-medium-emphasis">Baris per halaman:</span>
+                    <VSelect
+                      v-model="itemPerPage"
+                      :items="[10, 25, 50, 100]"
+                      density="compact"
+                      variant="outlined"
+                      hide-details
+                      style="inline-size: 80px;"
+                    />
+                    <span class="text-caption text-medium-emphasis ms-2">
+                      Menampilkan {{ ((itemPage - 1) * itemPerPage) + 1 }} - {{ Math.min(itemPage * itemPerPage, filteredItems.length) }} dari {{ filteredItems.length }} SKU
+                    </span>
+                  </div>
+
+                  <VPagination
+                    v-if="totalItemPages > 1"
+                    v-model="itemPage"
+                    :length="totalItemPages"
+                    :total-visible="4"
+                    density="compact"
+                    size="small"
+                  />
+                </div>
               </div>
             </VCol>
 

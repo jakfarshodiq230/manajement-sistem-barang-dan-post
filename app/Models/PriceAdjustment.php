@@ -15,6 +15,7 @@ class PriceAdjustment extends Model
         'title',
         'effective_date',
         'reason',
+        'batch_policy',
         'status',
         'total_items',
         'created_by',

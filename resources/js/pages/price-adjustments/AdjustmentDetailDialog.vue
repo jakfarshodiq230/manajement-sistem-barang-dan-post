@@ -17,6 +17,7 @@ const emit = defineEmits([
   'update:isDialogVisible',
   'close',
   'applied',
+  'edit',
 ])
 
 const snackbar = useSnackbarStore()
@@ -174,6 +175,12 @@ const cancelAdjustment = async () => {
     snackbar.showSnackbar('Gagal membatalkan dokumen', 'error')
   } finally {
     isCancelling.value = false
+  }
+}
+
+const editAdjustment = () => {
+  if (adjustment.value) {
+    emit('edit', adjustment.value)
   }
 }
 </script>
@@ -380,6 +387,16 @@ const cancelAdjustment = async () => {
             @click="cancelAdjustment"
           >
             Batalkan Dokumen
+          </VBtn>
+
+          <VBtn
+            v-if="adjustment?.status === 'draft'"
+            color="primary"
+            variant="tonal"
+            prepend-icon="ri-edit-line"
+            @click="editAdjustment"
+          >
+            Edit Dokumen
           </VBtn>
 
           <VBtn
