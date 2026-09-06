@@ -18,6 +18,7 @@ class GoodsReceiptController extends Controller
             'user',
             'validator',
             'approver',
+            'checkerEmployee',
             'items.productBranch.product'
         ]);
         
@@ -31,6 +32,10 @@ class GoodsReceiptController extends Controller
                 $q->where('receipt_number', 'like', "%{$search}%")
                   ->orWhere('invoice_number_supplier', 'like', "%{$search}%")
                   ->orWhere('sales_name', 'like', "%{$search}%")
+                  ->orWhere('checker_name', 'like', "%{$search}%")
+                  ->orWhereHas('checkerEmployee', function($ce) use ($search) {
+                      $ce->where('name', 'like', "%{$search}%");
+                  })
                   ->orWhereHas('purchaseOrder', function($po) use ($search) {
                       $po->where('po_number', 'like', "%{$search}%")
                          ->orWhereHas('supplier', function($s) use ($search) {
@@ -87,6 +92,8 @@ class GoodsReceiptController extends Controller
             'purchase_order_id' => 'required|exists:purchase_orders,id',
             'date' => 'required|date',
             'sales_name' => 'nullable|string|max:255',
+            'checker_name' => 'nullable|string|max:255',
+            'checker_employee_id' => 'nullable|integer',
             'received_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'notes' => 'nullable|string',
@@ -140,6 +147,8 @@ class GoodsReceiptController extends Controller
                 'receipt_number' => $receipt_number,
                 'invoice_number_supplier' => $request->invoice_number_supplier ?: $po->invoice_number_supplier,
                 'sales_name' => $request->sales_name ?: null,
+                'checker_name' => $request->checker_name ?: null,
+                'checker_employee_id' => $request->checker_employee_id ?: null,
                 'purchase_order_id' => $po->id,
                 'user_id' => $user ? $user->id : 1,
                 'validated_by' => $user ? $user->id : 1,
@@ -311,6 +320,8 @@ class GoodsReceiptController extends Controller
         $request->validate([
             'invoice_number_supplier' => 'nullable|string|max:255',
             'sales_name' => 'nullable|string|max:255',
+            'checker_name' => 'nullable|string|max:255',
+            'checker_employee_id' => 'nullable|integer',
             'received_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'tax_type' => 'nullable|in:include,exclude,none',
@@ -347,6 +358,8 @@ class GoodsReceiptController extends Controller
             $gr->update([
                 'invoice_number_supplier' => $request->invoice_number_supplier ?? $gr->invoice_number_supplier,
                 'sales_name' => $request->sales_name ?? $gr->sales_name,
+                'checker_name' => $request->checker_name ?? $gr->checker_name,
+                'checker_employee_id' => $request->has('checker_employee_id') ? $request->checker_employee_id : $gr->checker_employee_id,
                 'received_date' => $request->received_date ?? $gr->received_date,
                 'due_date' => $request->due_date ?? $gr->due_date,
                 'tax_type' => $taxType,
@@ -737,6 +750,7 @@ class GoodsReceiptController extends Controller
             'user.employee',
             'validator.employee',
             'approver.employee',
+            'checkerEmployee',
             'items.productBranch.product'
         ])->findOrFail($id);
 

@@ -182,10 +182,18 @@ const terbilangStr = computed(() => {
   return text.charAt(0).toUpperCase() + text.slice(1) + ' rupiah'
 })
 
-// Nama Petugas Penerima / Kasir
+// Nama Petugas Checker & Penerima
+const checkerName = computed(() => {
+  if (props.goodsReceipt?.checker_name) return props.goodsReceipt.checker_name
+  if (props.goodsReceipt?.checker_employee?.name) return props.goodsReceipt.checker_employee.name
+  if (props.goodsReceipt?.checkerEmployee?.name) return props.goodsReceipt.checkerEmployee.name
+  return ''
+})
+
 const receiverName = computed(() => {
-  if (props.goodsReceipt?.user?.name) return props.goodsReceipt.user.name
+  if (checkerName.value) return checkerName.value
   if (props.goodsReceipt?.validator?.name) return props.goodsReceipt.validator.name
+  if (props.goodsReceipt?.user?.name) return props.goodsReceipt.user.name
   if (props.goodsReceipt?.approver?.name) return props.goodsReceipt.approver.name
   
   try {

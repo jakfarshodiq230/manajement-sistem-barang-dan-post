@@ -260,6 +260,7 @@ const tableHeadersCompleted = [
   { title: 'NO. PO ASAL', key: 'purchase_order.po_number' },
   { title: 'FAKTUR SUPPLIER', key: 'invoice_number_supplier' },
   { title: 'SALES SUPPLIER', key: 'sales_name' },
+  { title: 'CHECKER FISIK', key: 'checker_name' },
   { title: 'TGL SAMPAI', key: 'received_date' },
   { title: 'JATUH TEMPO', key: 'due_date' },
   { title: 'TOTAL FAKTUR', key: 'total_amount' },
@@ -412,7 +413,7 @@ const executeDeleteGR = async () => {
               <VIcon icon="ri-time-line" size="26" />
             </VAvatar>
             <div>
-              <span class="text-caption text-medium-emphasis font-weight-medium">2. Menunggu Ka. Divisi</span>
+              <span class="text-caption text-medium-emphasis font-weight-medium">2. Menunggu Validasi</span>
               <h4 class="text-h5 font-weight-bold text-info mb-0">
                 {{ counts.pending_approval }} <span class="text-caption font-weight-normal text-medium-emphasis">Dokumen</span>
               </h4>
@@ -482,7 +483,7 @@ const executeDeleteGR = async () => {
 
         <VTab value="pending_approval">
           <VIcon icon="ri-time-line" size="18" class="mr-2 text-info" />
-          <span class="mr-2 font-weight-bold">2. Menunggu Validasi Ka. Divisi</span>
+          <span class="mr-2 font-weight-bold">2. Menunggu Validasi / Persetujuan</span>
           <VBadge
             v-if="counts.pending_approval > 0"
             color="info"
@@ -524,16 +525,16 @@ const executeDeleteGR = async () => {
           <div>
             <VCardTitle class="px-0 font-weight-bold text-h6 d-flex align-center gap-2">
               <span v-if="activeTab === 'pending'">Daftar PO yang Menunggu Cek Fisik Gudang</span>
-              <span v-else-if="activeTab === 'pending_approval'">Dokumen Penerimaan Menunggu Validasi Kepala Divisi</span>
+              <span v-else-if="activeTab === 'pending_approval'">Dokumen Penerimaan Menunggu Validasi & Persetujuan</span>
               <span v-else-if="activeTab === 'rejected'" class="text-error">Dokumen Penerimaan yang Ditolak / Perlu Revisi</span>
               <span v-else-if="activeTab === 'approved'" class="text-success">Dokumen Penerimaan yang Disetujui & Masuk Stok</span>
               <span v-else>Semua Dokumen Penerimaan Barang Gudang</span>
             </VCardTitle>
             <span class="text-caption text-medium-emphasis">
-              <span v-if="activeTab === 'pending'">Klik <strong>"Terima Fisik Barang"</strong> untuk mencatat nomor SCC/Batch, cek fisik, dan mengisi data faktur supplier.</span>
-              <span v-else-if="activeTab === 'pending_approval'">Dokumen telah dicek fisik oleh staf gudang dan sedang menunggu validasi harga faktur dari Kepala Divisi.</span>
-              <span v-else-if="activeTab === 'rejected'" class="text-error font-weight-medium">Kepala Divisi meminta revisi faktur/fisik. Klik tombol <strong>"Perbaiki & Ajukan Ulang"</strong> untuk merevisi dokumen.</span>
-              <span v-else-if="activeTab === 'approved'">Dokumen telah disetujui Kepala Divisi dan stok fisik cabang telah otomatis bertambah.</span>
+              <span v-if="activeTab === 'pending'">Klik <strong>"Terima Fisik Barang"</strong> untuk memilih Karyawan Checker, cek fisik, dan mengisi data faktur.</span>
+              <span v-else-if="activeTab === 'pending_approval'">Dokumen telah dicek fisik oleh staf checker dan sedang menunggu validasi/approval untuk masuk stok.</span>
+              <span v-else-if="activeTab === 'rejected'" class="text-error font-weight-medium">Diminta revisi faktur/fisik. Klik tombol <strong>"Perbaiki & Ajukan Ulang"</strong> untuk merevisi dokumen.</span>
+              <span v-else-if="activeTab === 'approved'">Dokumen telah disetujui dan stok fisik cabang telah otomatis bertambah.</span>
               <span v-else>Seluruh riwayat penerimaan barang fisik di gudang.</span>
             </span>
           </div>
@@ -654,6 +655,19 @@ const executeDeleteGR = async () => {
           #item.sales_name="{ item }"
         >
           <span>{{ item.sales_name || '-' }}</span>
+        </template>
+
+        <!-- CHECKER FISIK -->
+        <template
+          v-if="activeTab !== 'pending'"
+          #item.checker_name="{ item }"
+        >
+          <div class="d-flex align-center gap-1">
+            <VAvatar size="22" color="primary" variant="tonal" class="text-caption font-weight-bold">
+              {{ (item.checker_name || item.checker_employee?.name || 'C').charAt(0).toUpperCase() }}
+            </VAvatar>
+            <span class="font-weight-medium">{{ item.checker_name || item.checker_employee?.name || '-' }}</span>
+          </div>
         </template>
         
         <!-- Format Received Date -->
@@ -1003,7 +1017,8 @@ const executeDeleteGR = async () => {
               </VRow>
 
               <div class="mt-3 pt-2 border-t d-flex gap-4 flex-wrap text-caption text-medium-emphasis">
-                <div>Petugas Gudang (Input): <strong>{{ detailDialogData.validator?.name || detailDialogData.user?.name || '-' }}</strong></div>
+                <div>Checker Fisik: <strong class="text-primary">{{ detailDialogData.checker_name || detailDialogData.checker_employee?.name || '-' }}</strong></div>
+                <div>Petugas Input: <strong>{{ detailDialogData.validator?.name || detailDialogData.user?.name || '-' }}</strong></div>
                 <div v-if="detailDialogData.approver">Disetujui Oleh (Ka. Divisi): <strong>{{ detailDialogData.approver?.name }}</strong> ({{ detailDialogData.approved_at ? detailDialogData.approved_at.substring(0, 16) : '-' }})</div>
               </div>
             </div>

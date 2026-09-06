@@ -24,6 +24,8 @@ class GoodsReceipt extends Model
         'receipt_number',
         'invoice_number_supplier',
         'sales_name',
+        'checker_name',
+        'checker_employee_id',
         'purchase_order_id',
         'user_id',
         'date',
@@ -85,6 +87,11 @@ class GoodsReceipt extends Model
     public function items()
     {
         return $this->hasMany(GoodsReceiptItem::class);
+    }
+
+    public function checkerEmployee()
+    {
+        return $this->belongsTo(Employee::class, 'checker_employee_id');
     }
 
     public function payable()
