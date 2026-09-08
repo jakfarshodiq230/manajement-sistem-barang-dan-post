@@ -319,27 +319,31 @@ onUnmounted(() => {
       <p class="text-caption text-slate-600 mb-3">
         Sesi kasir akan diakhiri. Transaksi tertahan tetap tersimpan.
       </p>
-      <div class="d-flex gap-2">
-        <VBtn
-          block
-          size="small"
-          variant="tonal"
-          color="secondary"
-          class="flex-grow-1"
-          @click="isConfirmLogoutVisible = false"
-        >
-          Batal
-        </VBtn>
-        <VBtn
-          block
-          size="small"
-          color="error"
-          class="flex-grow-1 font-weight-bold"
-          @click="handleLogout"
-        >
-          Ya, Keluar
-        </VBtn>
-      </div>
+      <VRow dense class="mt-2">
+        <VCol cols="6">
+          <VBtn
+            block
+            size="small"
+            variant="tonal"
+            color="secondary"
+            class="text-none"
+            @click="isConfirmLogoutVisible = false"
+          >
+            Batal
+          </VBtn>
+        </VCol>
+        <VCol cols="6">
+          <VBtn
+            block
+            size="small"
+            color="error"
+            class="font-weight-bold text-none"
+            @click="handleLogout"
+          >
+            Ya, Keluar
+          </VBtn>
+        </VCol>
+      </VRow>
     </VCard>
   </VDialog>
 </template>

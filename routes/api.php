@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\AuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::post('/auth/login', [\App\Http\Controllers\Api\AuthController::class, 'login']);
+Route::post('/auth/login', [AuthController::class, 'login']);
 Route::get('/katalog/{branch_id}', [\App\Http\Controllers\Api\KatalogController::class, 'getKatalog']);
 
 Route::get('/fix-permissions', function () {

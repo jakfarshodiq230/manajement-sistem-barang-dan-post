@@ -16,18 +16,63 @@ class StockOpnameController extends Controller
     public function index(Request $request)
     {
         if ($request->has('group_by_batch')) {
-            $query = StockOpname::with('creator:id,name')
-                ->select('batch_id', 'audit_date', 'notes', 'created_by', DB::raw('MAX(created_at) as created_at'), DB::raw('COUNT(id) as total_branches'))
-                ->whereNotNull('batch_id')
-                ->groupBy('batch_id', 'audit_date', 'notes', 'created_by')
-                ->orderByRaw('MAX(created_at) DESC');
+            $perPage = (int) $request->query('itemsPerPage', 10);
+            if ($perPage <= 0) $perPage = 10;
+            $page = (int) $request->query('page', 1);
+            if ($page <= 0) $page = 1;
 
-            if ($request->has('search') && $request->search != '') {
+            $baseQuery = DB::table('stock_opnames')
+                ->leftJoin('users', 'stock_opnames.created_by', '=', 'users.id')
+                ->select(
+                    'stock_opnames.batch_id',
+                    'stock_opnames.audit_date',
+                    'stock_opnames.notes',
+                    'stock_opnames.created_by',
+                    'users.name as creator_name',
+                    DB::raw('MAX(stock_opnames.created_at) as created_at'),
+                    DB::raw('COUNT(stock_opnames.id) as total_branches')
+                )
+                ->whereNotNull('stock_opnames.batch_id');
+
+            if ($request->has('search') && !empty($request->search)) {
                 $search = $request->search;
-                $query->where('notes', 'like', "%{$search}%");
+                $baseQuery->where('stock_opnames.notes', 'like', "%{$search}%");
             }
-            
-            return response()->json($query->paginate(10));
+
+            $baseQuery->groupBy(
+                'stock_opnames.batch_id',
+                'stock_opnames.audit_date',
+                'stock_opnames.notes',
+                'stock_opnames.created_by',
+                'users.name'
+            )->orderByRaw('MAX(stock_opnames.created_at) DESC');
+
+            $total = DB::table(DB::raw("({$baseQuery->toSql()}) as grouped_table"))
+                ->mergeBindings($baseQuery)
+                ->count();
+
+            $records = $baseQuery->forPage($page, $perPage)->get()->map(function ($item) {
+                return [
+                    'batch_id' => $item->batch_id,
+                    'audit_date' => $item->audit_date,
+                    'notes' => $item->notes,
+                    'created_by' => $item->created_by,
+                    'created_at' => $item->created_at,
+                    'total_branches' => (int) $item->total_branches,
+                    'creator' => $item->created_by ? [
+                        'id' => $item->created_by,
+                        'name' => $item->creator_name ?? 'User',
+                    ] : null,
+                ];
+            });
+
+            return response()->json([
+                'data' => $records,
+                'total' => $total,
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'last_page' => (int) ceil($total / ($perPage ?: 10)),
+            ]);
         }
 
         $query = StockOpname::with(['branch:id,name', 'creator:id,name'])->orderBy('audit_date', 'desc');

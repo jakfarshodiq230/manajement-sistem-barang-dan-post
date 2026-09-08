@@ -15,6 +15,18 @@ use Inertia\Inertia;
 |
 */
 
+Route::get('/clear-all-cache', function () {
+    \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+    \Illuminate\Support\Facades\Artisan::call('config:clear');
+    \Illuminate\Support\Facades\Artisan::call('route:clear');
+    \Illuminate\Support\Facades\Artisan::call('view:clear');
+    \Illuminate\Support\Facades\Artisan::call('cache:clear');
+    return response()->json([
+        'status' => 'success',
+        'message' => 'All caches cleared successfully (optimize, config, route, view, app cache).',
+    ]);
+});
+
 Route::get('/login', function () {
     return view('app');
 })->name('login');
