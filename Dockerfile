@@ -53,7 +53,8 @@ COPY WebServer /var/www
 RUN composer install --no-interaction --optimize-autoloader
 
 # Install NPM dependencies and build Vue JS
-RUN npm install \
+RUN rm -rf node_modules package-lock.json \
+    && npm install \
     && npm run build
 
 # Clear any leftover Vite hot files and Laravel caches copied from development environment
