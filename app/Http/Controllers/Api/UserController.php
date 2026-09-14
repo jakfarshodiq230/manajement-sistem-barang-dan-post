@@ -12,8 +12,8 @@ class UserController extends Controller
     public function updatePin(Request $request, $id)
     {
         $admin = $request->user();
-        if (!$admin || (!$admin->can('Pengguna Write') && !$admin->can('Pengguna PIN') && !$admin->can('Daftar Pengguna Write'))) {
-            return response()->json(['message' => 'Anda tidak memiliki hak akses izin untuk mengubah PIN pengguna.'], 403);
+        if (!$admin || (!$admin->can('Pengguna & PIN Kasir Write') && !$admin->can('Pengguna Write') && !$admin->can('Pengguna PIN') && !$admin->can('Daftar Pengguna Write') && !$admin->can('manage all'))) {
+            abort(403, 'Unauthorized. Anda tidak memiliki akses untuk mengatur PIN kasir pengguna ini.');
         }
 
         $user = \App\Models\User::findOrFail($id);
@@ -194,8 +194,8 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $admin = $request->user();
-        if (!$admin || (!$admin->can('Pengguna Create') && !$admin->can('Daftar Pengguna Create') && !$admin->can('manage all') && !$admin->can('*'))) {
-            abort(403, 'Unauthorized action.');
+        if (!$admin || (!$admin->can('Pengguna & PIN Kasir Create') && !$admin->can('Pengguna Create') && !$admin->can('Daftar Pengguna Create') && !$admin->can('manage all') && !$admin->can('*'))) {
+            abort(403, 'Unauthorized action. Anda tidak memiliki izin untuk menambah pengguna baru.');
         }
 
         $request->validate([
@@ -314,8 +314,8 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $admin = $request->user();
-        if (!$admin || (!$admin->can('Pengguna Write') && !$admin->can('Daftar Pengguna Write'))) {
-            abort(403, 'Unauthorized action.');
+        if (!$admin || (!$admin->can('Pengguna & PIN Kasir Write') && !$admin->can('Pengguna Write') && !$admin->can('Daftar Pengguna Write') && !$admin->can('manage all'))) {
+            abort(403, 'Unauthorized action. Anda tidak memiliki izin untuk mengubah data pengguna ini.');
         }
 
         $request->validate([
@@ -386,8 +386,8 @@ class UserController extends Controller
     public function destroy(User $user)
     {
         $admin = request()->user();
-        if (!$admin || (!$admin->can('Pengguna Delete') && !$admin->can('Daftar Pengguna Delete') && !$admin->can('manage all') && !$admin->can('*'))) {
-            abort(403, 'Unauthorized action.');
+        if (!$admin || (!$admin->can('Pengguna & PIN Kasir Delete') && !$admin->can('Pengguna Delete') && !$admin->can('Daftar Pengguna Delete') && !$admin->can('manage all') && !$admin->can('*'))) {
+            abort(403, 'Unauthorized action. Anda tidak memiliki izin untuk menghapus pengguna.');
         }
 
         $user->delete();

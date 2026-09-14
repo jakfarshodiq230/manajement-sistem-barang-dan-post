@@ -100,7 +100,7 @@ class ModuleController extends Controller
 
     public function store(Request $request)
     {
-        if (!request()->user()->can('Modules Create')) {
+        if (!request()->user()->can('Manajemen Modul Create') && !request()->user()->can('Modules Create')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -136,7 +136,7 @@ class ModuleController extends Controller
 
     public function update(Request $request, Module $module)
     {
-        if (!request()->user()->can('Modules Write')) {
+        if (!request()->user()->can('Manajemen Modul Write') && !request()->user()->can('Modules Write')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -167,7 +167,7 @@ class ModuleController extends Controller
 
     public function destroy(Module $module)
     {
-        if (!request()->user()->can('Modules Delete')) {
+        if (!request()->user()->can('Manajemen Modul Delete') && !request()->user()->can('Modules Delete')) {
             abort(403, 'Unauthorized action.');
         }
 
