@@ -60,8 +60,9 @@ RUN rm -rf node_modules package-lock.json \
     && npm install \
     && npm run build
 
-# Clear any leftover Vite hot files and Laravel caches copied from development environment
+# Clear any leftover Vite hot files, broken storage links, and Laravel caches copied from development environment
 RUN rm -f /var/www/public/hot \
+    && rm -rf /var/www/public/storage \
     && php artisan optimize:clear || true \
     && php artisan storage:link || true
 
