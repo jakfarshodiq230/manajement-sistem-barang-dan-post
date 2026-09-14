@@ -4,13 +4,21 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
-        <title inertia>Ms.POS</title>
-
+        <title inertia>{{ \App\Models\Owner::first()->name ?? config('app.name') }}</title>
+        <link rel="icon" href="{{ \App\Models\Owner::first()->logo ? asset('storage/' . \App\Models\Owner::first()->logo) : asset('logo.png') }}" />
         <!-- Fonts -->
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap">
 
         <link rel="stylesheet" href="{{ asset('css/tailadmin.css') }}">
         
+        <script>
+            window.appConfig = {
+                appName: "{{ \App\Models\Owner::first()->name ?? config('app.name') }}",
+                appLogo: "{{ \App\Models\Owner::first()->logo ? asset('storage/' . \App\Models\Owner::first()->logo) : asset('logo.png') }}",
+                appEmail: "{{ \App\Models\Owner::first()->email ?? 'support@' . request()->getHost() }}"
+            };
+        </script>
+
         <!-- Scripts -->
         @php
             $manifestPath = public_path('build/manifest.json');

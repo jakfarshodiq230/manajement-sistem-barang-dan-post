@@ -16,6 +16,10 @@ use App\Http\Controllers\Api\AuthController;
 */
 
 Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->name('password.email');
+Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
+Route::get('/auth/verify-email/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('verification.verify');
+Route::post('/auth/email/verification-notification', [AuthController::class, 'sendVerificationEmail'])->name('verification.send');
 Route::get('/katalog/{branch_id}', [\App\Http\Controllers\Api\KatalogController::class, 'getKatalog']);
 
 Route::get('/fix-permissions', function () {
@@ -38,6 +42,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/apps/users/{id}/assignments', [\App\Http\Controllers\Api\UserController::class, 'updateAssignments']);
     Route::post('/users/{id}/assignments', [\App\Http\Controllers\Api\UserController::class, 'updateAssignments']);
     Route::post('/apps/verify-pin', [\App\Http\Controllers\Api\AuthController::class, 'verifyPin']);
+    
+    // Custom Queue Management
+    Route::get('/queue/stats', [\App\Http\Controllers\Api\QueueController::class, 'getStats']);
+    Route::get('/queue/failed', [\App\Http\Controllers\Api\QueueController::class, 'getFailedJobs']);
+    Route::post('/queue/retry/{id}', [\App\Http\Controllers\Api\QueueController::class, 'retryJob']);
+    Route::delete('/queue/delete/{id}', [\App\Http\Controllers\Api\QueueController::class, 'deleteJob']);
+    
+    // System Prerequisites Check
+    Route::get('/system/prerequisites', [\App\Http\Controllers\Api\SystemStatusController::class, 'checkPrerequisites']);
 });
 
 Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::class])->prefix('apps')->group(function () {
@@ -83,7 +96,27 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     // Branches endpoints
     Route::apiResource('branches', \App\Http\Controllers\Api\BranchController::class);
     // Employees endpoints
+    Route::get('employees/import-template', [\App\Http\Controllers\Api\EmployeeController::class, 'importTemplate']);
+    Route::post('employees/import', [\App\Http\Controllers\Api\EmployeeController::class, 'importEmployees']);
     Route::apiResource('employees', \App\Http\Controllers\Api\EmployeeController::class);
+    
+    // Positions & HR endpoints
+    Route::apiResource('positions', \App\Http\Controllers\Api\PositionController::class);
+    Route::apiResource('deduction-types', \App\Http\Controllers\Api\DeductionTypeController::class);
+    
+    Route::get('attendances/summary', [\App\Http\Controllers\Api\AttendanceController::class, 'summary']);
+    Route::get('attendances/import-template', [\App\Http\Controllers\Api\AttendanceController::class, 'importTemplate']);
+    Route::post('attendances/import', [\App\Http\Controllers\Api\AttendanceController::class, 'import']);
+    Route::apiResource('attendances', \App\Http\Controllers\Api\AttendanceController::class)->only(['index']);
+    
+    Route::get('payrolls/employees', [\App\Http\Controllers\Api\PayrollController::class, 'getEmployeesForPayroll']);
+    Route::post('payrolls/generate', [\App\Http\Controllers\Api\PayrollController::class, 'generate']);
+    Route::post('payrolls/import-attendance', [\App\Http\Controllers\Api\PayrollController::class, 'importAttendance']);
+    Route::get('payrolls', [\App\Http\Controllers\Api\PayrollController::class, 'index']);
+    Route::get('payrolls/{id}/pdf', [\App\Http\Controllers\Api\PayrollController::class, 'downloadPdf']);
+
+    // Sales Orders endpoints
+    Route::post('sales-orders/{id}/payments', [\App\Http\Controllers\Api\SalesOrderController::class, 'addPayment']);
     // Categories endpoints
     Route::post('categories/import', [\App\Http\Controllers\Api\CategoryController::class, 'import']);
     Route::apiResource('categories', \App\Http\Controllers\Api\CategoryController::class);
@@ -129,8 +162,11 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     Route::apiResource('bank-accounts', \App\Http\Controllers\Api\BankAccountController::class);
 
     // Products endpoints
+    Route::get('products/import-template', [\App\Http\Controllers\Api\ProductController::class, 'importTemplate']);
     Route::post('products/import', [\App\Http\Controllers\Api\ProductController::class, 'import']);
     Route::apiResource('products', \App\Http\Controllers\Api\ProductController::class);
+    Route::get('product-branches/import-initial-template', [\App\Http\Controllers\Api\ProductBranchController::class, 'importInitialTemplate']);
+    Route::post('product-branches/import-initial-stock', [\App\Http\Controllers\Api\ProductBranchController::class, 'importInitialStock']);
     Route::post('product-branches/import', [\App\Http\Controllers\Api\ProductBranchController::class, 'import']);
     Route::apiResource('product-branches', \App\Http\Controllers\Api\ProductBranchController::class);
     Route::put('product-batches/{batchId}', [\App\Http\Controllers\Api\ProductBranchController::class, 'updateBatchPrice']);
@@ -157,15 +193,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     // Petty Cash (Kas Kecil Cabang)
     Route::apiResource('petty-cashes', \App\Http\Controllers\Api\PettyCashController::class);
 
-    // Branch Capitals (Manajemen Modal & Pengembalian Modal Cabang)
+    // Branch Capitals (Distribusi Modal Barang Pusat ke Cabang & Rekonsiliasi Akhir Bulan)
     Route::get('branch-capitals/summary', [\App\Http\Controllers\Api\BranchCapitalController::class, 'summary']);
-    Route::post('branch-capitals/send-summary-email', [\App\Http\Controllers\Api\BranchCapitalController::class, 'sendSummaryEmail']);
-    Route::post('branch-capitals/{id}/send-email', [\App\Http\Controllers\Api\BranchCapitalController::class, 'sendEmail']);
-    Route::get('branch-capitals/{id}/email-logs', [\App\Http\Controllers\Api\BranchCapitalController::class, 'emailLogs']);
-    Route::post('branch-capitals/{id}/approve', [\App\Http\Controllers\Api\BranchCapitalController::class, 'approve']);
-    Route::post('branch-capitals/{id}/reject', [\App\Http\Controllers\Api\BranchCapitalController::class, 'reject']);
-    Route::post('branch-capitals/{id}/void', [\App\Http\Controllers\Api\BranchCapitalController::class, 'void']);
-    Route::post('branch-capitals/{id}', [\App\Http\Controllers\Api\BranchCapitalController::class, 'update']);
+    Route::get('branch-capitals/reconciliation', [\App\Http\Controllers\Api\BranchCapitalController::class, 'reconciliation']);
+    Route::get('branch-capitals/distributions', [\App\Http\Controllers\Api\BranchCapitalController::class, 'distributions']);
     Route::apiResource('branch-capitals', \App\Http\Controllers\Api\BranchCapitalController::class);
 
     // Security, IP Tracking & Anti-Hacker Logs
@@ -179,6 +210,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     // Accounting & Double-Entry General Ledger (Modul Sistem Akuntansi)
     Route::get('accounting/overview', [\App\Http\Controllers\Api\AccountingController::class, 'overview']);
     Route::get('accounting/accounts', [\App\Http\Controllers\Api\AccountingController::class, 'getAccounts']);
+    Route::get('accounting/accounts/import-template', [\App\Http\Controllers\Api\AccountingController::class, 'importCoaTemplate']);
+    Route::post('accounting/accounts/import', [\App\Http\Controllers\Api\AccountingController::class, 'importCoa']);
     Route::get('accounting/accounts/export-pdf', [\App\Http\Controllers\Api\AccountingController::class, 'exportCoaPdf']);
     Route::post('accounting/accounts', [\App\Http\Controllers\Api\AccountingController::class, 'storeAccount']);
     Route::put('accounting/accounts/{id}', [\App\Http\Controllers\Api\AccountingController::class, 'updateAccount']);

@@ -135,6 +135,200 @@ class AccountingController extends Controller
     }
 
     /**
+     * Download COA Import Template
+     */
+    public function importCoaTemplate()
+    {
+        $csvContent = "Kode Akun (Wajib),Nama Akun (Wajib),Tipe (Wajib),Kategori (Opsional),Saldo Normal (Wajib),Deskripsi\n";
+        
+        // Aset
+        $csvContent .= "1100,Aset Lancar,asset,current_asset,debit,Akun induk\n";
+        $csvContent .= "1101,Kas Laci Kasir (Cash on Hand),asset,current_asset,debit,\n";
+        $csvContent .= "1102,Kas di Bank (Bank Accounts),asset,current_asset,debit,\n";
+        $csvContent .= "1103,Piutang Usaha (Accounts Receivable),asset,current_asset,debit,\n";
+        $csvContent .= "1104,Persediaan Barang Dagang (Inventory),asset,current_asset,debit,\n";
+        $csvContent .= "1105,Biaya Dibayar di Muka (Prepaid Expenses),asset,current_asset,debit,\n";
+        $csvContent .= "1106,Perlengkapan Toko (Store Supplies),asset,current_asset,debit,\n";
+        $csvContent .= "1200,Aset Tetap,asset,fixed_asset,debit,Akun induk\n";
+        $csvContent .= "1201,Peralatan & Mesin Toko,asset,fixed_asset,debit,\n";
+        $csvContent .= "1202,Kendaraan Operasional,asset,fixed_asset,debit,\n";
+        $csvContent .= "1203,Bangunan & Renovasi Toko,asset,fixed_asset,debit,\n";
+        $csvContent .= "1299,Akumulasi Penyusutan Aset Tetap,asset,contra_asset,credit,\n";
+
+        // Kewajiban
+        $csvContent .= "2100,Kewajiban Lancar,liability,current_liability,credit,Akun induk\n";
+        $csvContent .= "2101,Hutang Usaha / Dagang (Accounts Payable),liability,current_liability,credit,\n";
+        $csvContent .= "2102,Hutang Gaji Karyawan,liability,current_liability,credit,\n";
+        $csvContent .= "2103,Hutang Pajak (PPN/PPh),liability,current_liability,credit,\n";
+        $csvContent .= "2104,Hutang Biaya Operasional Lainnya,liability,current_liability,credit,\n";
+        $csvContent .= "2200,Kewajiban Jangka Panjang,liability,long_term_liability,credit,Akun induk\n";
+        $csvContent .= "2201,Hutang Bank Jangka Panjang,liability,long_term_liability,credit,\n";
+
+        // Ekuitas
+        $csvContent .= "3100,Ekuitas Pemilik,equity,equity,credit,Akun induk\n";
+        $csvContent .= "3101,Modal Disetor Pemilik (Owner Capital),equity,equity,credit,\n";
+        $csvContent .= "3102,Prive / Pengembalian Modal / ROI Owner,equity,equity,debit,\n";
+        $csvContent .= "3103,Laba Ditahan (Retained Earnings),equity,equity,credit,\n";
+        $csvContent .= "3104,Laba / Rugi Periode Berjalan,equity,equity,credit,\n";
+
+        // Pendapatan
+        $csvContent .= "4100,Pendapatan Usaha,revenue,operating_revenue,credit,Akun induk\n";
+        $csvContent .= "4101,Pendapatan Penjualan Toko (Sales),revenue,operating_revenue,credit,\n";
+        $csvContent .= "4102,Retur & Potongan Penjualan,revenue,operating_revenue,debit,\n";
+        $csvContent .= "4201,Pendapatan Lain-lain (Non-Operasional),revenue,other_income,credit,\n";
+
+        // HPP
+        $csvContent .= "5100,Beban Pokok Penjualan,cogs,cogs,debit,Akun induk\n";
+        $csvContent .= "5101,Harga Pokok Penjualan (HPP Barang Dagang),cogs,cogs,debit,\n";
+        $csvContent .= "5102,Beban Selisih Stok Opname / Rusak,cogs,cogs,debit,\n";
+
+        // Beban
+        $csvContent .= "6100,Beban Operasional & Umum,expense,operating_expense,debit,Akun induk\n";
+        $csvContent .= "6101,Beban Kas Kecil Operasional Harian,expense,operating_expense,debit,\n";
+        $csvContent .= "6102,Beban Gaji & Upah Karyawan,expense,operating_expense,debit,\n";
+        $csvContent .= "6103,Beban Listrik, Air & Internet,expense,operating_expense,debit,\n";
+        $csvContent .= "6104,Beban Sewa Gedung / Ruko,expense,operating_expense,debit,\n";
+        $csvContent .= "6105,Beban Perlengkapan & ATK Toko,expense,operating_expense,debit,\n";
+        $csvContent .= "6106,Beban Transportasi & Logistik,expense,operating_expense,debit,\n";
+        $csvContent .= "6107,Beban Penyusutan Aset Tetap,expense,operating_expense,debit,\n";
+        $csvContent .= "6201,Beban Bunga & Administrasi Bank,expense,other_expense,debit,\n";
+
+        return response()->json([
+            'csv' => $csvContent
+        ]);
+    }
+
+    /**
+     * Import COA from CSV
+     */
+    public function importCoa(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt|max:5120',
+        ]);
+
+        $file = $request->file('file');
+        
+        // Auto-detect delimiter (comma or semicolon)
+        $content = file_get_contents($file->getRealPath());
+        $delimiter = strpos($content, ';') !== false ? ';' : ',';
+        
+        $handle = fopen($file->getRealPath(), "r");
+        
+        $header = true;
+        $count = 0;
+        
+        // Mapping tipe bahasa Indonesia ke standar English
+        $typeMapping = [
+            'aset' => 'asset',
+            'harta' => 'asset',
+            'kewajiban' => 'liability',
+            'hutang' => 'liability',
+            'modal' => 'equity',
+            'ekuitas' => 'equity',
+            'pendapatan' => 'revenue',
+            'hpp' => 'cogs',
+            'beban' => 'expense',
+            'biaya' => 'expense',
+            'pengeluaran' => 'expense',
+        ];
+        
+        DB::beginTransaction();
+        try {
+            while (($row = fgetcsv($handle, 4000, $delimiter)) !== FALSE) {
+                if ($header) {
+                    $header = false;
+                    continue; // Skip header row
+                }
+                
+                // Hapus BOM jika ada di kolom pertama
+                if (isset($row[0])) {
+                    $row[0] = preg_replace('/^[\xEF\xBB\xBF]+/', '', $row[0]);
+                }
+                
+                if (isset($row[0]) && trim($row[0]) !== '' && isset($row[1]) && trim($row[1]) !== '') {
+                    $code = trim($row[0]);
+                    $name = trim($row[1]);
+                    $rawType = isset($row[2]) ? strtolower(trim($row[2])) : 'asset';
+                    
+                    // Translate type
+                    $type = $typeMapping[$rawType] ?? $rawType;
+                    
+                    $category = isset($row[3]) ? trim($row[3]) : null;
+                    
+                    $rawBalance = isset($row[4]) ? strtolower(trim($row[4])) : 'debit';
+                    $normal_balance = ($rawBalance === 'kredit') ? 'credit' : $rawBalance;
+                    
+                    $description = isset($row[5]) ? trim($row[5]) : null;
+                    
+                    // Validate type and normal_balance
+                    $validTypes = ['asset', 'liability', 'equity', 'revenue', 'cogs', 'expense'];
+                    if (!in_array($type, $validTypes)) {
+                        $type = 'asset';
+                    }
+                    
+                    if (!in_array($normal_balance, ['debit', 'credit'])) {
+                        $normal_balance = in_array($type, ['asset', 'expense']) ? 'debit' : 'credit';
+                    }
+
+                    $systemCodes = ['1101', '1102', '1103', '1104', '2101', '3101', '4101', '5101', '6101'];
+                    $isSystem = in_array($code, $systemCodes);
+
+                    Account::updateOrCreate(
+                        ['code' => $code],
+                        [
+                            'name' => $name,
+                            'type' => $type,
+                            'category' => $category,
+                            'normal_balance' => $normal_balance,
+                            'description' => $description,
+                            'is_system' => $isSystem,
+                        ]
+                    );
+                    $count++;
+                }
+            }
+            fclose($handle);
+
+            // Auto-map default accounts to account_settings
+            $mappings = [
+                'default_cash' => '1101',
+                'default_bank' => '1102',
+                'default_ar' => '1103',
+                'default_inventory' => '1104',
+                'default_ap' => '2101',
+                'default_capital' => '3101',
+                'default_retained_earnings' => '3103',
+                'default_sales' => '4101',
+                'default_cogs' => '5101',
+                'default_expense' => '6101',
+            ];
+
+            foreach ($mappings as $key => $code) {
+                $acc = \App\Models\Account::where('code', $code)->first();
+                if ($acc) {
+                    \App\Models\AccountSetting::updateOrCreate(
+                        ['branch_id' => null, 'setting_key' => $key],
+                        ['account_id' => $acc->id]
+                    );
+                }
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            fclose($handle);
+            return response()->json(['message' => 'Gagal mengimpor: ' . $e->getMessage()], 500);
+        }
+        
+        fclose($handle);
+        return response()->json([
+            'success' => true,
+            'message' => "$count data akun berhasil diimpor"
+        ]);
+    }
+
+    /**
      * Store new account
      */
     public function storeAccount(Request $request)
@@ -179,6 +373,16 @@ class AccountingController extends Controller
             'is_active' => 'nullable|boolean',
             'description' => 'nullable|string',
         ]);
+
+        // Proteksi: Jika akun sistem, cegah perubahan KODE dan TIPE
+        if ($account->is_system) {
+            if ($validated['code'] !== $account->code || $validated['type'] !== $account->type) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Kode dan Tipe pada Akun Sistem (bawaan) tidak boleh diubah agar jurnal otomatis tidak error. Anda hanya boleh mengubah Nama Akun.',
+                ], 422);
+            }
+        }
 
         $account->update($validated);
 
@@ -647,7 +851,6 @@ class AccountingController extends Controller
         $syncedPay = 0;
         $syncedRec = 0;
         $syncedPetty = 0;
-        $syncedCap = 0;
 
         // 1. Sales
         $sales = Sale::with('saleItems.productBatch')->limit($limit)->get();
@@ -679,13 +882,7 @@ class AccountingController extends Controller
             if (JournalService::journalForPettyCash($pc)) $syncedPetty++;
         }
 
-        // 6. Branch Capital
-        $capitals = BranchCapital::limit($limit)->get();
-        foreach ($capitals as $cap) {
-            if (JournalService::journalForBranchCapital($cap)) $syncedCap++;
-        }
-
-        $totalSynced = $syncedSales + $syncedGR + $syncedPay + $syncedRec + $syncedPetty + $syncedCap;
+        $totalSynced = $syncedSales + $syncedGR + $syncedPay + $syncedRec + $syncedPetty;
 
         return response()->json([
             'success' => true,
@@ -696,7 +893,6 @@ class AccountingController extends Controller
                 'payable_payments' => $syncedPay,
                 'receivable_payments' => $syncedRec,
                 'petty_cash' => $syncedPetty,
-                'branch_capitals' => $syncedCap,
             ],
         ]);
     }
@@ -753,7 +949,6 @@ class AccountingController extends Controller
             case 'PayablePayment': return 'Bayar Hutang';
             case 'ReceivablePayment': return 'Setoran Piutang';
             case 'PettyCash': return 'Kas Kecil';
-            case 'BranchCapital': return 'Modal & ROI';
             case 'Manual': return 'Jurnal Penyesuaian';
             default: return $type ?: 'Umum';
         }
@@ -1228,7 +1423,7 @@ class AccountingController extends Controller
         if (!$owner) {
             $owner = Owner::whereNull('parent_id')->first() ?? Owner::first();
         }
-        $companyName = $owner?->name ?? ($branchObj?->name ?? config('app.name', 'Perusahaan'));
+        $companyName = optional($owner)->name ?? optional($branchObj)->name ?? config('app.name', 'Perusahaan');
         return [$owner, $companyName];
     }
 }

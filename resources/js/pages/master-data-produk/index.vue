@@ -116,7 +116,13 @@ const addNewProduct = async productData => {
     fetchProducts()
   } catch (error) {
     console.error(error)
-    snackbar.show('Terjadi kesalahan saat menyimpan data produk', 'error')
+    let errorMsg = error.response?._data?.message || error.data?.message || 'Terjadi kesalahan saat menyimpan data produk'
+    const validationErrors = error.response?._data?.errors || error.data?.errors
+    if (validationErrors) {
+        const firstErrorKey = Object.keys(validationErrors)[0]
+        errorMsg = validationErrors[firstErrorKey][0]
+    }
+    snackbar.show(errorMsg, 'error')
   }
 }
 
@@ -124,6 +130,7 @@ const tableHeaders = [
   { title: 'INFORMASI PRODUK & SKU', key: 'name' },
   { title: 'MEREK / BRAND', key: 'brand' },
   { title: 'KATEGORI', key: 'category' },
+  { title: 'PROMO ORI', key: 'promo_ori', align: 'center' },
   { title: 'METODE STOK', key: 'stock_method', align: 'center' },
   { title: 'STATUS', key: 'status', align: 'center' },
   { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
@@ -154,29 +161,29 @@ const executeDeleteProduct = async isConfirmed => {
   }
 }
 
-// --- Import / Export / Template ---
+const isImportDialogVisible = ref(false)
 const fileInput = ref(null)
 
-const downloadTemplate = () => {
-  let csvContent = 'SKU,Nama Produk,Kategori (Wajib),Type,Merek,Satuan,Qty Stok,Harga Modal,Harga Jual Pusat,Harga Cabang Bandung,Harga Cabang Sudirman\n'
-  csvContent += 'SKU-001,Produk Contoh A,Mesin,R175,Dongfeng,Unit,10,1000000,1200000,1300000,1350000\n'
-  csvContent += 'SKU-002,Produk Contoh B,Minuman,Aqua 600ml,Danone,Karton,50,45000,55000,55000,56000\n\n'
-  
-  if (categories.value && categories.value.length > 0) {
-    csvContent += ',,,,\n'
-    csvContent += '--- REFERENSI KATEGORI YANG SUDAH ADA ---,,,,\n'
-    categories.value.forEach(c => {
-      csvContent += `${c.name},,,,\n`
-    })
-    csvContent += '(Anda juga bisa mengetik nama kategori baru di atas dan sistem akan membuatnya otomatis),,,,\n'
-  }
+onMounted(() => {
+  fetchProducts()
+  fetchCategories()
+})
 
+const openImportDialog = () => {
+  isImportDialogVisible.value = true
+}
+
+const downloadTemplate = () => {
+  let csvContent = "SKU (Wajib),Nama Produk (Wajib),Kategori (Wajib),Barcode,Merek,Satuan,Berat (g),Panjang (cm),Lebar (cm),Tinggi (cm),Metode Stok (fifo/fefo/lifo),Status (Aktif/Nonaktif),Deskripsi,Bisa Retur (Ya/Tidak)\n"
+  csvContent += "SKU-001,Aki GS Astra Hybrid NS60,Otomotif,8991234567890,GS Astra,Pcs,15000,24,13,20,fifo,Aktif,Aki mobil hybrid,Ya\n"
+  csvContent += "SKU-002,Aqua Botol 600ml,Minuman,8999999999999,Danone,Karton,15000,40,30,25,fefo,Aktif,Air mineral botol 600ml isi 24,Ya\n"
+  
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
-
+  
   link.href = url
-  link.setAttribute('download', 'Template_Master_Produk.csv')
+  link.setAttribute('download', `Template_Master_Data_Produk.csv`)
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
@@ -235,6 +242,7 @@ const handleFileUpload = async event => {
     })
 
     snackbar.show(res.message || 'Import berhasil', 'success')
+    isImportDialogVisible.value = false
     fetchProducts()
   } catch (error) {
     console.error(error)
@@ -270,23 +278,12 @@ const handleFileUpload = async event => {
 
         <VBtn
           v-if="$can('import', 'Produk')"
-          color="secondary"
-          variant="tonal"
-          prepend-icon="ri-download-cloud-line"
-          @click="downloadTemplate"
-        >
-          Template CSV
-        </VBtn>
-
-        <VBtn
-          v-if="$can('import', 'Produk')"
           color="warning"
           variant="tonal"
           prepend-icon="ri-upload-cloud-line"
-          :loading="isLoading"
-          @click="triggerFileInput"
+          @click="openImportDialog"
         >
-          Import
+          Import Data
         </VBtn>
 
         <VBtn
@@ -498,6 +495,29 @@ const handleFileUpload = async event => {
           </VChip>
         </template>
 
+        <!-- Promo Ori -->
+        <template #item.promo_ori="{ item }">
+          <div v-if="Number(item.ori_discount_percent) > 0 || Number(item.ori_cashback_percent) > 0" class="d-flex flex-column align-center gap-1">
+            <VChip
+              v-if="Number(item.ori_discount_percent) > 0"
+              size="x-small"
+              color="error"
+              variant="flat"
+            >
+              Disc {{ item.ori_discount_percent }}%
+            </VChip>
+            <VChip
+              v-if="Number(item.ori_cashback_percent) > 0"
+              size="x-small"
+              color="warning"
+              variant="flat"
+            >
+              CB {{ item.ori_cashback_percent }}%
+            </VChip>
+          </div>
+          <span v-else class="text-caption text-disabled">-</span>
+        </template>
+
         <!-- Stock Method -->
         <template #item.stock_method="{ item }">
           <VChip
@@ -613,6 +633,51 @@ const handleFileUpload = async event => {
       cancel-text="Batal"
       @confirm="executeDeleteProduct"
     />
+
+    <VDialog
+      v-model="isImportDialogVisible"
+      max-width="500"
+    >
+      <VCard title="Import Master Data Produk">
+        <VCardText>
+          <p class="text-body-2 mb-4">
+            Import data katalog produk secara global. Data ini hanya membuat master SKU dan Nama Barang, tanpa menyertakan stok atau harga cabang.
+          </p>
+
+          <VBtn
+            color="secondary"
+            variant="tonal"
+            prepend-icon="ri-download-cloud-line"
+            class="w-100 mb-4"
+            @click="downloadTemplate"
+          >
+            Download Template Master Data
+          </VBtn>
+
+          <VDivider class="mb-4" />
+
+          <VBtn
+            color="primary"
+            prepend-icon="ri-upload-cloud-line"
+            class="w-100"
+            :loading="isLoading"
+            @click="triggerFileInput"
+          >
+            Upload File CSV
+          </VBtn>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn
+            color="error"
+            variant="text"
+            @click="isImportDialogVisible = false"
+          >
+            Tutup
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
 </template>
 

@@ -227,7 +227,8 @@ class ReceivableController extends Controller
             }
         } catch (\Exception $e) {
             return response()->json([
-                'message' => $e->getMessage(),
+                'message' => $e->getMessage() . ' di ' . $e->getFile() . ':' . $e->getLine(),
+                'trace' => $e->getTraceAsString(),
             ], 400);
         }
     }

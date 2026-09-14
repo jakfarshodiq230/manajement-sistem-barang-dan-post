@@ -99,6 +99,12 @@ const customerId = ref(null)
 const selectedCustomer = ref(null)
 const customerSearch = ref('')
 const isSearchingCustomer = ref(false)
+
+const selectedCustomerObject = computed(() => {
+  if (!selectedCustomer.value) return null
+  if (typeof selectedCustomer.value === 'object') return selectedCustomer.value
+  return customers.value.find(c => c.id === selectedCustomer.value) || null
+})
 let customerSearchTimeout = null
 
 const onCustomerSearchInput = val => {
@@ -938,6 +944,10 @@ const addToCart = (productBranch, batch = null) => {
       price: Math.round(sellingPrice),
       tax_percentage: Number(productBranch.tax_percentage) || 0,
       tax_type: productBranch.product?.tax_type || 'Exclude PPN',
+      ori_discount_percent: Number(productBranch.product?.ori_discount_percent) || 0,
+      ori_cashback_percent: Number(productBranch.product?.ori_cashback_percent) || 0,
+      ori_promo_type: Number(productBranch.product?.ori_discount_percent) > 0 ? 'discount' : (Number(productBranch.product?.ori_cashback_percent) > 0 ? 'cashback' : null),
+      is_ori: false,
     })
   }
 }
@@ -946,8 +956,22 @@ const removeFromCart = index => {
   cart.value.splice(index, 1)
 }
 
+const getItemOriDiscount = item => {
+  if (item.is_ori && item.ori_promo_type === 'discount' && item.ori_discount_percent > 0) {
+    return (item.price * item.qty) * (item.ori_discount_percent / 100)
+  }
+  return 0
+}
+
+const getItemOriCashback = item => {
+  if (item.is_ori && item.ori_promo_type === 'cashback' && item.ori_cashback_percent > 0) {
+    return (item.price * item.qty) * (item.ori_cashback_percent / 100)
+  }
+  return 0
+}
+
 const subtotal = computed(() => {
-  return cart.value.reduce((sum, item) => sum + (item.qty * item.price), 0)
+  return cart.value.reduce((sum, item) => sum + (item.qty * item.price) - getItemOriDiscount(item), 0)
 })
 
 const discountType = ref('rupiah') // 'rupiah' | 'percent'
@@ -988,11 +1012,23 @@ const totalTaxInclude = computed(() => {
 })
 
 const totalTax = computed(() => {
+  if (applyGlobalTax.value) {
+    const basis = Math.max(0, subtotal.value - discountNominal.value - redeemPoints.value)
+    return basis * 0.11
+  }
   return totalTaxExclude.value + totalTaxInclude.value
 })
 
+const applyGlobalTax = ref(false)
+
+const redeemPoints = ref(0)
+
 const totalAmount = computed(() => {
-  return Math.max(0, subtotal.value + totalTaxExclude.value - discountNominal.value)
+  if (applyGlobalTax.value) {
+    const basis = Math.max(0, subtotal.value - discountNominal.value - redeemPoints.value)
+    return basis + totalTax.value
+  }
+  return Math.max(0, subtotal.value + totalTaxExclude.value - discountNominal.value - redeemPoints.value)
 })
 
 // Fullscreen API Handling
@@ -1024,6 +1060,8 @@ const handleCheckoutClick = () => {
   paymentMethod.value = 'cash'
   paidAmountRaw.value = 0
   dpAmountRaw.value = 0
+  redeemPoints.value = 0
+  applyGlobalTax.value = false
   customerId.value = null
   selectedCustomer.value = null
   customerSearch.value = ''
@@ -1059,7 +1097,13 @@ const submitCheckout = async () => {
   // Wajib jika transaksi Utang (Tempo/Piutang)
   if (transactionType.value === 'utang' && !targetCustomerId && !targetCustomerName) {
     snackbar.show('Mohon pilih atau ketik nama pelanggan! (Wajib diisi untuk transaksi utang/tempo)', 'warning')
-    
+    return
+  }
+
+  // Wajib jika ada klaim promo ori
+  const hasOriClaim = cart.value.some(item => item.is_ori)
+  if (hasOriClaim && !targetCustomerId && !targetCustomerName) {
+    snackbar.show('Mohon pilih atau ketik nama pelanggan! (Wajib untuk klaim Promo Barang Ori)', 'warning')
     return
   }
 
@@ -1124,6 +1168,14 @@ const confirmAndSubmitCheckout = () => {
 
   const formData = new FormData()
 
+  if (redeemPoints.value > 0) {
+    formData.append('redeemed_points', redeemPoints.value)
+  }
+  
+  if (applyGlobalTax.value) {
+    formData.append('apply_global_tax', '1')
+  }
+
   formData.append('branch_id', activeBranchId.value)
   formData.append('date', new Date().toISOString().substr(0, 10))
   formData.append('discount', discount.value)
@@ -1183,6 +1235,10 @@ const confirmAndSubmitCheckout = () => {
     formData.append(`items[${index}][price]`, item.price)
     if (item.batch_id) {
       formData.append(`items[${index}][batch_id]`, item.batch_id)
+    }
+    if (item.is_ori && customerId.value) {
+      formData.append(`items[${index}][is_ori]`, 1)
+      formData.append(`items[${index}][ori_promo_type]`, item.ori_promo_type || '')
     }
   })
 
@@ -1653,6 +1709,42 @@ const startNewTransaction = () => {
                     </div>
                   </div>
 
+                  <!-- Barang Ori Checkbox (Only if applicable) -->
+                  <div
+                    v-if="item.ori_discount_percent > 0 || item.ori_cashback_percent > 0"
+                    class="mt-2"
+                  >
+                    <VCheckbox
+                      v-model="item.is_ori"
+                      label="Klaim Promo Barang Ori"
+                      density="compact"
+                      hide-details
+                      class="pos-ori-checkbox"
+                      color="primary"
+                      @change="!item.ori_promo_type ? item.ori_promo_type = (item.ori_discount_percent > 0 ? 'discount' : 'cashback') : null"
+                    />
+                    
+                    <div v-if="item.is_ori" class="d-flex flex-column gap-1 mt-1 ms-6">
+                      <VRadioGroup v-model="item.ori_promo_type" inline hide-details density="compact">
+                        <VRadio
+                          v-if="item.ori_discount_percent > 0"
+                          :label="`Diskon (${item.ori_discount_percent}%)`"
+                          value="discount"
+                          density="compact"
+                        />
+                        <VRadio
+                          v-if="item.ori_cashback_percent > 0"
+                          :label="`Cashback (${item.ori_cashback_percent}%)`"
+                          value="cashback"
+                          density="compact"
+                        />
+                      </VRadioGroup>
+                      <div class="text-caption text-error font-weight-medium" style="font-size: 10px;">
+                        * Wajib pilih pelanggan di menu Pembayaran.
+                      </div>
+                    </div>
+                  </div>
+
                   <!-- Warning below minimum price limit -->
                   <div
                     v-if="Number(item.price) < Number(item.min_nego_price > 0 ? item.min_nego_price : item.original_price)"
@@ -1674,8 +1766,14 @@ const startNewTransaction = () => {
                     <VIcon icon="ri-delete-bin-line" size="16" color="error" />
                   </button>
 
-                  <div class="font-weight-bold text-slate-800 text-caption mt-auto">
-                    {{ formatRupiah(item.price * item.qty) }}
+                  <div class="font-weight-bold text-slate-800 text-caption mt-auto d-flex flex-column align-end">
+                    <div v-if="getItemOriDiscount(item) > 0" class="text-decoration-line-through text-disabled" style="font-size: 10px;">
+                      {{ formatRupiah(item.price * item.qty) }}
+                    </div>
+                    <span>{{ formatRupiah((item.price * item.qty) - getItemOriDiscount(item)) }}</span>
+                    <div v-if="getItemOriCashback(item) > 0" class="text-warning mt-1" style="font-size: 10px;">
+                      + {{ formatRupiah(getItemOriCashback(item)) }} Poin
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1757,6 +1855,11 @@ const startNewTransaction = () => {
             <!-- Discount Nominal Preview if Percent -->
             <div v-if="discountType === 'percent' && discountPercentInput > 0" class="text-right text-xs text-slate-500 mb-1" style="font-size: 10.5px;">
               Potongan: -{{ formatRupiah(discountNominal) }}
+            </div>
+
+            <div v-if="totalTax > 0" class="d-flex justify-space-between align-center mb-1 text-caption text-info">
+              <span>{{ applyGlobalTax ? 'PPN (11%)' : 'Pajak (PPN)' }}</span>
+              <span class="font-weight-semibold">+ {{ formatRupiah(totalTax) }}</span>
             </div>
 
             <div class="pos-summary-divider my-2"></div>
@@ -1975,6 +2078,23 @@ const startNewTransaction = () => {
             />
           </VRadioGroup>
 
+          <!-- Global PPN Toggle -->
+          <div class="mt-4 mb-2 pa-3 bg-indigo-50 border border-primary rounded d-flex align-center justify-space-between">
+            <div class="d-flex align-center gap-2">
+              <VIcon icon="ri-percent-line" color="primary" />
+              <div>
+                <div class="font-weight-medium text-primary">Kenakan PPN 11%</div>
+                <div class="text-caption text-medium-emphasis">Dihitung otomatis 11% dari Total (Subtotal - Diskon)</div>
+              </div>
+            </div>
+            <VSwitch
+              v-model="applyGlobalTax"
+              color="primary"
+              hide-details
+              density="compact"
+            />
+          </div>
+
           <!-- Customer Selection (Optional for regular, Mandatory for Utang) -->
           <div class="mt-4">
             <div class="d-flex align-center justify-space-between mb-1">
@@ -2019,6 +2139,42 @@ const startNewTransaction = () => {
                 </div>
               </template>
             </VCombobox>
+
+            <!-- Poin Redemption UI -->
+            <VExpandTransition>
+              <div v-if="selectedCustomerObject && selectedCustomerObject.points > 0" class="pa-3 bg-amber-50 rounded border border-warning mb-4">
+                <div class="d-flex align-center justify-space-between mb-2">
+                  <div class="font-weight-bold text-warning text-caption">
+                    <VIcon icon="ri-vip-crown-line" size="14" class="me-1" />
+                    Pelanggan memiliki {{ formatRupiah(selectedCustomerObject.points) }} Poin
+                  </div>
+                </div>
+                <div class="d-flex align-center gap-2">
+                  <VTextField
+                    :model-value="formatInputRupiah(redeemPoints)"
+                    label="Gunakan Poin (Rp)"
+                    density="compact"
+                    variant="outlined"
+                    prefix="Rp"
+                    hide-details
+                    bg-color="white"
+                    :error-messages="redeemPoints > selectedCustomerObject.points ? ['Melebihi saldo poin'] : []"
+                    @update:model-value="val => {
+                      const num = parseInputRupiah(val);
+                      redeemPoints = Math.min(num, selectedCustomerObject.points);
+                    }"
+                  />
+                  <VBtn
+                    color="warning"
+                    size="small"
+                    variant="flat"
+                    @click="redeemPoints = Math.min(selectedCustomerObject.points, subtotal + totalTaxExclude - discountNominal)"
+                  >
+                    Pakai Maksimal
+                  </VBtn>
+                </div>
+              </div>
+            </VExpandTransition>
           </div>
 
           <VExpandTransition>
@@ -3024,7 +3180,7 @@ const startNewTransaction = () => {
   transition: all 0.15s;
 }
 .pos-scan-btn:hover {
-  border-color: #3b82f6;
+  border-color: #F2000E;
   background: #f8fafc;
 }
 
@@ -3060,13 +3216,13 @@ const startNewTransaction = () => {
   transition: all 0.15s;
 }
 .pos-cat-pill:hover {
-  border-color: #3b82f6;
-  color: #3b82f6;
+  border-color: #F2000E;
+  color: #F2000E;
 }
 .pos-cat-pill-active {
-  background: #3b82f6 !important;
+  background: #F2000E !important;
   color: #ffffff !important;
-  border-color: #3b82f6 !important;
+  border-color: #F2000E !important;
 }
 
 .pos-catalog-body {
@@ -3113,7 +3269,7 @@ const startNewTransaction = () => {
 }
 .pos-product-card:hover {
   transform: translateY(-2px);
-  border-color: #3b82f6;
+  border-color: #F2000E;
   box-shadow: 0 6px 16px rgba(59, 130, 246, 0.1);
 }
 
@@ -3164,7 +3320,7 @@ const startNewTransaction = () => {
 .pos-card-price {
   font-size: 14px;
   font-weight: 800;
-  color: #3b82f6;
+  color: #F2000E;
   line-height: 1.2;
 }
 
@@ -3178,9 +3334,9 @@ const startNewTransaction = () => {
   display: inline-block;
 }
 .pos-method-badge.fifo {
-  background: #eff6ff;
-  color: #2563eb;
-  border: 1px solid #dbeafe;
+  background: #FDEEEF;
+  color: #D9000C;
+  border: 1px solid #FBD2D5;
 }
 .pos-method-badge.lifo {
   background: #f5f3ff;
@@ -3273,7 +3429,7 @@ const startNewTransaction = () => {
   height: 44px;
   min-height: 44px;
   flex-shrink: 0;
-  background: #3b82f6;
+  background: #F2000E;
   color: #ffffff;
   padding: 0 14px;
   display: flex;
@@ -3283,7 +3439,7 @@ const startNewTransaction = () => {
 
 .pos-cart-count-badge {
   background: #ffffff;
-  color: #3b82f6;
+  color: #F2000E;
   font-size: 11px;
   font-weight: 800;
   padding: 1px 7px;
@@ -3393,7 +3549,7 @@ const startNewTransaction = () => {
   transition: all 0.15s;
 }
 .pos-cart-price-input-wrapper:focus-within {
-  border-color: #3b82f6;
+  border-color: #F2000E;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
 .pos-cart-price-prefix {
@@ -3408,7 +3564,7 @@ const startNewTransaction = () => {
   outline: none;
   font-size: 11.5px;
   font-weight: 700;
-  color: #2563eb;
+  color: #D9000C;
   background: transparent;
   text-align: right;
   font-family: monospace;
@@ -3453,7 +3609,7 @@ const startNewTransaction = () => {
   transition: all 0.15s;
 }
 .pos-disc-btn-active {
-  background: #3b82f6;
+  background: #F2000E;
   color: #ffffff;
   box-shadow: 0 1px 2px rgba(59, 130, 246, 0.2);
 }
@@ -3469,7 +3625,7 @@ const startNewTransaction = () => {
   transition: all 0.15s;
 }
 .pos-diskon-input-wrapper:focus-within {
-  border-color: #3b82f6;
+  border-color: #F2000E;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
 .pos-diskon-prefix,
@@ -3528,20 +3684,20 @@ const startNewTransaction = () => {
   flex: 1.5;
   height: 40px;
   border: none;
-  background: #3b82f6;
+  background: #07AE2D;
   color: #ffffff;
   border-radius: 8px;
-  font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.15s;
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 2px 6px rgba(7, 174, 45, 0.25);
 }
 .pos-btn-pay:hover:not(:disabled) {
-  background: #2563eb;
+  background: #058A23;
 }
 .pos-btn-pay:disabled {
   opacity: 0.5;
@@ -3581,7 +3737,7 @@ const startNewTransaction = () => {
 }
 
 .bg-primary-subtle {
-  background: #eff6ff;
+  background: #FDEEEF;
 }
 .bg-amber-subtle {
   background: #fffbeb;

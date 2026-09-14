@@ -377,34 +377,6 @@ class BankAccountController extends Controller
                 ];
             });
 
-        // 3. Branch Capital Injection (Penyaluran Modal ke Cabang via Bank) - Debit (-)
-        $injections = \App\Models\BranchCapital::with('branch:id,name')
-            ->where('type', 'injection')
-            ->where('status', 'approved')
-            ->where(function($q) use ($bankAccount) {
-                $q->where('bank_account_id', $bankAccount->id)
-                  ->orWhere('account_number', $bankAccount->account_number)
-                  ->orWhere('bank_name', $bankAccount->bank_name);
-            })
-            ->get()->map(function ($bc) {
-                $amt = (float)$bc->amount;
-                $bName = $bc->branch ? $bc->branch->name : 'Cabang';
-                return [
-                    'id' => 'cap_inj_' . $bc->id,
-                    'raw_date' => $bc->created_at ? $bc->created_at->format('Y-m-d H:i:s') : ($bc->date . ' 00:00:00'),
-                    'date' => $bc->date ? date('Y-m-d', strtotime($bc->date)) : ($bc->created_at ? $bc->created_at->format('Y-m-d') : date('Y-m-d')),
-                    'time' => $bc->created_at ? $bc->created_at->format('H:i') : '-',
-                    'reference_no' => $bc->reference_no ?: ('INJ-' . $bc->id),
-                    'category' => 'Penyaluran Modal Cabang (Injeksi)',
-                    'description' => 'Penyaluran Modal ke Cabang ' . $bName . ' - ' . ($bc->category ?: 'Injeksi Modal Usaha') . ($bc->notes ? ' (' . $bc->notes . ')' : ''),
-                    'type' => 'debit',
-                    'debit' => $amt,
-                    'credit' => 0,
-                    'amount' => $amt,
-                    'channel' => strtoupper($bc->payment_method ?: 'TRANSFER'),
-                ];
-            });
-
         // 4. Payable Payments - Debit (-)
         $payablePayments = \App\Models\PayablePayment::with(['payableStatement.supplier:id,name', 'payable.purchaseOrder.supplier:id,name', 'user:id,name'])
             ->where('bank_account_id', $bankAccount->id)
@@ -457,34 +429,6 @@ class BankAccountController extends Controller
                 ];
             });
 
-        // 6. Branch Capital Returns (Setoran Pengembalian Modal / ROI dari Cabang via Bank) - Credit (+)
-        $capitalReturns = \App\Models\BranchCapital::with('branch:id,name')
-            ->where('type', 'return')
-            ->where('status', 'approved')
-            ->where(function($q) use ($bankAccount) {
-                $q->where('bank_account_id', $bankAccount->id)
-                  ->orWhere('account_number', $bankAccount->account_number)
-                  ->orWhere('bank_name', $bankAccount->bank_name);
-            })
-            ->get()->map(function ($bc) {
-                $amt = (float)$bc->amount;
-                $bName = $bc->branch ? $bc->branch->name : 'Cabang';
-                return [
-                    'id' => 'cap_ret_' . $bc->id,
-                    'raw_date' => $bc->created_at ? $bc->created_at->format('Y-m-d H:i:s') : ($bc->date . ' 00:00:00'),
-                    'date' => $bc->date ? date('Y-m-d', strtotime($bc->date)) : ($bc->created_at ? $bc->created_at->format('Y-m-d') : date('Y-m-d')),
-                    'time' => $bc->created_at ? $bc->created_at->format('H:i') : '-',
-                    'reference_no' => $bc->reference_no ?: ('RET-CAP-' . $bc->id),
-                    'category' => 'Pengembalian Modal / ROI Masuk',
-                    'description' => 'Setoran Pengembalian Modal / ROI dari Cabang ' . $bName . ' - ' . ($bc->category ?: 'Setoran Modal') . ($bc->notes ? ' (' . $bc->notes . ')' : ''),
-                    'type' => 'credit',
-                    'debit' => 0,
-                    'credit' => $amt,
-                    'amount' => $amt,
-                    'channel' => strtoupper($bc->payment_method ?: 'TRANSFER'),
-                ];
-            });
-
         // 7. Sale Returns Refund - Debit (-)
         $saleReturns = \App\Models\ReturnTransaction::where('reference_type', 'sale')
             ->whereIn('return_type', ['pengembalian_dana', 'pengembalian_uang'])
@@ -514,10 +458,8 @@ class BankAccountController extends Controller
         $allTransactions = collect([])
             ->concat($sales)
             ->concat($receivablePayments)
-            ->concat($injections)
             ->concat($payablePayments)
             ->concat($pettyCash)
-            ->concat($capitalReturns)
             ->concat($saleReturns)
             ->sortBy('raw_date')
             ->values();

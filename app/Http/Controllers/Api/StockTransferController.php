@@ -134,88 +134,131 @@ class StockTransferController extends Controller
         try {
             DB::beginTransaction();
 
-            // Generate reference number
+            $isCapital = $request->boolean('is_capital_transfer', false);
+
+            // Generate reference number — pakai prefix CAP untuk distribusi modal barang
             $count = StockTransfer::whereDate('created_at', date('Y-m-d'))->count() + 1;
-            $referenceNo = 'TRF-' . date('Ymd') . '-' . str_pad($count, 3, '0', STR_PAD_LEFT);
+            $prefix = $isCapital ? 'CAP' : 'TRF';
+            $referenceNo = $prefix . '-' . date('Ymd') . '-' . str_pad($count, 3, '0', STR_PAD_LEFT);
+
+            // Hitung total capital_value (∑ qty × cost_price) jika ini distribusi modal barang
+            $capitalValue = null;
+            if ($isCapital) {
+                $capitalValue = 0;
+                foreach ($request->items as $item) {
+                    $qty = (int) ($item['qty'] ?? 0);
+                    // Ambil cost_price dari request jika ada, fallback ke product_branches atau products
+                    $costPrice = isset($item['cost_price']) && $item['cost_price'] > 0
+                        ? (float) $item['cost_price']
+                        : (float) (\App\Models\ProductBranch::withoutGlobalScopes()
+                            ->where('branch_id', $request->source_branch_id)
+                            ->where('product_id', $item['product_id'])
+                            ->value('cost_price')
+                            ?? \App\Models\Product::where('id', $item['product_id'])->value('cost_price')
+                            ?? 0);
+                    $capitalValue += $qty * $costPrice;
+                }
+            }
 
             $transfer = StockTransfer::create([
-                'reference_no' => $referenceNo,
-                'source_branch_id' => $request->source_branch_id,
-                'destination_branch_id' => $request->destination_branch_id,
-                'status' => 'pending',
-                'notes' => $request->notes,
-                'created_by' => $request->user()->id ?? null,
+                'reference_no'           => $referenceNo,
+                'source_branch_id'       => $request->source_branch_id,
+                'destination_branch_id'  => $request->destination_branch_id,
+                'status'                 => 'pending',
+                'notes'                  => $request->notes,
+                'created_by'             => $request->user()->id ?? null,
+                'is_capital_transfer'    => $isCapital,
+                'capital_value'          => $capitalValue,
             ]);
 
             foreach ($request->items as $item) {
                 // Ensure product branch records exist for both source and destination
                 ProductBranch::withoutGlobalScopes()->firstOrCreate(
                     [
-                        'branch_id' => $request->source_branch_id,
+                        'branch_id'  => $request->source_branch_id,
                         'product_id' => $item['product_id'],
                     ],
-                    [
-                        'stock' => 0,
-                    ]
+                    ['stock' => 0]
                 );
 
                 ProductBranch::withoutGlobalScopes()->firstOrCreate(
                     [
-                        'branch_id' => $request->destination_branch_id,
+                        'branch_id'  => $request->destination_branch_id,
                         'product_id' => $item['product_id'],
                     ],
-                    [
-                        'stock' => 0,
-                    ]
+                    ['stock' => 0]
                 );
 
                 StockTransferItem::create([
                     'stock_transfer_id' => $transfer->id,
-                    'product_id' => $item['product_id'],
-                    'qty' => $item['qty'],
-                    'status' => 'pending',
+                    'product_id'        => $item['product_id'],
+                    'qty'               => $item['qty'],
+                    'status'            => 'pending',
                 ]);
             }
 
             DB::commit();
 
             $sourceBranch = Branch::find($request->source_branch_id);
-            $destBranch = Branch::find($request->destination_branch_id);
-            $sourceName = $sourceBranch ? $sourceBranch->name : 'Cabang Asal';
-            $destName = $destBranch ? $destBranch->name : 'Cabang Tujuan';
+            $destBranch   = Branch::find($request->destination_branch_id);
+            $sourceName   = $sourceBranch ? $sourceBranch->name : 'Cabang Asal';
+            $destName     = $destBranch   ? $destBranch->name   : 'Cabang Tujuan';
 
-            NotificationService::notifyBranch(
-                $request->source_branch_id,
-                'Permintaan Mutasi Stok Masuk',
-                "Permintaan barang dari cabang {$destName} (Ref: {$referenceNo}) menunggu disiapkan.",
-                '/mutasi-stok',
-                'info',
-                'ri-truck-line'
-            );
-
-            if ($request->user()) {
-                NotificationService::notifyUser(
-                    $request->user()->id,
-                    'Pengajuan Mutasi Berhasil',
-                    "Permintaan mutasi barang {$referenceNo} ke {$sourceName} berhasil diajukan.",
-                    '/mutasi-stok',
+            if ($isCapital) {
+                // Notifikasi distribusi modal barang
+                $formattedValue = $capitalValue ? 'Rp ' . number_format($capitalValue, 0, ',', '.') : '';
+                NotificationService::notifyBranch(
+                    $request->destination_branch_id,
+                    'Distribusi Modal Barang dari Pusat',
+                    "Pusat mengirimkan modal barang senilai {$formattedValue} ke cabang Anda (Ref: {$referenceNo}). Menunggu konfirmasi pengiriman.",
+                    '/apps/branch-capitals',
                     'success',
+                    'ri-store-3-line'
+                );
+                NotificationService::notifyOwnerAndAdmins(
+                    'Distribusi Modal Barang Baru',
+                    "Distribusi modal barang {$referenceNo} dari {$sourceName} ke {$destName} senilai {$formattedValue}.",
+                    '/apps/branch-capitals',
+                    'info',
+                    'ri-store-3-line',
+                    $request->destination_branch_id
+                );
+            } else {
+                NotificationService::notifyBranch(
+                    $request->source_branch_id,
+                    'Permintaan Mutasi Stok Masuk',
+                    "Permintaan barang dari cabang {$destName} (Ref: {$referenceNo}) menunggu disiapkan.",
+                    '/mutasi-stok',
+                    'info',
+                    'ri-truck-line'
+                );
+
+                if ($request->user()) {
+                    NotificationService::notifyUser(
+                        $request->user()->id,
+                        'Pengajuan Mutasi Berhasil',
+                        "Permintaan mutasi barang {$referenceNo} ke {$sourceName} berhasil diajukan.",
+                        '/mutasi-stok',
+                        'success',
+                        'ri-truck-line',
+                        $request->destination_branch_id
+                    );
+                }
+
+                NotificationService::notifyOwnerAndAdmins(
+                    'Permintaan Mutasi Stok Baru',
+                    "Pengajuan mutasi {$referenceNo} dari {$sourceName} ke {$destName}.",
+                    '/mutasi-stok',
+                    'info',
                     'ri-truck-line',
                     $request->destination_branch_id
                 );
             }
 
-            NotificationService::notifyOwnerAndAdmins(
-                'Permintaan Mutasi Stok Baru',
-                "Pengajuan mutasi {$referenceNo} dari {$sourceName} ke {$destName}.",
-                '/mutasi-stok',
-                'info',
-                'ri-truck-line',
-                $request->destination_branch_id
-            );
-
             return response()->json([
-                'message' => 'Permintaan mutasi stok berhasil dibuat dan menunggu konfirmasi cabang asal.',
+                'message' => $isCapital
+                    ? 'Distribusi modal barang berhasil dibuat dan menunggu proses pengiriman.'
+                    : 'Permintaan mutasi stok berhasil dibuat dan menunggu konfirmasi cabang asal.',
                 'data' => $transfer->load(['items.product', 'sourceBranch', 'destinationBranch'])
             ], 201);
 
@@ -277,6 +320,16 @@ class StockTransferController extends Controller
             $sourceName = $transfer->sourceBranch ? $transfer->sourceBranch->name : 'Cabang Asal';
             $destName = $transfer->destinationBranch ? $transfer->destinationBranch->name : 'Cabang Tujuan';
 
+            $productIds = $transfer->items->pluck('product_id')->unique()->toArray();
+            $sourceProductBranches = \App\Models\ProductBranch::withoutGlobalScopes()
+                ->where('branch_id', $transfer->source_branch_id)
+                ->whereIn('product_id', $productIds)
+                ->with(['product', 'productBatches' => function ($q) {
+                    $q->where('qty', '>', 0);
+                }])
+                ->get()
+                ->keyBy('product_id');
+
             foreach ($transfer->items as $item) {
                 $payload = $inputItemsById->get($item->id);
                 
@@ -296,10 +349,7 @@ class StockTransferController extends Controller
                 }
 
                 // 1. Deduct from source branch
-                $sourceProductBranch = ProductBranch::withoutGlobalScopes()
-                    ->where('branch_id', $transfer->source_branch_id)
-                    ->where('product_id', $item->product_id)
-                    ->first();
+                $sourceProductBranch = $sourceProductBranches->get($item->product_id);
 
                 if (!$sourceProductBranch || $sourceProductBranch->stock < $qtyPrepared) {
                     $prodName = $item->product->name ?? "ID " . $item->product_id;
@@ -323,20 +373,19 @@ class StockTransferController extends Controller
                 $remainingQty = $qtyPrepared;
                 $transferredBatches = [];
                 
-                $stockMethod = $sourceProductBranch->product->stock_method ?? 'fifo';
+                $stockMethod = $item->product->stock_method ?? 'fifo';
                 
-                $batchQuery = ProductBatch::where('product_branch_id', $sourceProductBranch->id)
-                    ->where('qty', '>', 0);
-                    
                 if ($stockMethod === 'fefo') {
-                    $batchQuery->orderByRaw('expiration_date IS NULL, expiration_date ASC, entry_date ASC');
+                    $sourceBatches = $sourceProductBranch->productBatches->sortBy([
+                        fn ($a, $b) => ($a->expiration_date === null) <=> ($b->expiration_date === null),
+                        ['expiration_date', 'asc'],
+                        ['entry_date', 'asc'],
+                    ]);
                 } elseif ($stockMethod === 'lifo') {
-                    $batchQuery->orderBy('entry_date', 'desc')->orderBy('id', 'desc');
+                    $sourceBatches = $sourceProductBranch->productBatches->sortByDesc('entry_date')->sortByDesc('id');
                 } else { // fifo
-                    $batchQuery->orderBy('entry_date', 'asc')->orderBy('id', 'asc');
+                    $sourceBatches = $sourceProductBranch->productBatches->sortBy('entry_date')->sortBy('id');
                 }
-                
-                $sourceBatches = $batchQuery->get();
                     
                 if ($sourceBatches->count() > 0) {
                     foreach ($sourceBatches as $batch) {
@@ -592,13 +641,9 @@ class StockTransferController extends Controller
 
                 if ($qtyReceived <= 0) continue;
 
-                $sourceProductBranch = ProductBranch::withoutGlobalScopes()
-                    ->where('branch_id', $transfer->source_branch_id)
-                    ->where('product_id', $item->product_id)
-                    ->first();
-
-                $sourcePrice = $sourceProductBranch ? $sourceProductBranch->price : 0;
-                $sourceCostPrice = $sourceProductBranch ? $sourceProductBranch->cost_price : 0;
+                // Pre-loaded source info from original transfer preparation
+                // Note: For receiving, we assume items have their batch/price metadata stored
+                $sourceCostPrice = collect($item->batches_data)->sum('cost_price') / (count($item->batches_data) ?: 1);
 
                 // Add to destination branch
                 $destinationProductBranch = ProductBranch::withoutGlobalScopes()->firstOrCreate(
@@ -609,7 +654,7 @@ class StockTransferController extends Controller
                     [
                         'id' => (string) Str::uuid(),
                         'stock' => 0,
-                        'price' => $sourcePrice,
+                        'price' => 0,
                         'cost_price' => $sourceCostPrice,
                         'min_stock' => 0,
                         'is_active' => true
@@ -802,6 +847,13 @@ class StockTransferController extends Controller
             // If stock was already deducted (ready_for_pickup / in_transit / approved), restore it to source
             if (in_array($transfer->status, ['ready_for_pickup', 'in_transit', 'approved'])) {
                 $destName = $transfer->destinationBranch ? $transfer->destinationBranch->name : 'Cabang Tujuan';
+                
+                $productIds = $transfer->items->pluck('product_id')->unique()->toArray();
+                $sourceProductBranches = ProductBranch::withoutGlobalScopes()
+                    ->where('branch_id', $transfer->source_branch_id)
+                    ->whereIn('product_id', $productIds)
+                    ->get()
+                    ->keyBy('product_id');
 
                 foreach ($transfer->items as $item) {
                     // Only restore items that were actually prepared
@@ -812,10 +864,7 @@ class StockTransferController extends Controller
                     $qtyToRestore = $item->qty_prepared ?? $item->qty;
                     if ($qtyToRestore <= 0) continue;
 
-                    $sourceProductBranch = ProductBranch::withoutGlobalScopes()
-                        ->where('branch_id', $transfer->source_branch_id)
-                        ->where('product_id', $item->product_id)
-                        ->first();
+                    $sourceProductBranch = $sourceProductBranches->get($item->product_id);
 
                     if ($sourceProductBranch) {
                         $sourceProductBranch->stock += $qtyToRestore;

@@ -13,7 +13,7 @@ class EmployeeController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Employee::with(['branch', 'user']);
+        $query = Employee::with(['branch', 'user', 'position', 'deductionTypes']);
         
         $search = $request->query('search');
         $branchId = $request->query('branch_id');
@@ -95,6 +95,14 @@ class EmployeeController extends Controller
                     'joined_date' => $emp->joined_date,
                     'status' => $isActive ? 'Aktif' : ($emp->status ?? 'Nonaktif'),
                     'role_id' => count($roles) > 0 ? $roles[0] : null,
+                    'position_id' => $emp->position_id,
+                    'position_name' => $emp->position ? $emp->position->name : null,
+                    'custom_base_salary' => $emp->custom_base_salary,
+                    'custom_allowance' => $emp->custom_allowance,
+                    'custom_deduction' => $emp->custom_deduction,
+                    'bank_name' => $emp->bank_name,
+                    'bank_account_number' => $emp->bank_account_number,
+                    'attendance_machine_id' => $emp->attendance_machine_id,
                 ];
             });
 
@@ -160,6 +168,14 @@ class EmployeeController extends Controller
                 'joined_date' => $emp->joined_date,
                 'status' => $emp->status,
                 'role_id' => count($roles) > 0 ? $roles[0] : null,
+                'position_id' => $emp->position_id,
+                'position_name' => $emp->position ? $emp->position->name : null,
+                'custom_base_salary' => $emp->custom_base_salary,
+                'custom_allowance' => $emp->custom_allowance,
+                'custom_deduction' => $emp->custom_deduction,
+                'bank_name' => $emp->bank_name,
+                'bank_account_number' => $emp->bank_account_number,
+                'attendance_machine_id' => $emp->attendance_machine_id,
             ];
         });
         
@@ -176,12 +192,25 @@ class EmployeeController extends Controller
             'name' => 'required|string|max:255',
             'branch_id' => 'required|exists:branches,id',
             'email' => 'nullable|email',
+            'nik' => 'nullable|string',
+            'position_id' => 'nullable|exists:positions,id',
+            'status' => 'required|string',
+            'bank_name' => 'nullable|string',
+            'bank_account_number' => 'nullable|string',
+            'attendance_machine_id' => 'nullable|string',
+            'custom_base_salary' => 'nullable|numeric',
+            'custom_allowance' => 'nullable|numeric',
+            'custom_deduction' => 'nullable|numeric',
         ]);
 
         DB::beginTransaction();
         try {
-            $employeeData = $request->except(['role_id']);
+            $employeeData = $request->except(['role_id', 'deduction_type_ids']);
             $employee = Employee::create($employeeData);
+
+            if ($request->has('deduction_type_ids')) {
+                $employee->deductionTypes()->sync($request->deduction_type_ids);
+            }
 
             // If a role is provided, create a user account
             if ($request->filled('role_id')) {
@@ -192,6 +221,10 @@ class EmployeeController extends Controller
                 
                 // Check if user with email already exists
                 $user = User::where('email', $request->email)->first();
+                if ($user) {
+                    throw new \Exception('Email sudah terdaftar pada pengguna lain. Gunakan email yang berbeda.');
+                }
+
                 if (!$user) {
                     $defaultPassword = 'password';
                     if (!empty($request->birth_date)) {
@@ -202,7 +235,12 @@ class EmployeeController extends Controller
                         'name' => $request->name,
                         'email' => $request->email,
                         'password' => Hash::make($defaultPassword),
+                        'branch_id' => $request->branch_id,
+                        'status' => 'Aktif',
                     ]);
+
+                    // Send Email Verification Notification
+                    $user->sendEmailVerificationNotification();
                 }
                 
                 $employee->user_id = $user->id;
@@ -231,7 +269,7 @@ class EmployeeController extends Controller
 
     public function show(string $id)
     {
-        return Employee::findOrFail($id);
+        return Employee::with(['branch', 'user', 'position', 'deductionTypes'])->findOrFail($id);
     }
 
     public function update(Request $request, string $id)
@@ -243,13 +281,27 @@ class EmployeeController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'branch_id' => 'required|exists:branches,id',
+            'email' => 'nullable|email',
+            'nik' => 'nullable|string',
+            'position_id' => 'nullable|exists:positions,id',
+            'status' => 'required|string',
+            'bank_name' => 'nullable|string',
+            'bank_account_number' => 'nullable|string',
+            'attendance_machine_id' => 'nullable|string',
+            'custom_base_salary' => 'nullable|numeric',
+            'custom_allowance' => 'nullable|numeric',
+            'custom_deduction' => 'nullable|numeric',
         ]);
 
         DB::beginTransaction();
         try {
             $employee = Employee::findOrFail($id);
-            $employeeData = $request->except(['role_id']);
+            $employeeData = $request->except(['role_id', 'deduction_type_ids']);
             $employee->update($employeeData);
+
+            if ($request->has('deduction_type_ids')) {
+                $employee->deductionTypes()->sync($request->deduction_type_ids);
+            }
 
             if ($request->filled('role_id')) {
                 if (empty($request->email)) {
@@ -257,6 +309,11 @@ class EmployeeController extends Controller
                 }
 
                 $user = User::where('email', $request->email)->first();
+                
+                if ($user && $user->id !== $employee->user_id) {
+                    throw new \Exception('Email sudah terdaftar pada pengguna lain. Gunakan email yang berbeda.');
+                }
+
                 if (!$user && $employee->user_id) {
                     $user = User::find($employee->user_id);
                     $user->update(['email' => $request->email, 'name' => $request->name]);
@@ -270,7 +327,12 @@ class EmployeeController extends Controller
                         'name' => $request->name,
                         'email' => $request->email,
                         'password' => Hash::make($defaultPassword),
+                        'branch_id' => $request->branch_id,
+                        'status' => 'Aktif',
                     ]);
+
+                    // Send Email Verification Notification
+                    $user->sendEmailVerificationNotification();
                 }
                 
                 $employee->user_id = $user->id;
@@ -313,9 +375,154 @@ class EmployeeController extends Controller
 
         $employee = Employee::findOrFail($id);
         
-        // Instead of hard delete, maybe just set status to Diberhentikan or Resign, but let's allow hard delete if no related transactions
-        $employee->delete();
+        // Soft delete (Ubah status ke Nonaktif)
+        $employee->status = 'Nonaktif';
+        $employee->save();
         
-        return response()->json(['message' => 'Karyawan berhasil dihapus.']);
+        // Remove roles if any
+        if ($employee->user_id) {
+            DB::table('model_has_roles')
+                ->where('model_type', 'App\\Models\\User')
+                ->where('model_id', $employee->user_id)
+                ->delete();
+        }
+        
+        return response()->json(['message' => 'Karyawan berhasil dinonaktifkan (Soft Delete).']);
+    }
+
+    /**
+     * Download import template CSV
+     */
+    public function importTemplate()
+    {
+        $branches = \App\Models\Branch::orderBy('name')->get();
+        
+        $csvContent = "Nama Lengkap (Wajib),NIK / No KTP (Wajib),No HP (Wajib),Email,Jenis Kelamin (L/P),Tempat Lahir,Tanggal Lahir (YYYY-MM-DD),Agama,Status Pernikahan,Pendidikan,Alamat Lengkap,Nama Cabang (Wajib),Tanggal Bergabung (YYYY-MM-DD),Status (Aktif/Nonaktif),Kontak Darurat Nama,Kontak Darurat No HP\n";
+        
+        // Add example rows
+        $branchExample = $branches->first() ? $branches->first()->name : 'Cabang Utama';
+        $csvContent .= "Ahmad Fauzi,3201010101010001,081234567890,ahmad@email.com,L,Bandung,1995-03-15,Islam,Menikah,S1,Jl. Merdeka No. 10,$branchExample,2024-01-15,Aktif,Siti Aminah,081298765432\n";
+        $csvContent .= "Dewi Lestari,3201020202020002,085612345678,dewi@email.com,P,Jakarta,1998-07-22,Kristen,Belum Menikah,SMA,Jl. Sudirman No. 5,$branchExample,2024-06-01,Aktif,,\n";
+        
+        return response()->json([
+            'csv' => $csvContent,
+        ]);
+    }
+
+    /**
+     * Import employees from CSV file
+     */
+    public function importEmployees(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt|max:5120',
+        ]);
+
+        $file = $request->file('file');
+        $handle = fopen($file->getRealPath(), "r");
+        
+        $header = true;
+        $count = 0;
+        $errors = [];
+        
+        // Pre-load branches for matching
+        $branches = \App\Models\Branch::all()->keyBy(function ($b) {
+            return strtolower(trim($b->name));
+        });
+
+        DB::beginTransaction();
+        try {
+            $rowNum = 1;
+            while (($row = fgetcsv($handle, 4000, ",")) !== FALSE) {
+                if ($header) {
+                    $header = false;
+                    $rowNum++;
+                    continue;
+                }
+                $rowNum++;
+                
+                // Skip empty rows
+                if (!isset($row[0]) || trim($row[0]) === '') continue;
+
+                $name       = trim($row[0] ?? '');
+                $nik        = trim($row[1] ?? '');
+                $phone      = trim($row[2] ?? '');
+                $email      = trim($row[3] ?? '') ?: null;
+                $gender     = strtoupper(trim($row[4] ?? 'L'));
+                $birthPlace = trim($row[5] ?? '') ?: null;
+                $birthDate  = trim($row[6] ?? '') ?: null;
+                $religion   = trim($row[7] ?? '') ?: null;
+                $marital    = trim($row[8] ?? '') ?: null;
+                $education  = trim($row[9] ?? '') ?: null;
+                $address    = trim($row[10] ?? '') ?: null;
+                $branchName = strtolower(trim($row[11] ?? ''));
+                $joinedDate = trim($row[12] ?? '') ?: null;
+                $status     = trim($row[13] ?? 'Aktif');
+                $emergName  = trim($row[14] ?? '') ?: null;
+                $emergPhone = trim($row[15] ?? '') ?: null;
+
+                // Validate required fields
+                if (empty($name) || empty($nik) || empty($phone)) {
+                    $errors[] = "Baris $rowNum: Nama, NIK, dan No HP wajib diisi.";
+                    continue;
+                }
+
+                // Match branch
+                $branch = $branches->get($branchName);
+                if (!$branch) {
+                    $errors[] = "Baris $rowNum ($name): Cabang '$branchName' tidak ditemukan di sistem.";
+                    continue;
+                }
+
+                // Normalize gender
+                if (!in_array($gender, ['L', 'P'])) {
+                    $gender = 'L';
+                }
+
+                // Normalize status
+                $statusNormalized = in_array(strtolower($status), ['aktif', 'active', '1']) ? 'Aktif' : 'Nonaktif';
+
+                Employee::updateOrCreate(
+                    ['nik' => $nik],
+                    [
+                        'name'                   => $name,
+                        'phone'                  => $phone,
+                        'email'                  => $email,
+                        'gender'                 => $gender,
+                        'birth_place'            => $birthPlace,
+                        'birth_date'             => $birthDate,
+                        'religion'               => $religion,
+                        'marital_status'         => $marital,
+                        'education'              => $education,
+                        'address'                => $address,
+                        'branch_id'              => $branch->id,
+                        'joined_date'            => $joinedDate,
+                        'status'                 => $statusNormalized,
+                        'emergency_contact_name' => $emergName,
+                        'emergency_contact_phone'=> $emergPhone,
+                    ]
+                );
+                $count++;
+            }
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            fclose($handle);
+            return response()->json(['message' => 'Gagal mengimpor: ' . $e->getMessage()], 500);
+        }
+        
+        fclose($handle);
+        
+        $message = "$count data karyawan berhasil diimpor.";
+        if (count($errors) > 0) {
+            $message .= ' ' . count($errors) . ' baris dilewati: ' . implode(' | ', array_slice($errors, 0, 5));
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'imported' => $count,
+            'errors' => $errors,
+        ]);
     }
 }

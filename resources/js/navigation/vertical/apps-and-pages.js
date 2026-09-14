@@ -93,6 +93,19 @@ export default [
     ],
   },
   {
+    title: 'Personalia',
+    icon: { icon: 'ri-team-line' },
+    action: 'read',
+    subject: 'Personalia',
+    children: [
+      { title: 'Presensi', to: 'personalia-presensi', action: 'read', subject: 'Presensi' },
+      { title: 'Penggajian', to: 'personalia-penggajian', action: 'read', subject: 'Penggajian' },
+      { title: 'Master Karyawan', to: 'personalia-karyawan', action: 'read', subject: 'Master Karyawan' },
+      { title: 'Jabatan & Departemen', to: 'personalia-jabatan', action: 'read', subject: 'Jabatan & Departemen' },
+      { title: 'Master Potongan', to: 'personalia-potongan', action: 'read', subject: 'Master Potongan' },
+    ],
+  },
+  {
     title: 'Pusat Laporan',
     icon: { icon: 'ri-file-chart-line' },
     to: 'laporan',
@@ -111,6 +124,12 @@ export default [
     title: 'Pengaturan Pengguna',
     icon: { icon: 'ri-user-settings-line' },
     to: 'pengaturan-pengguna',
+  },
+  {
+    title: 'Manajemen Antrean',
+    icon: { icon: 'ri-list-settings-line' },
+    href: '/horizon',
+    target: '_blank',
   },
   {
     title: 'Roles & Permissions',

@@ -27,6 +27,13 @@ class Employee extends Model
         'user_id',
         'joined_date',
         'status',
+        'position_id',
+        'custom_base_salary',
+        'custom_allowance',
+        'custom_deduction',
+        'bank_name',
+        'bank_account_number',
+        'attendance_machine_id',
     ];
     
     public function branch()
@@ -37,5 +44,15 @@ class Employee extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function position()
+    {
+        return $this->belongsTo(Position::class);
+    }
+
+    public function deductionTypes()
+    {
+        return $this->belongsToMany(DeductionType::class, 'deduction_type_employee');
     }
 }

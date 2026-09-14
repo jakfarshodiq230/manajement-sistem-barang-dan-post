@@ -1,10 +1,14 @@
+<script setup>
+import { themeConfig } from '@themeConfig'
+</script>
+
 <template>
   <div class="h-100 d-flex align-center justify-space-between text-medium-emphasis">
     <!-- 👉 Footer: left content -->
     <div class="d-flex align-center text-base">
       &copy;
       {{ new Date().getFullYear() }} - 
-      By <span class="text-primary ms-1 font-weight-medium">Ms.POS</span>
+      By <span class="text-primary ms-1 font-weight-medium">{{ themeConfig.app.title }}</span>
     </div>
     <!-- 👉 Footer: right content -->
     <span class="d-md-flex gap-x-4 text-primary d-none">

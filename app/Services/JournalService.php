@@ -101,11 +101,33 @@ class JournalService
     }
 
     /**
-     * Helper to find account by code
+     * Helper to find account by setting key
      */
-    public static function getAccountByCode($code)
+    public static function getAccountByKey($key, $branchId = null)
     {
-        return Account::where('code', $code)->first();
+        $id = \App\Models\AccountSetting::getAccountId($key, $branchId);
+        if ($id) {
+            return Account::find($id);
+        }
+        
+        // Fallback to hardcoded codes if settings are not seeded
+        $fallbackCodes = [
+            'default_cash' => '1101',
+            'default_bank' => '1102',
+            'default_ar' => '1103',
+            'default_inventory' => '1104',
+            'default_ap' => '2101',
+            'default_capital' => '3101',
+            'default_sales' => '4101',
+            'default_cogs' => '5101',
+            'default_expense' => '6101',
+        ];
+        
+        if (isset($fallbackCodes[$key])) {
+            return Account::where('code', $fallbackCodes[$key])->first();
+        }
+        
+        return null;
     }
 
     /**
@@ -125,18 +147,20 @@ class JournalService
 
             $items = [];
             $branchId = $sale->branch_id;
+            $method = strtolower($sale->payment_method ?? 'cash');
 
-            // 1. Debit Payment Account (Kas / Bank / Piutang)
-            $paymentMethod = strtolower($sale->payment_method ?? 'cash');
-            if ($paymentMethod === 'bank_transfer' || $paymentMethod === 'qris' || $paymentMethod === 'edc') {
-                $cashAcc = self::getAccountByCode('1102') ?? self::getAccountByCode('1101'); // Bank
-            } elseif ($paymentMethod === 'tempo' || $paymentMethod === 'credit') {
-                $cashAcc = self::getAccountByCode('1103'); // Piutang Usaha
+            // 1. Rekam Pembayaran
+            if ($method === 'cash') {
+                $cashAcc = self::getAccountByKey('default_cash', $branchId); // Kas Kasir
+            } elseif ($method === 'bank_transfer' || $method === 'qris') {
+                $cashAcc = self::getAccountByKey('default_bank', $branchId) ?? self::getAccountByKey('default_cash', $branchId); // Bank
+            } elseif ($method === 'credit') {
+                $cashAcc = self::getAccountByKey('default_ar', $branchId); // Piutang Usaha
             } else {
-                $cashAcc = self::getAccountByCode('1101'); // Kas Kasir
+                $cashAcc = self::getAccountByKey('default_cash', $branchId); // Kas Kasir
             }
 
-            $salesRevenueAcc = self::getAccountByCode('4101'); // Pendapatan Penjualan
+            $salesRevenueAcc = self::getAccountByKey('default_sales', $branchId); // Pendapatan Penjualan
 
             if ($cashAcc && $salesRevenueAcc) {
                 $items[] = [
@@ -167,8 +191,8 @@ class JournalService
             }
 
             if ($cogsAmount > 0) {
-                $cogsAcc = self::getAccountByCode('5101'); // HPP
-                $invAcc = self::getAccountByCode('1104');  // Persediaan Barang
+                $cogsAcc = self::getAccountByKey('default_cogs', $branchId); // HPP
+                $invAcc = self::getAccountByKey('default_inventory', $branchId);  // Persediaan Barang
 
                 if ($cogsAcc && $invAcc) {
                     $items[] = [
@@ -218,9 +242,10 @@ class JournalService
             $totalAmount = floatval($gr->total_amount ?? $gr->grand_total ?? 0);
             if ($totalAmount <= 0) return null;
 
-            $invAcc = self::getAccountByCode('1104'); // Persediaan Barang
-            $apAcc = self::getAccountByCode('2101');  // Hutang Usaha
             $branchId = $gr->branch_id;
+
+            $invAcc = self::getAccountByKey('default_inventory', $branchId); // Persediaan Barang
+            $apAcc = self::getAccountByKey('default_ap', $branchId);  // Hutang Usaha
 
             if ($invAcc && $apAcc) {
                 $items = [
@@ -269,10 +294,12 @@ class JournalService
             $amount = floatval($payment->amount ?? 0);
             if ($amount <= 0) return null;
 
-            $apAcc = self::getAccountByCode('2101'); // Hutang Usaha
-            $method = strtolower($payment->payment_method ?? 'bank_transfer');
-            $cashAcc = ($method === 'cash') ? self::getAccountByCode('1101') : self::getAccountByCode('1102');
-            $branchId = $payment->payable?->branch_id ?? $payment->branch_id;
+            $branchId = $payment->payable->branch_id ?? 1;
+
+            $apAcc = self::getAccountByKey('default_ap', $branchId); // Hutang Usaha
+            $method = strtolower($payment->payment_method);
+            $cashAcc = ($method === 'cash') ? self::getAccountByKey('default_cash', $branchId) : self::getAccountByKey('default_bank', $branchId);
+            $branchId = $payment->payable ? $payment->payable->branch_id : ($payment->payableStatement ? $payment->payableStatement->branch_id : ($payment->statement ? $payment->statement->branch_id : 1));
 
             if ($apAcc && $cashAcc) {
                 $items = [
@@ -321,10 +348,12 @@ class JournalService
             $amount = floatval($payment->amount ?? 0);
             if ($amount <= 0) return null;
 
-            $arAcc = self::getAccountByCode('1103'); // Piutang Usaha
-            $method = strtolower($payment->payment_method ?? 'cash');
-            $cashAcc = ($method === 'bank_transfer' || $method === 'qris') ? self::getAccountByCode('1102') : self::getAccountByCode('1101');
-            $branchId = $payment->receivable?->branch_id ?? $payment->branch_id;
+            $branchId = $payment->receivable->branch_id ?? $payment->branch_id ?? 1;
+
+            $arAcc = self::getAccountByKey('default_ar', $branchId); // Piutang Usaha
+            $method = strtolower($payment->payment_method);
+            $cashAcc = ($method === 'bank_transfer' || $method === 'qris') ? self::getAccountByKey('default_bank', $branchId) : self::getAccountByKey('default_cash', $branchId);
+            $branchId = $payment->receivable ? $payment->receivable->branch_id : 1;
 
             if ($arAcc && $cashAcc) {
                 $items = [
@@ -373,9 +402,11 @@ class JournalService
             $amount = floatval($petty->amount ?? 0);
             if ($amount <= 0) return null;
 
-            $expAcc = self::getAccountByCode('6101'); // Beban Operasional Kas Kecil
+            $branchId = $petty->branch_id;
+
+            $expAcc = self::getAccountByKey('default_expense', $branchId); // Beban Operasional Kas Kecil
             $method = strtolower($petty->payment_method ?? 'cash');
-            $cashAcc = ($method === 'bank_transfer') ? self::getAccountByCode('1102') : self::getAccountByCode('1101');
+            $cashAcc = ($method === 'bank_transfer') ? self::getAccountByKey('default_bank', $branchId) : self::getAccountByKey('default_cash', $branchId);
             $branchId = $petty->branch_id;
 
             if ($expAcc && $cashAcc) {
@@ -413,77 +444,4 @@ class JournalService
         return null;
     }
 
-    /**
-     * Auto-journal for Branch Capital (Injeksi & Return/ROI)
-     */
-    public static function journalForBranchCapital(BranchCapital $cap)
-    {
-        try {
-            $existing = JournalEntry::where('reference_type', 'BranchCapital')->where('reference_id', $cap->id)->first();
-            if ($existing) return $existing;
-
-            $amount = floatval($cap->amount ?? 0);
-            if ($amount <= 0) return null;
-
-            $type = strtolower($cap->type ?? 'injection'); // injection vs return
-            $cashAcc = $cap->bank_account_id ? (self::getAccountByCode('1102') ?? self::getAccountByCode('1101')) : self::getAccountByCode('1101');
-            $equityAcc = self::getAccountByCode('3101'); // Modal Pemilik / Owner
-            $branchId = $cap->branch_id;
-
-            if ($type === 'injection' && $cashAcc && $equityAcc) {
-                // Injeksi: (D) Kas/Bank, (C) Modal Pemilik
-                $items = [
-                    [
-                        'account_id' => $cashAcc->id,
-                        'debit' => $amount,
-                        'credit' => 0,
-                        'memo' => 'Penerimaan Injeksi Modal Cabang dari Owner',
-                        'branch_id' => $branchId,
-                    ],
-                    [
-                        'account_id' => $equityAcc->id,
-                        'debit' => 0,
-                        'credit' => $amount,
-                        'memo' => 'Penyertaan Modal Owner Cabang',
-                        'branch_id' => $branchId,
-                    ],
-                ];
-            } elseif ($cashAcc && $equityAcc) {
-                // Return/ROI: (D) Prive/Modal Pemilik, (C) Kas/Bank
-                $priveAcc = self::getAccountByCode('3102') ?? $equityAcc;
-                $items = [
-                    [
-                        'account_id' => $priveAcc->id,
-                        'debit' => $amount,
-                        'credit' => 0,
-                        'memo' => 'Pengembalian Modal / Setoran ROI ke Owner',
-                        'branch_id' => $branchId,
-                    ],
-                    [
-                        'account_id' => $cashAcc->id,
-                        'debit' => 0,
-                        'credit' => $amount,
-                        'memo' => 'Pengeluaran Kas/Bank Setoran Modal/ROI',
-                        'branch_id' => $branchId,
-                    ],
-                ];
-            } else {
-                return null;
-            }
-
-            return self::createEntry([
-                'entry_number' => self::generateEntryNumber('CAP', $cap->transaction_date ?? $cap->created_at),
-                'entry_date' => $cap->transaction_date ? date('Y-m-d', strtotime($cap->transaction_date)) : now()->toDateString(),
-                'branch_id' => $branchId,
-                'reference_type' => 'BranchCapital',
-                'reference_id' => $cap->id,
-                'notes' => 'Otomatis Modal Cabang: ' . ($cap->notes ?? ($type === 'injection' ? 'Injeksi Modal' : 'Pengembalian Modal')),
-                'status' => 'posted',
-                'created_by' => $cap->created_by ?? auth()->id(),
-            ], $items);
-        } catch (Exception $e) {
-            Log::error('Error auto-journaling BranchCapital: ' . $e->getMessage());
-        }
-        return null;
-    }
 }

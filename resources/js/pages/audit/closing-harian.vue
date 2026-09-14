@@ -94,7 +94,6 @@ const tableHeaders = [
   { title: 'Tanggal', key: 'date' },
   { title: 'Kasir', key: 'user.name' },
   { title: 'Uang Sistem', key: 'expected_cash' },
-  { title: 'Cicilan/Setor Modal', key: 'capital_returns_amount', align: 'center' },
   { title: 'Uang Fisik', key: 'actual_cash' },
   { title: 'Selisih (Variance)', key: 'variance' },
   { title: 'Status Waktu', key: 'status_waktu' },
@@ -107,8 +106,6 @@ const liveBreakdown = ref({
   cash_sales_amount: 0,
   dp_cash_amount: 0,
   receivable_payments_amount: 0,
-  capital_injections_amount: 0,
-  capital_returns_amount: 0,
   petty_cash_amount: 0,
   expected_cash: 0,
 })
@@ -364,12 +361,12 @@ onMounted(async () => {
           />
         </div>
         <VBtn
-          color="success"
+          color="info"
           variant="tonal"
           to="/apps/branch-capitals"
-          prepend-icon="ri-hand-coin-line"
+          prepend-icon="ri-store-3-line"
         >
-          + Setor Cicilan Modal
+          Distribusi Modal Barang
         </VBtn>
         <VBtn
           v-if="!showForm"
@@ -475,10 +472,6 @@ onMounted(async () => {
                         <span class="text-medium-emphasis">Pelunasan Piutang:</span>
                         <span class="font-weight-medium font-mono">{{ formatCurrency(liveBreakdown.receivable_payments_amount) }}</span>
                       </div>
-                      <div class="d-flex justify-space-between py-1" v-if="liveBreakdown.capital_injections_amount > 0">
-                        <span class="text-medium-emphasis">Injeksi Modal:</span>
-                        <span class="font-weight-bold text-success font-mono">+ {{ formatCurrency(liveBreakdown.capital_injections_amount) }}</span>
-                      </div>
                     </div>
                   </VCol>
 
@@ -487,15 +480,6 @@ onMounted(async () => {
                     <div class="pa-3 rounded-lg bg-var-theme-background border h-100">
                       <div class="font-weight-bold text-error text-uppercase mb-2 d-flex align-center gap-1">
                         <VIcon icon="ri-indeterminate-circle-line" size="16" /> 2. Pengeluaran Kas (-)
-                      </div>
-                      <div class="d-flex align-center justify-space-between py-1 pa-1 rounded mb-1 bg-error-subtle">
-                        <div>
-                          <span class="text-error font-weight-bold d-block">Setoran Modal ke Owner:</span>
-                          <RouterLink to="/apps/branch-capitals" class="text-caption font-weight-bold text-primary text-decoration-none">
-                            + Catat Setoran
-                          </RouterLink>
-                        </div>
-                        <span class="font-weight-bold text-error font-mono">- {{ formatCurrency(liveBreakdown.capital_returns_amount) }}</span>
                       </div>
                       <div class="d-flex justify-space-between py-1">
                         <span class="text-medium-emphasis">Kas Kecil (Petty Cash):</span>
@@ -724,18 +708,7 @@ onMounted(async () => {
               {{ formatCurrency(item.expected_cash) }}
             </template>
 
-            <template #item.capital_returns_amount="{ item }">
-              <VChip
-                v-if="item.capital_returns_amount > 0"
-                color="error"
-                variant="tonal"
-                size="small"
-                class="font-weight-bold"
-              >
-                - {{ formatCurrency(item.capital_returns_amount) }}
-              </VChip>
-              <span v-else class="text-medium-emphasis text-caption">-</span>
-            </template>
+
         
             <template #item.actual_cash="{ item }">
               {{ formatCurrency(item.actual_cash) }}

@@ -6,6 +6,10 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -20,6 +24,15 @@ class AuthController extends Controller
             if (Auth::attempt($request->only('email', 'password'))) {
                 /** @var \App\Models\User $user */
                 $user = Auth::user();
+
+                if (!$user->hasVerifiedEmail()) {
+                    Auth::logout();
+                    return response()->json([
+                        'message' => 'Akun Anda belum diverifikasi. Silakan periksa kotak masuk email Anda atau kirim ulang tautan verifikasi.',
+                        'unverified' => true,
+                        'email' => $request->email
+                    ], 403);
+                }
 
                 // Load all branch-role assignments directly with leftJoin
                 $assignments = DB::table('model_has_roles as mhr')
@@ -256,5 +269,90 @@ class AuthController extends Controller
             'approver_name' => $approver->name,
             'purpose' => $purpose,
         ]);
+    }
+
+    public function forgotPassword(Request $request)
+    {
+        $request->validate(['email' => 'required|email']);
+
+        $status = Password::sendResetLink(
+            $request->only('email')
+        );
+
+        if ($status == Password::RESET_LINK_SENT) {
+            return response()->json(['message' => 'Tautan pemulihan kata sandi telah dikirim ke email Anda.']);
+        }
+
+        return response()->json(['message' => 'Gagal mengirim email pemulihan. Pastikan email terdaftar.'], 400);
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'token' => 'required',
+            'email' => 'required|email',
+            'password' => 'required|min:8|confirmed',
+        ]);
+
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password)
+                ])->setRememberToken(Str::random(60));
+
+                $user->save();
+
+                event(new PasswordReset($user));
+            }
+        );
+
+        if ($status == Password::PASSWORD_RESET) {
+            return response()->json(['message' => 'Kata sandi berhasil diatur ulang. Silakan login dengan kata sandi baru.']);
+        }
+
+        return response()->json(['message' => 'Token tidak valid atau kedaluwarsa.'], 400);
+    }
+
+    public function verifyEmail(Request $request, $id, $hash)
+    {
+        $user = \App\Models\User::find($id);
+
+        if (!$user) {
+            return redirect(config('app.url') . '/login?verification=failed');
+        }
+
+        if (!hash_equals((string) $hash, sha1($user->getEmailForVerification()))) {
+            return redirect(config('app.url') . '/login?verification=failed');
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            return redirect(config('app.url') . '/login?verification=already');
+        }
+
+        if ($user->markEmailAsVerified()) {
+            event(new \Illuminate\Auth\Events\Verified($user));
+        }
+
+        return redirect(config('app.url') . '/login?verification=success');
+    }
+
+    public function sendVerificationEmail(Request $request)
+    {
+        $request->validate(['email' => 'required|email']);
+        
+        $user = \App\Models\User::where('email', $request->email)->first();
+        
+        if (!$user) {
+            return response()->json(['message' => 'Email tidak ditemukan.'], 404);
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json(['message' => 'Email sudah diverifikasi sebelumnya.'], 400);
+        }
+
+        $user->sendEmailVerificationNotification();
+
+        return response()->json(['message' => 'Email verifikasi berhasil dikirim ulang.']);
     }
 }

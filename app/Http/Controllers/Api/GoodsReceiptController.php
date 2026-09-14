@@ -229,13 +229,8 @@ class GoodsReceiptController extends Controller
                     ['stock' => 0, 'cost_price' => $finalCostPerPiece, 'price' => 0, 'tax_percentage' => 0]
                 );
 
-                $sellingPrice = (!empty($item['price']) && (float)$item['price'] > 0)
-                    ? (float)$item['price']
-                    : (($productBranch->price > 0) ? (float)$productBranch->price : (float)(ceil(($finalCostPerPiece * 1.25) / 1000) * 1000));
-
-                $minNegoPrice = (!empty($item['min_nego_price']) && (float)$item['min_nego_price'] > 0)
-                    ? (float)$item['min_nego_price']
-                    : (($productBranch->min_nego_price > 0) ? (float)$productBranch->min_nego_price : (float)(ceil(($finalCostPerPiece * 1.10) / 1000) * 1000));
+                $sellingPrice = (float) $productBranch->price;
+                $minNegoPrice = (float) $productBranch->min_nego_price;
 
                 // Create GR Item Record (Stok belum bertambah pada tahap ini)
                 \App\Models\GoodsReceiptItem::create([
@@ -446,13 +441,8 @@ class GoodsReceiptController extends Controller
                     ['stock' => 0, 'cost_price' => $finalCostPerPiece, 'price' => 0, 'tax_percentage' => 0]
                 );
 
-                $sellingPrice = (!empty($item['price']) && (float)$item['price'] > 0)
-                    ? (float)$item['price']
-                    : (($productBranch->price > 0) ? (float)$productBranch->price : (float)(ceil(($finalCostPerPiece * 1.25) / 1000) * 1000));
-
-                $minNegoPrice = (!empty($item['min_nego_price']) && (float)$item['min_nego_price'] > 0)
-                    ? (float)$item['min_nego_price']
-                    : (($productBranch->min_nego_price > 0) ? (float)$productBranch->min_nego_price : (float)(ceil(($finalCostPerPiece * 1.10) / 1000) * 1000));
+                $sellingPrice = (float) $productBranch->price;
+                $minNegoPrice = (float) $productBranch->min_nego_price;
 
                 \App\Models\GoodsReceiptItem::create([
                     'goods_receipt_id' => $gr->id,

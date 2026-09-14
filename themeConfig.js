@@ -4,16 +4,15 @@ import { defineThemeConfig } from '@core'
 import { Skins } from '@core/enums'
 import VerticalNavHeaderArrow from '@images/svg/vertical-nav-header-arrow.svg'
 
-// ❗ Logo SVG must be imported with ?raw suffix
-import logo from '@images/logo.svg?raw'
+// ❗ Logo PNG from public folder is used now
 import { AppContentLayoutNav, ContentWidth, FooterType, NavbarType } from '@layouts/enums'
 
 export const { themeConfig, layoutConfig } = defineThemeConfig({
   app: {
-    title: 'Ms.POS',
+    title: window.appConfig?.appName || 'Ms.POS',
 
-    // ❗ if you have SVG logo and want it to adapt according to theme color, you have to apply color as `color: rgb(var(--v-global-theme-primary))`
-    logo: h('div', { innerHTML: logo, style: 'line-height:0; color: rgb(var(--v-global-theme-primary))' }),
+    // ❗ Logo PNG from public folder or database is used now
+    logo: h('img', { src: window.appConfig?.appLogo || '/logo.png', style: 'height: 30px;' }),
     contentWidth: ContentWidth.Boxed,
     contentLayoutNav: AppContentLayoutNav.Vertical,
     overlayNavFromBreakpoint: breakpointsVuetifyV3.lg - 1, // 1 for matching with vuetify breakpoint. Docs: https://next.vuetifyjs.com/en/features/display-and-platform/

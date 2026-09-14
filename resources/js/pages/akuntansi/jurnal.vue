@@ -54,6 +54,15 @@ const formatCurrency = val => {
   }).format(val || 0)
 }
 
+const formatDateId = val => {
+  if (!val) return '-'
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  }).format(new Date(val))
+}
+
 const getRefBadgeColor = type => {
   switch (type) {
     case 'Sale': return 'success'
@@ -363,7 +372,7 @@ onMounted(() => {
         @update:options="fetchJournals"
       >
         <template #item.entry_date="{ item }">
-          <span class="font-mono text-body-2">{{ item.entry_date }}</span>
+          <span class="font-mono text-body-2">{{ formatDateId(item.entry_date) }}</span>
         </template>
 
         <template #item.entry_number="{ item }">

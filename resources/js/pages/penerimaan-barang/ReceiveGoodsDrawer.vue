@@ -722,7 +722,7 @@ const handleDrawerModelValueUpdate = val => {
         @click="currentTab = 'pricing'"
       >
         <VIcon icon="ri-price-tag-3-line" size="16" class="me-1" />
-        3. Harga & Margin POS
+        3. Harga Faktur
       </VBtn>
 
       <VIcon icon="ri-arrow-right-s-line" size="16" class="text-medium-emphasis flex-shrink-0" />
@@ -1248,63 +1248,6 @@ const handleDrawerModelValueUpdate = val => {
           <!-- TAB 3: HARGA FAKTUR & MARGIN PENJUALAN POS (AUTO PRICING)     -->
           <!-- ============================================================== -->
           <div v-show="currentTab === 'pricing'" class="tab-pane-content">
-            <!-- Global Margin Preset Card -->
-            <div class="pa-4 mb-4 rounded-xl border bg-primary-lighten-5 border-primary border-opacity-25 shadow-xs">
-              <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-2">
-                <div class="d-flex align-center gap-2">
-                  <VIcon icon="ri-magic-line" color="primary" size="20" />
-                  <span class="text-subtitle-2 font-weight-bold text-primary">
-                    Preset Cepat Margin Penjualan (Auto Pricing):
-                  </span>
-                </div>
-                <VBtn
-                  size="small"
-                  color="primary"
-                  variant="flat"
-                  prepend-icon="ri-check-double-line"
-                  class="font-weight-bold shadow-xs"
-                  @click="applyGlobalPercentages"
-                >
-                  Terapkan Persen ke Semua Barang
-                </VBtn>
-              </div>
-
-              <VRow dense align="center">
-                <VCol cols="12" md="6">
-                  <div class="d-flex align-center gap-2 flex-wrap">
-                    <span class="text-caption font-weight-bold text-medium-emphasis">Markup Harga Jual POS:</span>
-                    <VChip
-                      v-for="p in [15, 20, 25, 30, 35, 40]"
-                      :key="p"
-                      size="small"
-                      :color="globalMarkupPercent === p ? 'success' : 'default'"
-                      :variant="globalMarkupPercent === p ? 'flat' : 'outlined'"
-                      class="font-weight-bold cursor-pointer"
-                      @click="() => { globalMarkupPercent = p; applyGlobalPercentages(); }"
-                    >
-                      +{{ p }}% {{ p === 25 ? '(Retail)' : (p === 15 ? '(Grosir)' : '') }}
-                    </VChip>
-                  </div>
-                </VCol>
-                <VCol cols="12" md="6">
-                  <div class="d-flex align-center gap-2 flex-wrap justify-md-end">
-                    <span class="text-caption font-weight-bold text-medium-emphasis">Batas Nego Minimum:</span>
-                    <VChip
-                      v-for="n in [5, 10, 15, 20]"
-                      :key="n"
-                      size="small"
-                      :color="globalMinNegoPercent === n ? 'warning' : 'default'"
-                      :variant="globalMinNegoPercent === n ? 'flat' : 'outlined'"
-                      class="font-weight-bold cursor-pointer"
-                      @click="() => { globalMinNegoPercent = n; applyGlobalPercentages(); }"
-                    >
-                      +{{ n }}% {{ n === 10 ? '(Standar)' : (n === 5 ? '(Min)' : '') }}
-                    </VChip>
-                  </div>
-                </VCol>
-              </VRow>
-            </div>
-
             <!-- Pricing Matrix List per Item -->
             <div class="d-flex flex-column gap-4 mb-4">
               <VCard
@@ -1372,10 +1315,9 @@ const handleDrawerModelValueUpdate = val => {
                   </VRow>
                 </div>
 
-                <!-- 2. Tiga Tingkatan Harga (HPP, Jual POS, Batas Nego) -->
+                <!-- HPP Real Modal Toko -->
                 <VRow dense align="stretch">
-                  <!-- HPP Real Modal Toko -->
-                  <VCol cols="12" md="4">
+                  <VCol cols="12" md="12">
                     <div class="pa-3 bg-red-50 border border-error border-opacity-25 rounded-lg text-center h-100 d-flex flex-column justify-center">
                       <div class="text-caption font-weight-bold text-error">1. MODAL REAL (HPP/Pcs)</div>
                       <div class="font-weight-bold text-error text-h6 font-mono mt-1">
@@ -1383,88 +1325,6 @@ const handleDrawerModelValueUpdate = val => {
                       </div>
                       <div class="text-caption text-medium-emphasis" style="font-size: 10px;">
                         {{ tax_type === 'exclude' ? '(HPP + PPN 11% Exclude)' : '(Inc. Diskon & PPN)' }}
-                      </div>
-                    </div>
-                  </VCol>
-
-                  <!-- Harga Jual Normal POS -->
-                  <VCol cols="12" md="4">
-                    <div class="pa-3 bg-green-50 border border-success border-opacity-25 rounded-lg h-100 d-flex flex-column justify-space-between">
-                      <div>
-                        <div class="d-flex justify-space-between align-center mb-1">
-                          <span class="text-caption font-weight-bold text-success">2. HARGA JUAL (NORMAL POS)</span>
-                          <span v-if="calculateItemHppPerPcs(item) > 0" class="text-caption font-weight-bold text-success font-mono">
-                            +{{ item.markup_percent || 25 }}%
-                          </span>
-                        </div>
-                        <div class="d-flex gap-1 flex-wrap mb-2">
-                          <VChip
-                            v-for="p in [15, 20, 25, 30, 35, 40]"
-                            :key="p"
-                            size="x-small"
-                            :color="(item.markup_percent || 25) === p ? 'success' : 'default'"
-                            :variant="(item.markup_percent || 25) === p ? 'flat' : 'outlined'"
-                            class="cursor-pointer font-weight-medium"
-                            @click="applyMarkupPercent(item, p)"
-                          >
-                            {{ p }}%
-                          </VChip>
-                        </div>
-                      </div>
-
-                      <VTextField
-                        :model-value="item.price_display || (item.price ? formatRupiahNumber(item.price) : '')"
-                        placeholder="0"
-                        density="compact"
-                        variant="outlined"
-                        prefix="Rp"
-                        hide-details
-                        @update:model-value="val => onSellingPriceInput(val, item)"
-                      />
-
-                      <div v-if="(item.price || 0) > calculateItemHppPerPcs(item)" class="text-caption text-success font-weight-medium mt-1" style="font-size: 10.5px;">
-                        Laba Untung: +{{ formatCurrency((item.price || 0) - calculateItemHppPerPcs(item)) }}
-                      </div>
-                    </div>
-                  </VCol>
-
-                  <!-- Batas Nego Minimum Kasir -->
-                  <VCol cols="12" md="4">
-                    <div class="pa-3 bg-amber-50 border border-warning border-opacity-25 rounded-lg h-100 d-flex flex-column justify-space-between">
-                      <div>
-                        <div class="d-flex justify-space-between align-center mb-1">
-                          <span class="text-caption font-weight-bold text-warning">3. BATAS NEGO MINIMUM (KASIR)</span>
-                          <span v-if="calculateItemHppPerPcs(item) > 0" class="text-caption font-weight-bold text-warning font-mono">
-                            +{{ item.min_nego_percent || 10 }}%
-                          </span>
-                        </div>
-                        <div class="d-flex gap-1 flex-wrap mb-2">
-                          <VChip
-                            v-for="n in [5, 10, 15, 20]"
-                            :key="n"
-                            size="x-small"
-                            :color="(item.min_nego_percent || 10) === n ? 'warning' : 'default'"
-                            :variant="(item.min_nego_percent || 10) === n ? 'flat' : 'outlined'"
-                            class="cursor-pointer font-weight-medium"
-                            @click="applyMinNegoPercent(item, n)"
-                          >
-                            {{ n }}%
-                          </VChip>
-                        </div>
-                      </div>
-
-                      <VTextField
-                        :model-value="item.min_nego_price_display || (item.min_nego_price ? formatRupiahNumber(item.min_nego_price) : '')"
-                        placeholder="0"
-                        density="compact"
-                        variant="outlined"
-                        prefix="Rp"
-                        hide-details
-                        @update:model-value="val => onMinNegoPriceInput(val, item)"
-                      />
-
-                      <div v-if="(item.min_nego_price || 0) > calculateItemHppPerPcs(item)" class="text-caption text-warning font-weight-medium mt-1" style="font-size: 10.5px;">
-                        Min. Laba: +{{ formatCurrency((item.min_nego_price || 0) - calculateItemHppPerPcs(item)) }} (Batas Bawah)
                       </div>
                     </div>
                   </VCol>

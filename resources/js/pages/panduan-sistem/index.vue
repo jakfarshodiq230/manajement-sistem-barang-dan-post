@@ -35,6 +35,14 @@ const categories = [
 // Visual Architecture Flow Steps
 const visualFlowSteps = [
   {
+    step: 0,
+    title: 'Konfigurasi Wajib (Prasyarat)',
+    icon: 'ri-alert-fill',
+    color: 'error',
+    desc: 'Wajib diisi pertama kali agar tidak error: Data Cabang, Kategori, Satuan, Kas Bank, & Profil Usaha.',
+    route: '/apps/branches',
+  },
+  {
     step: 1,
     title: 'Master Data & Inisialisasi',
     icon: 'ri-database-2-line',
@@ -118,6 +126,53 @@ const visualFlowSteps = [
 
 // Detailed Module Guides
 const guides = [
+  {
+    id: 'prasyarat-wajib',
+    category: 'master',
+    icon: 'ri-alert-fill',
+    color: 'error',
+    title: '0. PRASYARAT WAJIB (Isi Ini Pertama Kali Agar Tidak Error!)',
+    subtitle: 'Data inti yang mutlak harus ada di database sebelum Anda menginput barang, transaksi kasir, atau menu lainnya.',
+    steps: [
+      {
+        title: '1. Manajemen Cabang (Lokasi Toko)',
+        desc: 'Buka menu Cabang (Branches). Anda wajib membuat minimal 1 Cabang (misal: "Toko Pusat"). Tanpa cabang, sistem tidak akan tahu ke mana barang akan masuk atau di mana kasir sedang bertugas, yang akan menyebabkan error.',
+        link: '/apps/branches',
+        linkText: 'Buka Manajemen Cabang',
+      },
+      {
+        title: '2. Kategori Barang & Satuan',
+        desc: 'Buka menu Master Data > Kategori. Buat minimal 1 Kategori (misal: "Umum") dan Satuan (misal: "Pcs"). Tanpa ini, Anda tidak akan bisa menyimpan data produk baru.',
+        link: '/kategori-barang',
+        linkText: 'Buka Kategori Barang',
+      },
+      {
+        title: '3. Rekening Bank Dasar (Untuk Kasir)',
+        desc: 'Buka menu Rekening Bank. Buat minimal 1 rekening dengan nama "KASIR TUNAI" atau semacamnya. Jika ini kosong, kasir POS tidak akan bisa menyelesaikan pembayaran karena uangnya tidak tahu harus masuk ke rekening mana.',
+        link: '/bank-accounts',
+        linkText: 'Buka Rekening Bank',
+      },
+      {
+        title: '4. Profil Usaha / Owner',
+        desc: 'Buka menu Manajemen Owner. Isi Nama Toko dan Alamat. Jika dibiarkan kosong, proses cetak PDF, SK Harga, dan Struk POS bisa mengalami error karena kehilangan variabel nama perusahaan.',
+        link: '/apps/owners',
+        linkText: 'Buka Profil Usaha',
+      },
+      {
+        title: '5. Bagan Akun Akuntansi (COA)',
+        desc: 'Buka menu Akuntansi > Bagan Akun. Anda HARUS menekan tombol "Import Template Standar" di pojok kanan atas untuk memuat daftar akun dasar. Tanpa akun ini, sistem tidak bisa mencatat pendapatan kasir atau stok gudang yang berujung pada sistem crash/error.',
+        link: '/akuntansi/coa',
+        linkText: 'Buka Bagan Akun',
+      },
+      {
+        title: '6. Penugasan Karyawan ke Cabang',
+        desc: 'Buka menu Pengaturan Pengguna. Pastikan akun Karyawan/Kasir telah diberikan Hak Akses (Role) dan ditugaskan ke minimal 1 Cabang aktif. Jika pengguna tidak tertaut ke cabang manapun, aplikasi POS Kasir akan menolak transaksi (error).',
+        link: '/apps/pengaturan-pengguna',
+        linkText: 'Buka Pengaturan Pengguna',
+      },
+    ],
+    tips: 'SANGAT PENTING: Lakukan ke-6 langkah di atas SEBELUM Anda mencoba fitur POS Kasir, Pembelian Gudang, atau Tambah Produk.',
+  },
   {
     id: 'master-data',
     category: 'master',
@@ -675,6 +730,27 @@ const filteredGuides = computed(() => {
         </VRow>
       </VCardText>
     </VCard>
+
+    <!-- Alert: Prasyarat Wajib -->
+    <VAlert
+      color="error"
+      icon="ri-alert-fill"
+      variant="tonal"
+      class="mb-6 rounded-xl border-error border"
+      prominent
+    >
+      <div class="text-h6 font-weight-bold mb-1">PENTING: Langkah Pertama Sebelum Menggunakan Sistem!</div>
+      <p class="text-body-2 mb-0">
+        Agar sistem berjalan normal dan <strong>TIDAK ERROR</strong>, Anda wajib mengisi data dasar berikut terlebih dahulu secara berurutan:
+        <br>
+        1. <strong>Manajemen Cabang</strong> (Buat minimal 1 cabang utama/pusat).<br>
+        2. <strong>Kategori & Satuan Barang</strong> (Buat minimal 1 kategori dan satuan sebelum menambah produk).<br>
+        3. <strong>Rekening Bank</strong> (Buat minimal 1 rekening bank tunai/kasir untuk menampung transaksi POS).<br>
+        4. <strong>Manajemen Owner/Profil Usaha</strong> (Isi nama toko dan alamat untuk keperluan cetak struk).<br>
+        5. <strong>Bagan Akun (COA) Akuntansi</strong> (Wajib "Import Template Standar" di menu Akuntansi agar penjurnalan otomatis POS/Gudang tidak <i>crash</i>).<br>
+        6. <strong>Penugasan Pengguna ke Cabang</strong> (Kasir yang login wajib diatur penugasan cabangnya di Pengaturan Pengguna agar POS bisa digunakan).
+      </p>
+    </VAlert>
 
     <!-- Navigation Tabs: Peta Alur Visual vs Dokumentasi Lengkap vs Pintasan Keyboard -->
     <VCard class="rounded-xl border elevation-1 mb-6">

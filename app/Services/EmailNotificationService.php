@@ -7,6 +7,7 @@ use App\Models\Receivable;
 use App\Models\ReceivablePayment;
 use App\Models\BranchCapital;
 use App\Models\User;
+use App\Models\Owner;
 use App\Mail\ReceivableInvoiceMail;
 use App\Mail\ReceivablePaymentReceiptMail;
 use App\Mail\CapitalInstallmentAlertMail;
@@ -83,7 +84,7 @@ class EmailNotificationService
         }
 
         $mailable = new ReceivableInvoiceMail($receivable);
-        $branchId = $receivable->sale->branch_id ?? null;
+        $branchId = $receivable->branch_id ?? ($receivable->sale->branch_id ?? null);
 
         return self::dispatchWithLog(
             $mailable,
@@ -121,12 +122,12 @@ class EmailNotificationService
                 'status'          => 'failed',
                 'error_message'   => 'Pelanggan tidak memiliki alamat email yang tersimpan.',
                 'user_id'         => $userId,
-                'branch_id'       => $payment->receivable->sale->branch_id ?? null,
+                'branch_id'       => $payment->receivable->branch_id ?? ($payment->receivable->sale->branch_id ?? null),
             ]);
         }
 
         $mailable = new ReceivablePaymentReceiptMail($payment);
-        $branchId = $payment->receivable->sale->branch_id ?? null;
+        $branchId = $payment->receivable->branch_id ?? ($payment->receivable->sale->branch_id ?? null);
 
         return self::dispatchWithLog(
             $mailable,
@@ -142,41 +143,6 @@ class EmailNotificationService
         );
     }
 
-    /**
-     * Kirim Notifikasi Setoran Angsuran / Pengembalian Modal ke Owner.
-     */
-    public static function sendCapitalInstallmentAlert(BranchCapital $capital, ?string $recipientEmail = null, string $triggerMode = 'automatic', ?int $userId = null): EmailLog
-    {
-        $capital->loadMissing(['branch', 'user']);
-        
-        // Find Owner / Admin email via database RBAC permissions or fallback
-        $email = $recipientEmail;
-        if (!$email) {
-            $ownerUser = User::all()->first(function($u) {
-                return $u->email && ($u->can('manage all') || $u->can('Modal & ROI Cabang Approve') || $u->can('Dashboard Keuntungan Read'));
-            });
-
-            $email = $ownerUser ? $ownerUser->email : env('MAIL_FROM_ADDRESS', 'noreply@' . (request()->getHost() ?: 'localhost'));
-        }
-
-        $owner = $capital->branch?->owner ?? Owner::whereNull('parent_id')->first() ?? Owner::first();
-        $ownerTitle = 'Owner / Direksi ' . ($owner?->name ?? config('app.name', 'Perusahaan'));
-
-        $mailable = new CapitalInstallmentAlertMail($capital);
-
-        return self::dispatchWithLog(
-            $mailable,
-            $email,
-            $ownerTitle,
-            'capital_installment',
-            BranchCapital::class,
-            (string) $capital->id,
-            $triggerMode,
-            $userId,
-            $capital->branch_id,
-            ['amount' => $capital->amount, 'type' => $capital->type]
-        );
-    }
 
     /**
      * Kirim Ringkasan Portofolio Modal & ROI ke Owner.
@@ -193,7 +159,8 @@ class EmailNotificationService
         }
 
         $owner = Owner::whereNull('parent_id')->first() ?? Owner::first();
-        $ownerTitle = 'Owner / Direksi ' . ($owner?->name ?? config('app.name', 'Perusahaan'));
+        $ownerName = $owner ? $owner->name : config('app.name', 'Perusahaan');
+        $ownerTitle = 'Owner / Direksi ' . $ownerName;
 
         $mailable = new CapitalSummaryReportMail($summary);
 
@@ -226,10 +193,6 @@ class EmailNotificationService
             $payment = ReceivablePayment::find($log->reference_id);
             if (!$payment) throw new \Exception("Data kwitansi pembayaran tidak ditemukan.");
             $mailable = new ReceivablePaymentReceiptMail($payment);
-        } elseif ($log->email_type === 'capital_installment') {
-            $capital = BranchCapital::find($log->reference_id);
-            if (!$capital) throw new \Exception("Data setoran modal tidak ditemukan.");
-            $mailable = new CapitalInstallmentAlertMail($capital);
         } else {
             throw new \Exception("Tipe email tidak mendukung retry otomatis.");
         }

@@ -48,6 +48,8 @@ const is_returnable = ref(true)
 const tax_type = ref(null)
 const image = ref(null)
 const previewImage = ref(null)
+const ori_discount_percent = ref(0)
+const ori_cashback_percent = ref(0)
 
 watch(() => props.selectedProduct, newVal => {
   if (newVal) {
@@ -67,6 +69,8 @@ watch(() => props.selectedProduct, newVal => {
     height.value = newVal.height || null
     is_returnable.value = newVal.is_returnable ?? true
     tax_type.value = newVal.tax_type || null
+    ori_discount_percent.value = newVal.ori_discount_percent || 0
+    ori_cashback_percent.value = newVal.ori_cashback_percent || 0
     image.value = null
     previewImage.value = newVal.image ? `/storage/${newVal.image}` : null
   } else {
@@ -86,6 +90,8 @@ watch(() => props.selectedProduct, newVal => {
     height.value = null
     is_returnable.value = true
     tax_type.value = null
+    ori_discount_percent.value = 0
+    ori_cashback_percent.value = 0
     image.value = null
     previewImage.value = null
   }
@@ -127,8 +133,10 @@ const onSubmit = () => {
         length: length.value,
         width: width.value,
         height: height.value,
-        is_returnable: is_returnable.value,
+        is_returnable: is_returnable.value ? 1 : 0,
         tax_type: tax_type.value,
+        ori_discount_percent: Number(ori_discount_percent.value) || 0,
+        ori_cashback_percent: Number(ori_cashback_percent.value) || 0,
         image: image.value ? image.value[0] : null,
       })
       closeNavigationDrawer()
@@ -427,6 +435,48 @@ const onSubmit = () => {
                   color="primary"
                   inset
                   class="mt-1"
+                />
+              </VCol>
+            </VRow>
+          </div>
+
+          <VDivider class="my-5" />
+
+          <!-- Section 4: Promo Ori -->
+          <div class="mb-6">
+            <div class="d-flex align-center gap-2 mb-3">
+              <VIcon icon="ri-percent-line" color="warning" size="18" />
+              <span class="text-subtitle-2 font-weight-bold text-uppercase letter-spacing-1 text-warning">
+                4. Pengaturan Promo Barang Ori
+              </span>
+            </div>
+
+            <VRow dense>
+              <VCol cols="12" md="6">
+                <VTextField
+                  v-model="ori_discount_percent"
+                  type="number"
+                  label="Diskon Ori"
+                  suffix="%"
+                  placeholder="0"
+                  density="comfortable"
+                  variant="outlined"
+                  hint="Memotong harga langsung saat kasir mencentang Barang Ori"
+                  persistent-hint
+                />
+              </VCol>
+
+              <VCol cols="12" md="6">
+                <VTextField
+                  v-model="ori_cashback_percent"
+                  type="number"
+                  label="Cashback Poin Ori"
+                  suffix="%"
+                  placeholder="0"
+                  density="comfortable"
+                  variant="outlined"
+                  hint="Masuk ke saldo poin pelanggan saat transaksi selesai"
+                  persistent-hint
                 />
               </VCol>
             </VRow>

@@ -23,6 +23,11 @@ const selectedProductBranch = ref(null)
 const fileInput = ref(null)
 const isPriceGuideVisible = ref(false)
 
+const isImportInitialDialogVisible = ref(false)
+const selectedBranchForInitialImport = ref(null)
+const initialFileInput = ref(null)
+const isDownloading = ref(false)
+
 // Pagination
 const page = ref(1)
 const itemsPerPage = ref(10)
@@ -98,11 +103,9 @@ const fetchData = async options => {
     const pbData = await $api('/apps/product-branches', { query: params })
 
     productBranches.value = extractArray(pbData)
-    totalItems.value = pbData?.total ?? (Array.isArray(productBranches.value) ? productBranches.value.length : 0)
+    totalItems.value = pbData.meta?.total || pbData.total || productBranches.value.length
   } catch (error) {
     console.error(error)
-    snackbar.show('Gagal mengambil data inventori', 'error')
-    productBranches.value = []
   } finally {
     isLoading.value = false
   }
@@ -123,20 +126,17 @@ onMounted(() => {
 
 const saveProductBranch = async data => {
   try {
-    if (data.id) {
-      await $api(`/apps/product-branches/${data.id}`, {
-        method: 'PUT',
-        body: data,
-      })
-      snackbar.show('Data harga/cabang berhasil diperbarui', 'success')
-    } else {
-      await $api('/apps/product-branches', {
-        method: 'POST',
-        body: data,
-      })
-      snackbar.show('Produk berhasil ditambahkan ke cabang', 'success')
-    }
+    const method = data.id ? 'PUT' : 'POST'
+    const endpoint = data.id ? `/apps/product-branches/${data.id}` : '/apps/product-branches'
+    
+    await $api(endpoint, {
+      method,
+      body: data,
+    })
+
+    snackbar.show('Data inventori berhasil disimpan', 'success')
     fetchData()
+    isAddNewDrawerVisible.value = false
   } catch (error) {
     console.error(error)
     snackbar.show('Gagal menyimpan data', 'error')
@@ -237,6 +237,66 @@ const handleFileUpload = async event => {
   }
 }
 
+const openImportInitialDialog = () => {
+  selectedBranchForInitialImport.value = null
+  isImportInitialDialogVisible.value = true
+}
+
+const downloadInitialTemplate = async () => {
+  isDownloading.value = true
+  try {
+    const response = await $api('/apps/product-branches/import-initial-template')
+    const blob = new Blob([response.csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.setAttribute('download', `Template_Migrasi_Stok_Awal.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } catch (error) {
+    console.error(error)
+    snackbar.show('Gagal mengunduh template', 'error')
+  } finally {
+    isDownloading.value = false
+  }
+}
+
+const triggerInitialFileInput = () => {
+  if (!selectedBranchForInitialImport.value) {
+    snackbar.show('Pilih cabang terlebih dahulu', 'warning')
+    return
+  }
+  initialFileInput.value.click()
+}
+
+const handleInitialFileUpload = async event => {
+  const file = event.target.files[0]
+  if (!file) return
+  
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('branch_id', selectedBranchForInitialImport.value)
+  
+  isLoading.value = true
+  try {
+    const res = await $api('/apps/product-branches/import-initial-stock', {
+      method: 'POST',
+      body: formData,
+    })
+
+    snackbar.show(res.message || 'Import stok awal berhasil', 'success')
+    isImportInitialDialogVisible.value = false
+    fetchData()
+  } catch (error) {
+    console.error(error)
+    snackbar.show('Gagal melakukan import data', 'error')
+  } finally {
+    isLoading.value = false
+    event.target.value = ''
+  }
+}
 
 const tableHeaders = [
   { title: 'PRODUK & SKU', key: 'product.name' },
@@ -310,36 +370,6 @@ const confirmDelete = async id => {
       </div>
       
       <div class="d-flex flex-wrap align-center gap-2 w-100 w-md-auto">
-        <input 
-          ref="fileInput" 
-          type="file" 
-          accept=".csv" 
-          style="display: none" 
-          @change="handleFileUpload"
-        >
-        <VBtn
-          v-if="$can('import', 'Inventori Cabang')"
-          color="info"
-          variant="tonal"
-          size="small"
-          prepend-icon="ri-download-cloud-line"
-          class="flex-grow-1 flex-sm-grow-0"
-          @click="downloadTemplate"
-        >
-          Template
-        </VBtn>
-        <VBtn
-          v-if="$can('import', 'Inventori Cabang')"
-          color="warning"
-          variant="tonal"
-          size="small"
-          prepend-icon="ri-upload-cloud-line"
-          :loading="isLoading"
-          class="flex-grow-1 flex-sm-grow-0"
-          @click="triggerFileInput"
-        >
-          Import
-        </VBtn>
         <VBtn
           v-if="$can('export', 'Inventori Cabang')"
           color="success"
@@ -360,6 +390,16 @@ const confirmDelete = async id => {
           to="/price-adjustments"
         >
           Penyesuaian Harga Massal
+        </VBtn>
+        <VBtn
+          color="warning"
+          variant="tonal"
+          size="small"
+          prepend-icon="ri-upload-cloud-line"
+          class="flex-grow-1 flex-sm-grow-0"
+          @click="openImportInitialDialog"
+        >
+          Migrasi Stok Awal (Excel)
         </VBtn>
         <VBtn
           v-if="$can('create', 'Inventori Cabang')"
@@ -942,6 +982,77 @@ const confirmDelete = async id => {
       :selected-data="selectedProductBranch"
       @update:is-dialog-visible="val => isPrintLabelDialogVisible = val"
     />
+
+    <VDialog
+      v-model="isImportInitialDialogVisible"
+      max-width="500"
+    >
+      <VCard title="Migrasi Stok Awal Cabang">
+        <VCardText>
+          <p class="text-body-2 mb-4">
+            Fitur khusus untuk migrasi (Bypass). Stok akan langsung bertambah dan ditandai sebagai batch <b>MIGRASI-AWAL</b>.
+          </p>
+          
+          <input 
+            ref="initialFileInput" 
+            type="file" 
+            accept=".csv" 
+            style="display: none" 
+            @change="handleInitialFileUpload"
+          >
+
+          <VSelect
+            v-model="selectedBranchForInitialImport"
+            :items="branches"
+            item-title="name"
+            item-value="id"
+            label="Pilih Cabang Tujuan Migrasi"
+            variant="outlined"
+            class="mb-4"
+          />
+
+          <VBtn
+            color="secondary"
+            variant="tonal"
+            prepend-icon="ri-download-cloud-line"
+            class="w-100 mb-4"
+            :loading="isDownloading"
+            @click="downloadInitialTemplate"
+          >
+            Download Template (Semua Master Produk)
+          </VBtn>
+
+          <VProgressLinear
+            v-if="isLoading || isDownloading"
+            indeterminate
+            color="primary"
+            class="mb-4"
+          />
+
+          <VDivider class="mb-4" />
+
+          <VBtn
+            color="primary"
+            prepend-icon="ri-upload-cloud-line"
+            class="w-100"
+            :loading="isLoading"
+            @click="triggerInitialFileInput"
+          >
+            Upload File CSV Stok Awal
+          </VBtn>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn
+            color="error"
+            variant="text"
+            @click="isImportInitialDialogVisible = false"
+          >
+            Tutup
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </section>
 </template>
 

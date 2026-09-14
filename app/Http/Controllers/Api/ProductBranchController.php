@@ -141,6 +141,134 @@ class ProductBranchController extends Controller
         ]);
     }
 
+    public function importInitialTemplate(Request $request)
+    {
+        // $branchId = $request->query('branch_id');
+        // $branchName = 'Semua Produk';
+        // if ($branchId) {
+        //     $branch = \App\Models\Branch::find($branchId);
+        //     if ($branch) $branchName = $branch->name;
+        // }
+        
+        $products = \App\Models\Product::orderBy('name')->get();
+        
+        $csvContent = "SKU (Wajib),Nama Produk,Kategori,Satuan,Qty Stok Fisik (Wajib),Harga Modal (Wajib),Harga Jual (Wajib),Harga Nego Minimum\n";
+        
+        foreach ($products as $p) {
+            // Escape possible commas in names/categories
+            $sku = str_replace('"', '""', $p->sku);
+            $name = str_replace('"', '""', $p->name);
+            $category = $p->category ? str_replace('"', '""', $p->category->name) : '';
+            $unit = str_replace('"', '""', $p->unit);
+            
+            $csvContent .= "\"{$sku}\",\"{$name}\",\"{$category}\",\"{$unit}\",0,0,0,0\n";
+        }
+        
+        if ($products->count() === 0) {
+            $csvContent .= "\"CONTOH-SKU-001\",\"Produk Contoh (Master Barang Kosong)\",\"Umum\",\"Pcs\",10,100000,120000,110000\n";
+        }
+        
+        return response()->json([
+            'csv' => $csvContent
+        ]);
+    }
+
+    public function importInitialStock(Request $request)
+    {
+        if (!request()->user()->can('Inventori Cabang Create')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt|max:5120',
+            'branch_id' => 'required|exists:branches,id',
+        ]);
+
+        $file = $request->file('file');
+        $branchId = $request->input('branch_id');
+        $handle = fopen($file->getRealPath(), "r");
+        
+        $header = true;
+        $count = 0;
+        
+        \DB::beginTransaction();
+        try {
+            while (($row = fgetcsv($handle, 4000, ",")) !== FALSE) {
+                if ($header) {
+                    $header = false;
+                    continue; // Skip header row
+                }
+                
+                // Format CSV: SKU, Nama Produk, Kategori, Satuan, Qty Stok, Harga Modal, Harga Jual, Harga Nego Minimum
+                if (isset($row[0]) && trim($row[0]) !== '') {
+                    $sku = trim($row[0]);
+                    $qty = isset($row[4]) && is_numeric(trim($row[4])) ? (int)trim($row[4]) : 0;
+                    $cost = isset($row[5]) && is_numeric(trim($row[5])) ? (float)trim($row[5]) : 0;
+                    $price = isset($row[6]) && is_numeric(trim($row[6])) ? (float)trim($row[6]) : $cost;
+                    $minNego = isset($row[7]) && is_numeric(trim($row[7])) ? (float)trim($row[7]) : $price;
+                    
+                    if ($qty > 0 || $price > 0 || $cost > 0) {
+                        $product = \App\Models\Product::where('sku', $sku)->first();
+                        
+                        if ($product) {
+                            $pb = \App\Models\ProductBranch::firstOrCreate(
+                                ['product_id' => $product->id, 'branch_id' => $branchId],
+                                ['cost_price' => $cost, 'price' => $price, 'min_nego_price' => $minNego, 'stock' => 0]
+                            );
+                            
+                            // Update price if imported price is different
+                            if ($pb->price != $price || $pb->cost_price != $cost || $pb->min_nego_price != $minNego) {
+                                $pb->price = $price;
+                                $pb->cost_price = $cost;
+                                $pb->min_nego_price = $minNego;
+                                $pb->save();
+                            }
+                            
+                            if ($qty > 0) {
+                                $batchDate = now()->toDateString();
+                                $batchNumber = 'MIGRASI-AWAL-' . date('YmdHis') . '-' . $product->id;
+                                
+                                $batch = \App\Models\ProductBatch::create([
+                                    'product_branch_id' => $pb->id,
+                                    'batch_number' => $batchNumber,
+                                    'qty' => $qty,
+                                    'cost_price' => $cost,
+                                    'price' => $price,
+                                    'min_nego_price' => $minNego,
+                                    'entry_date' => $batchDate
+                                ]);
+                                
+                                $pb->stock += $qty;
+                                $pb->save();
+                                
+                                // Create stock movement
+                                \App\Models\StockMovement::create([
+                                    'product_branch_id' => $pb->id,
+                                    'user_id' => auth()->id(),
+                                    'type' => 'in',
+                                    'quantity' => $qty,
+                                    'unit_cost' => $cost,
+                                    'reference_type' => 'Migrasi Stok Awal',
+                                    'reference_id' => $batch->id,
+                                    'notes' => 'Stok Awal dari Migrasi Sistem (CSV Import)'
+                                ]);
+                            }
+                            $count++;
+                        }
+                    }
+                }
+            }
+            \DB::commit();
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            fclose($handle);
+            return response()->json(['message' => 'Gagal mengimpor: ' . $e->getMessage()], 500);
+        }
+        
+        fclose($handle);
+        return response()->json(['message' => "$count data inventori cabang berhasil diimpor"]);
+    }
+
     public function destroy(ProductBranch $productBranch)
     {
         if (!request()->user()->can('Inventori Cabang Delete')) {

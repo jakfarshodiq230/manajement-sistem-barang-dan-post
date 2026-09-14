@@ -76,11 +76,18 @@ class SaleController extends Controller
                                     ->groupBy('payment_method')
                                     ->get();
         
+        $totalPpnQuery = clone $query;
+        if (!$request->has('start_date') && !$request->has('end_date')) {
+            $totalPpnQuery->whereDate('date', now()->toDateString());
+        }
+        $totalPpn = $totalPpnQuery->where('status', '!=', 'cancelled')->sum('total_tax');
+
         $summary = [
             'cash' => 0,
             'transfer' => 0,
             'qris' => 0,
             'tempo' => 0,
+            'total_ppn' => $totalPpn,
         ];
 
         foreach ($summaryData as $row) {
@@ -265,9 +272,16 @@ class SaleController extends Controller
 
             $subtotal = 0;
             $total_tax = 0;
+            $total_cashback_points = 0;
+
+            $productBranchIds = collect($request->items)->pluck('product_branch_id')->unique()->toArray();
+            $productBranches = \App\Models\ProductBranch::with(['product', 'productBatches' => function($q) {
+                $q->where('qty', '>', 0);
+            }])->whereIn('id', $productBranchIds)->lockForUpdate()->get()->keyBy('id');
 
             foreach ($request->items as $item) {
-                $productBranch = \App\Models\ProductBranch::lockForUpdate()->findOrFail($item['product_branch_id']);
+                $productBranch = $productBranches->get($item['product_branch_id']);
+                if (!$productBranch) throw new \Exception("Produk tidak ditemukan.");
                 
                 if ($productBranch->stock < $item['qty']) {
                     throw new \Exception("Stok tidak mencukupi untuk barang: " . $productBranch->product->name);
@@ -287,12 +301,33 @@ class SaleController extends Controller
                     $tax_amount = $item_subtotal - ($item_subtotal / (1 + ($tax_percentage / 100)));
                 }
 
+                $is_ori = !empty($item['is_ori']) ? (bool)$item['is_ori'] : false;
+                $ori_promo_type = !empty($item['ori_promo_type']) ? $item['ori_promo_type'] : null;
+                $final_item_price = (float) $item['price'];
+
+                if ($is_ori && $finalCustomerId) {
+                    if ($ori_promo_type === 'discount' && $productBranch->product->ori_discount_percent > 0) {
+                        $discount_amount = ($final_item_price * (float)$productBranch->product->ori_discount_percent) / 100;
+                        $final_item_price -= $discount_amount;
+                        $item_subtotal = $item['qty'] * $final_item_price;
+                        // Recalculate tax if price drops due to ori discount
+                        if ($tax_type === 'Exclude PPN') {
+                            $tax_amount = ($item_subtotal * $tax_percentage) / 100;
+                            $total_tax = $total_tax - (($item['qty'] * $item['price'] * $tax_percentage) / 100) + $tax_amount;
+                        } else if ($tax_type === 'Include PPN') {
+                            $tax_amount = $item_subtotal - ($item_subtotal / (1 + ($tax_percentage / 100)));
+                        }
+                    } else if ($ori_promo_type === 'cashback' && $productBranch->product->ori_cashback_percent > 0) {
+                        $total_cashback_points += ($item_subtotal * (float)$productBranch->product->ori_cashback_percent) / 100;
+                    }
+                }
+
                 $subtotal += $item_subtotal;
 
                 // Validate minimum nego price
                 $minNegoPrice = 0;
                 if (isset($item['batch_id']) && $item['batch_id']) {
-                    $specificBatch = \App\Models\ProductBatch::find($item['batch_id']);
+                    $specificBatch = $productBranch->productBatches->firstWhere('id', $item['batch_id']);
                     $minNegoPrice = $specificBatch ? $specificBatch->min_nego_price : $productBranch->min_nego_price;
                 } else {
                     $activeBatch = $productBranch->active_batch;
@@ -308,11 +343,13 @@ class SaleController extends Controller
                     'product_branch_id' => $productBranch->id,
                     'qty' => $item['qty'],
                     'original_price' => $productBranch->price, // Original selling price
-                    'price' => $item['price'], // Price might be negotiated
+                    'price' => $final_item_price, // Price might be negotiated and ori discounted
                     'cost_price' => $productBranch->cost_price, // Snapshot cost
                     'tax_percentage' => $tax_percentage,
                     'tax_amount' => $tax_amount,
                     'subtotal' => $item_subtotal,
+                    'is_ori' => $is_ori,
+                    'ori_promo_type' => $is_ori ? $ori_promo_type : null,
                 ]);
 
                 // Create Stock Movement (Out)
@@ -331,9 +368,10 @@ class SaleController extends Controller
                 $qtyToDeduct = $item['qty'];
 
                 if (isset($item['batch_id']) && $item['batch_id']) {
-                    $specificBatch = \App\Models\ProductBatch::lockForUpdate()->find($item['batch_id']);
+                    $specificBatch = $productBranch->productBatches->firstWhere('id', $item['batch_id']);
                     if ($specificBatch && $specificBatch->qty >= $qtyToDeduct) {
-                        $specificBatch->decrement('qty', $qtyToDeduct);
+                        $specificBatch->qty -= $qtyToDeduct;
+                        $specificBatch->save();
                         $qtyToDeduct = 0;
                     } else {
                         throw new \Exception("Stok spesifik (Batch #" . $item['batch_id'] . ") tidak mencukupi untuk barang: " . $productBranch->product->name);
@@ -341,19 +379,25 @@ class SaleController extends Controller
                 } else {
                     $stockMethod = $productBranch->product->stock_method ?? 'fifo';
                     
-                    $batchQuery = \App\Models\ProductBatch::where('product_branch_id', $productBranch->id)
-                        ->where('qty', '>', 0);
-                        
                     if ($stockMethod === 'fefo') {
-                        // Sort by expiration date ascending (nulls last)
-                        $batchQuery->orderByRaw('expiration_date IS NULL, expiration_date ASC, entry_date ASC');
+                        $batchQuery = $productBranch->productBatches->sortBy([
+                            fn ($a, $b) => ($a->expiration_date === null) <=> ($b->expiration_date === null),
+                            ['expiration_date', 'asc'],
+                            ['entry_date', 'asc'],
+                        ]);
                     } elseif ($stockMethod === 'lifo') {
-                        $batchQuery->orderBy('entry_date', 'desc')->orderBy('id', 'desc');
+                        $batchQuery = $productBranch->productBatches->sortBy([
+                            ['entry_date', 'desc'],
+                            ['id', 'desc'],
+                        ]);
                     } else { // fifo
-                        $batchQuery->orderBy('entry_date', 'asc')->orderBy('id', 'asc');
+                        $batchQuery = $productBranch->productBatches->sortBy([
+                            ['entry_date', 'asc'],
+                            ['id', 'asc'],
+                        ]);
                     }
                     
-                    $batches = $batchQuery->lockForUpdate()->get();
+                    $batches = $batchQuery;
                     
                     foreach ($batches as $batch) {
                         if ($qtyToDeduct <= 0) break;
@@ -376,7 +420,33 @@ class SaleController extends Controller
                 $productBranch->decrement('stock', $item['qty']);
             }
 
-            $total_amount = max(0, $subtotal + $total_tax - ($request->discount ?? 0));
+            $redeemedPoints = 0;
+            if ($request->has('redeemed_points') && $request->redeemed_points > 0) {
+                if (!$finalCustomerId) {
+                    throw new \Exception("Pelanggan wajib dipilih untuk menggunakan poin.");
+                }
+                $customer = \App\Models\Customer::find($finalCustomerId);
+                if (!$customer || $customer->points < $request->redeemed_points) {
+                    throw new \Exception("Saldo poin pelanggan tidak mencukupi.");
+                }
+                $redeemedPoints = $request->redeemed_points;
+                
+                // Deduct points
+                $customer->decrement('points', $redeemedPoints);
+                \App\Models\CustomerPointHistory::create([
+                    'customer_id' => $finalCustomerId,
+                    'sale_id' => $sale->id,
+                    'type' => 'redeemed',
+                    'points' => $redeemedPoints,
+                    'notes' => 'Redeem poin untuk tagihan ' . $invoice_number
+                ]);
+            }
+
+            if ($request->apply_global_tax) {
+                $total_tax = 0.11 * max(0, $subtotal - ($request->discount ?? 0) - $redeemedPoints);
+            }
+
+            $total_amount = max(0, $subtotal + $total_tax - ($request->discount ?? 0) - $redeemedPoints);
 
             $paymentMethod = $request->payment_method ?? 'cash';
             
@@ -430,6 +500,19 @@ class SaleController extends Controller
                         'payment_date' => $request->date,
                         'payment_method' => $request->dp_payment_method ?? 'cash',
                         'payment_proof' => $request->hasFile('payment_proof') ? $sale->payment_proof : null,
+                    ]);
+                }
+            }
+            if ($total_cashback_points > 0 && $finalCustomerId) {
+                $customer = \App\Models\Customer::find($finalCustomerId);
+                if ($customer) {
+                    $customer->increment('points', $total_cashback_points);
+                    \App\Models\CustomerPointHistory::create([
+                        'customer_id' => $finalCustomerId,
+                        'sale_id' => $sale->id,
+                        'type' => 'earned',
+                        'points' => $total_cashback_points,
+                        'description' => 'Cashback Barang Ori dari transaksi ' . $invoice_number,
                     ]);
                 }
             }

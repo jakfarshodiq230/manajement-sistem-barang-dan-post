@@ -10,6 +10,7 @@ import NavbarShortcuts from '@/layouts/components/NavbarShortcuts.vue'
 import NavbarThemeSwitcher from '@/layouts/components/NavbarThemeSwitcher.vue'
 import UserProfile from '@/layouts/components/UserProfile.vue'
 import NavBarI18n from '@core/components/I18n.vue'
+import GlobalPrerequisiteAlert from '@/components/GlobalPrerequisiteAlert.vue'
 
 // @layouts plugin
 import { VerticalNavLayout } from '@layouts'
@@ -80,6 +81,7 @@ watch([
     </template>
 
     <!-- 👉 Pages -->
+    <GlobalPrerequisiteAlert />
     <slot />
 
     <!-- 👉 Footer -->

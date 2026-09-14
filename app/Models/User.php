@@ -10,7 +10,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
@@ -52,6 +52,16 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    /**
+     * Send the email verification notification via queue.
+     *
+     * @return void
+     */
+    public function sendEmailVerificationNotification()
+    {
+        $this->notify(new \App\Notifications\QueuedVerifyEmail);
+    }
 
     public function branch()
     {
@@ -182,5 +192,15 @@ class User extends Authenticatable
         }
 
         return false;
+    }
+
+    /**
+     * Override default password reset notification to point to Vue frontend
+     */
+    public function sendPasswordResetNotification($token)
+    {
+        $url = config('app.url') . '/reset-password?token=' . $token . '&email=' . urlencode($this->email);
+        
+        $this->notify(new \Illuminate\Auth\Notifications\ResetPassword($url));
     }
 }

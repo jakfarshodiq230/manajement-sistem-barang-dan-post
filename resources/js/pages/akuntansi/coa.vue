@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { paginationMeta } from '@/utils/paginationMeta'
+import { useSnackbarStore } from '@/stores/snackbar'
 
 definePage({
   meta: {
@@ -21,6 +22,11 @@ const isEditing = ref(false)
 const deleteDialog = ref(false)
 const accountToDelete = ref(null)
 const isDownloadingPdf = ref(false)
+const isImporting = ref(false)
+const isDownloadingTemplate = ref(false)
+const fileInput = ref(null)
+
+const snackbar = useSnackbarStore()
 
 const tableHeaders = [
   { title: 'KODE AKUN', key: 'code' },
@@ -239,6 +245,56 @@ const deleteAccount = async () => {
   }
 }
 
+const downloadTemplate = async () => {
+  isDownloadingTemplate.value = true
+  try {
+    const response = await $api('/apps/accounting/accounts/import-template')
+    const blob = new Blob([response.csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.setAttribute('download', `Template_COA.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } catch (error) {
+    console.error(error)
+    snackbar.show('Gagal mengunduh template COA', 'error')
+  } finally {
+    isDownloadingTemplate.value = false
+  }
+}
+
+const triggerFileInput = () => {
+  fileInput.value.click()
+}
+
+const handleFileUpload = async event => {
+  const file = event.target.files[0]
+  if (!file) return
+  
+  const formData = new FormData()
+  formData.append('file', file)
+  
+  isImporting.value = true
+  try {
+    const res = await $api('/apps/accounting/accounts/import', {
+      method: 'POST',
+      body: formData,
+    })
+
+    snackbar.show(res.message || 'Import COA berhasil', 'success')
+    await fetchAccounts()
+  } catch (error) {
+    console.error(error)
+    snackbar.show(error.data?.message || 'Gagal melakukan import data COA', 'error')
+  } finally {
+    isImporting.value = false
+    event.target.value = ''
+  }
+}
+
 watch([searchQuery, selectedType], () => {
   fetchAccounts()
 })
@@ -262,6 +318,13 @@ onMounted(() => {
       </div>
 
       <div class="d-flex flex-wrap align-center gap-3">
+        <input 
+          ref="fileInput" 
+          type="file" 
+          accept=".csv" 
+          style="display: none" 
+          @change="handleFileUpload"
+        >
         <VBtn
           color="secondary"
           variant="tonal"
@@ -272,6 +335,24 @@ onMounted(() => {
         </VBtn>
         <VBtn
           color="info"
+          variant="tonal"
+          prepend-icon="ri-download-cloud-line"
+          :loading="isDownloadingTemplate"
+          @click="downloadTemplate"
+        >
+          Template
+        </VBtn>
+        <VBtn
+          color="warning"
+          variant="tonal"
+          prepend-icon="ri-upload-cloud-line"
+          :loading="isImporting"
+          @click="triggerFileInput"
+        >
+          Import
+        </VBtn>
+        <VBtn
+          color="success"
           variant="tonal"
           prepend-icon="ri-file-pdf-2-line"
           :loading="isDownloadingPdf"

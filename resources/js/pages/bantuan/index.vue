@@ -769,7 +769,7 @@ const filteredFaqs = computed(() => {
             </VAvatar>
             <div>
               <h3 class="text-subtitle-1 font-weight-bold mb-0">Email Bantuan Resmi</h3>
-              <span class="text-caption text-info font-weight-medium">support@ptdumai.com</span>
+              <span class="text-caption text-info font-weight-medium">support@pagaruyung.com</span>
             </div>
           </div>
           <p class="text-body-2 text-medium-emphasis mb-4">
@@ -780,7 +780,7 @@ const filteredFaqs = computed(() => {
             color="info"
             variant="tonal"
             prepend-icon="ri-mail-line"
-            href="mailto:support@ptdumai.com?subject=Bantuan%20Sistem%20Ms.POS"
+            href="mailto:support@pagaruyung.com?subject=Bantuan%20Sistem%20Pagaruyung%20Mitra%20Persada"
             class="font-weight-bold"
           >
             Kirim Pesan Email

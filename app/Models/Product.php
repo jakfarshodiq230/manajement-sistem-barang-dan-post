@@ -26,6 +26,8 @@ class Product extends Model
         'height',
         'is_returnable',
         'tax_type',
+        'ori_discount_percent',
+        'ori_cashback_percent',
     ];
 
     protected $appends = [

@@ -19,6 +19,8 @@ class SaleItem extends Model
         'tax_percentage',
         'tax_amount',
         'subtotal',
+        'is_ori',
+        'ori_promo_type',
     ];
 
     public function getActivitylogOptions(): \Spatie\Activitylog\LogOptions

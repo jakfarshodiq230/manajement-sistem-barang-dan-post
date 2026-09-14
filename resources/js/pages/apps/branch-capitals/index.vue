@@ -1,7 +1,5 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { paginationMeta } from '@/utils/paginationMeta'
-import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import { useSnackbarStore } from '@/stores/snackbar'
 
 definePage({
@@ -11,2652 +9,789 @@ definePage({
   },
 })
 
-const snackbar = useSnackbarStore()
+const { show: showSnackbar } = useSnackbarStore()
 
-// State Data
-const transactions = ref([])
-const branches = ref([])
-const bankAccounts = ref([])
+// ============================
+// State
+// ============================
+const activeTab      = ref('distribusi')
+const branches       = ref([])
+const products       = ref([])
+const isLoading      = ref(false)
+const isSubmitting   = ref(false)
+
+// Distribusi tab
+const distributions   = ref([])
+const totalDistrib    = ref(0)
+const distribPage     = ref(1)
+const distribPerPage  = ref(10)
+const filterBranch    = ref('all')
+const filterStatus    = ref('all')
+const filterPeriod    = ref(currentMonthStr())
+const filterSearch    = ref('')
+
+// Rekonsiliasi tab
+const rekonData      = ref([])
+const rekonPeriod    = ref(currentMonthStr())
+const rekonBranch    = ref('all')
+const isRekonLoading = ref(false)
+
+// Summary KPI
 const summary = ref({
-  total_injected: 0,
-  total_returned: 0,
-  pending_returned: 0,
-  remaining_capital: 0,
-  payback_percentage: 0,
+  total_capital_value: 0,
+  total_transactions: 0,
+  total_sales: 0,
   branch_breakdown: [],
 })
 
-const isLoading = ref(false)
-const isSummaryLoading = ref(false)
-const isSubmitting = ref(false)
+// Form kirim modal barang
+const showSendDialog  = ref(false)
+const formItems       = ref([{ product_id: null, qty: 1, cost_price: 0, subtotal: 0 }])
+const formBranchId    = ref(null)
+const formNotes       = ref('')
 
-// Filters & Pagination
-const selectedBranch = ref('all')
-const selectedType = ref('all')
-const selectedStatus = ref('all')
-const search = ref('')
-const page = ref(1)
-const itemsPerPage = ref(10)
-const totalItems = ref(0)
-let searchTimeout = null
-
-// Drawers & Modals Visibility
-const isInflowDrawerOpen = ref(false)
-const isRequestDrawerOpen = ref(false)
-const isOutflowDrawerOpen = ref(false)
-const isEditDrawerOpen = ref(false)
-
-const isApproveDialogVisible = ref(false)
-const isRejectDialogVisible = ref(false)
-const isVoidDialogVisible = ref(false)
-const isDeleteDialogVisible = ref(false)
-const isDetailDialogVisible = ref(false)
-const isPreviewDialogVisible = ref(false)
-
-const selectedTransaction = ref(null)
-const rejectReason = ref('')
-const voidReason = ref('')
-const previewImage = ref('')
-
-// Form State 1: Injeksi Langsung Owner -> Cabang
-const inflowForm = ref({
-  branch_id: null,
-  category: 'Modal Awal',
-  amount: '',
-  date: new Date().toISOString().substring(0, 10),
-  payment_method: 'Transfer Bank',
-  bank_account_id: null,
-  bank_name: '',
-  account_number: '',
-  account_name: '',
-  proof_file: null,
-  notes: '',
-})
-
-// Form State 2: Permintaan Modal Tambahan Cabang -> Owner
-const requestForm = ref({
-  branch_id: null,
-  category: 'Permintaan Tambahan Stok',
-  amount: '',
-  date: new Date().toISOString().substring(0, 10),
-  proof_file: null,
-  notes: '',
-})
-
-// Form State 3: Setoran Pengembalian Modal Cabang -> Owner
-const outflowForm = ref({
-  branch_id: null,
-  category: 'Setoran Laba Closing Shift',
-  amount: '',
-  date: new Date().toISOString().substring(0, 10),
-  payment_method: 'Transfer Bank',
-  bank_account_id: null,
-  bank_name: '',
-  account_number: '',
-  account_name: '',
-  proof_file: null,
-  notes: '',
-})
-
-// Form State 4: Edit Transaksi
-const editForm = ref({
-  id: null,
-  branch_id: null,
-  type: 'injection',
-  category: 'Modal Awal',
-  amount: '',
-  date: '',
-  payment_method: 'Transfer Bank',
-  bank_account_id: null,
-  bank_name: '',
-  account_number: '',
-  account_name: '',
-  proof_file: null,
-  current_proof: null,
-  notes: '',
-})
-
-// Form State 5: Approval Modal Penyaluran (Untuk Permintaan Injeksi)
-const approveForm = ref({
-  payment_method: 'Transfer Bank',
-  bank_account_id: null,
-  bank_name: '',
-  account_number: '',
-  account_name: '',
-  proof_file: null,
-})
-
-// Formatting Helpers
-const formatCurrency = val => {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    minimumFractionDigits: 0,
-  }).format(val || 0)
+function currentMonthStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-const formatInputRupiah = val => {
-  if (!val && val !== 0) return ''
-  const digits = String(val).replace(/\D/g, '')
-  return digits ? new Intl.NumberFormat('id-ID').format(digits) : ''
-}
+const totalModalValue = computed(() =>
+  formItems.value.reduce((s, i) => s + (parseFloat(i.qty || 0) * parseFloat(i.cost_price || 0)), 0)
+)
 
-const parseInputRupiah = val => {
-  if (!val && val !== 0) return 0
-  const digits = String(val).replace(/\D/g, '')
-  return Number(digits) || 0
-}
+// ============================
+// Formatters
+// ============================
+const fmtCurrency = v => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(v || 0)
+const fmtDate = d => d ? new Date(d).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'
 
-const formatDate = dateStr => {
-  if (!dateStr) return '-'
-  const d = new Date(dateStr)
-  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+const statusColor = s => ({
+  completed: 'success', received: 'success',
+  in_transit: 'info', ready_for_pickup: 'primary', approved: 'primary',
+  pending: 'warning', rejected: 'error', cancelled: 'error',
+}[s] || 'secondary')
 
-const formatDateTime = dateStr => {
-  if (!dateStr) return '-'
-  const d = new Date(dateStr)
-  return d.toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+const statusLabel = s => ({
+  pending: 'Menunggu', approved: 'Disetujui', ready_for_pickup: 'Siap Kirim',
+  in_transit: 'Dalam Pengiriman', completed: 'Selesai',
+  rejected: 'Ditolak', cancelled: 'Dibatalkan',
+}[s] || s)
 
-// Fetch Branches
+// ============================
+// Fetch data
+// ============================
 const fetchBranches = async () => {
   try {
-    const res = await $api('/apps/branches', { query: { itemsPerPage: 100 } })
-    branches.value = res.branches || res.data || (Array.isArray(res) ? res : [])
-    if (branches.value.length === 1) {
-      selectedBranch.value = branches.value[0].id
+    const res = await $api('/apps/branches?simple=true')
+    if (res?.length) {
+      branches.value = res.map(b => ({ title: b.name, value: b.id }))
     }
-  } catch (error) {
-    console.error('Error fetching branches:', error)
-    branches.value = []
-  }
+  } catch (e) { console.error(e) }
 }
 
-// Fetch Active Bank Accounts
-const fetchBankAccounts = async () => {
+const fetchProducts = async () => {
   try {
-    const res = await $api('/apps/bank-accounts', { query: { is_active: true, itemsPerPage: 100 } })
-    bankAccounts.value = res.data || (Array.isArray(res) ? res : [])
-  } catch (error) {
-    console.error('Error fetching bank accounts:', error)
-    bankAccounts.value = []
-  }
+    const res = await $api('/apps/products?per_page=1000')
+    products.value = (res?.data || res || []).map(p => ({
+      title: `${p.name}${p.sku ? ' [' + p.sku + ']' : ''}`,
+      value: p.id,
+      cost_price: p.cost_price || 0,
+    }))
+  } catch (e) { console.error(e) }
 }
 
-const onBankAccountChange = form => {
-  if (!form || !form.bank_account_id) return
-  const b = bankAccounts.value.find(acc => acc.id === form.bank_account_id)
-  if (b) {
-    form.bank_name = b.bank_name
-    form.account_number = b.account_number
-    form.account_name = b.account_name
-  }
-}
-
-// Fetch Executive Summary
 const fetchSummary = async () => {
-  isSummaryLoading.value = true
   try {
-    const params = {}
-    if (selectedBranch.value !== 'all') {
-      params.branch_id = selectedBranch.value
-    }
-    const res = await $api('/apps/branch-capitals/summary', { query: params })
-    summary.value = {
-      total_injected: 0,
-      total_returned: 0,
-      pending_returned: 0,
-      remaining_capital: 0,
-      payback_percentage: 0,
-      branch_breakdown: [],
-      ...res,
-    }
-  } catch (error) {
-    console.error('Error fetching summary:', error)
-  } finally {
-    isSummaryLoading.value = false
-  }
+    const res = await $api('/apps/branch-capitals/summary', {
+      query: { period: filterPeriod.value, branch_id: filterBranch.value }
+    })
+    summary.value = res
+  } catch (e) { console.error(e) }
 }
 
-// Fetch Transactions
-const fetchTransactions = async () => {
+const fetchDistributions = async () => {
   isLoading.value = true
   try {
-    const params = {
-      page: page.value,
-      per_page: itemsPerPage.value,
-    }
-    if (selectedBranch.value !== 'all') params.branch_id = selectedBranch.value
-    if (selectedType.value !== 'all') params.type = selectedType.value
-    if (selectedStatus.value !== 'all') params.status = selectedStatus.value
-    if (search.value) params.search = search.value
+    const res = await $api('/apps/branch-capitals/distributions', {
+      query: {
+        branch_id: filterBranch.value,
+        status: filterStatus.value,
+        period: filterPeriod.value,
+        search: filterSearch.value,
+        per_page: distribPerPage.value,
+        page: distribPage.value,
+      }
+    })
+    distributions.value = res.data
+    totalDistrib.value  = res.total
+  } catch (e) { console.error(e) }
+  finally { isLoading.value = false }
+}
 
-    const res = await $api('/apps/branch-capitals', { query: params })
-    transactions.value = res.data || []
-    totalItems.value = res.total || 0
-  } catch (error) {
-    console.error('Error fetching transactions:', error)
-    snackbar.show('Gagal memuat riwayat mutasi modal', 'error')
-  } finally {
-    isLoading.value = false
+const fetchRekonsiliasi = async () => {
+  isRekonLoading.value = true
+  try {
+    const res = await $api('/apps/branch-capitals/reconciliation', {
+      query: { period: rekonPeriod.value, branch_id: rekonBranch.value }
+    })
+    rekonData.value = res.data
+  } catch (e) { console.error(e) }
+  finally { isRekonLoading.value = false }
+}
+
+// ============================
+// Form submit: kirim modal barang
+// ============================
+const onProductSelect = (idx) => {
+  const p = products.value.find(p => p.value === formItems.value[idx].product_id)
+  if (p) {
+    formItems.value[idx].cost_price = p.cost_price
+    recalcSubtotal(idx)
   }
 }
 
-// Watchers
-watch([selectedBranch, selectedType, selectedStatus], () => {
-  page.value = 1
-  fetchSummary()
-  fetchTransactions()
-})
-
-watch(search, () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    page.value = 1
-    fetchTransactions()
-  }, 400)
-})
-
-watch([page, itemsPerPage], () => {
-  fetchTransactions()
-})
-
-// Action Handlers
-const openInflowDrawer = () => {
-  resetInflowForm()
-  isInflowDrawerOpen.value = true
+const recalcSubtotal = (idx) => {
+  const item = formItems.value[idx]
+  item.subtotal = (parseFloat(item.qty || 0) * parseFloat(item.cost_price || 0))
 }
 
-const openRequestDrawer = () => {
-  resetRequestForm()
-  isRequestDrawerOpen.value = true
-}
+const addItem = () => formItems.value.push({ product_id: null, qty: 1, cost_price: 0, subtotal: 0 })
+const removeItem = (idx) => { if (formItems.value.length > 1) formItems.value.splice(idx, 1) }
 
-const openOutflowDrawer = () => {
-  resetOutflowForm()
-  isOutflowDrawerOpen.value = true
-}
-
-// Submit Inflow Langsung (Owner -> Cabang)
-const handleInflowSubmit = async () => {
-  const numericAmount = parseInputRupiah(inflowForm.value.amount)
-  if (!inflowForm.value.branch_id || !numericAmount || numericAmount <= 0) {
-    snackbar.show('Mohon lengkapi cabang tujuan dan nominal modal', 'warning')
-    return
-  }
+const submitKirimModal = async () => {
+  if (!formBranchId.value) { showSnackbar('Pilih cabang tujuan terlebih dahulu.', 'error'); return }
+  const invalid = formItems.value.some(i => !i.product_id || i.qty < 1)
+  if (invalid) { showSnackbar('Lengkapi semua item produk dan kuantitas.', 'error'); return }
 
   isSubmitting.value = true
   try {
-    const formData = new FormData()
-    formData.append('branch_id', inflowForm.value.branch_id)
-    formData.append('type', 'injection')
-    formData.append('category', inflowForm.value.category)
-    formData.append('amount', numericAmount)
-    formData.append('date', inflowForm.value.date)
-    formData.append('payment_method', inflowForm.value.payment_method)
-    if (inflowForm.value.bank_account_id) formData.append('bank_account_id', inflowForm.value.bank_account_id)
-    if (inflowForm.value.bank_name) formData.append('bank_name', inflowForm.value.bank_name)
-    if (inflowForm.value.account_number) formData.append('account_number', inflowForm.value.account_number)
-    if (inflowForm.value.account_name) formData.append('account_name', inflowForm.value.account_name)
-    if (inflowForm.value.proof_file) formData.append('proof_file', inflowForm.value.proof_file)
-    if (inflowForm.value.notes) formData.append('notes', inflowForm.value.notes)
+    // Ambil ID Gudang Pusat (branch type = warehouse, atau source_branch dari server default)
+    const sourceBranch = branches.value[0] // akan dikonfigurasi dari server; pakai yang pertama sebagai fallback
+    // Cari branch warehouse/pusat
+    const warehouseRes = await $api('/apps/branches?type=warehouse&simple=true')
+    const sourceId = warehouseRes?.[0]?.id || sourceBranch?.value
 
-    await $api('/apps/branch-capitals', {
+    await $api('/apps/stock-transfers', {
       method: 'POST',
-      body: formData,
+      body: {
+        source_branch_id:      sourceId,
+        destination_branch_id: formBranchId.value,
+        is_capital_transfer:   true,
+        notes:                 formNotes.value || 'Distribusi Modal Barang dari Pusat',
+        items: formItems.value.map(i => ({
+          product_id: i.product_id,
+          qty:        i.qty,
+          cost_price: i.cost_price,
+        })),
+      }
     })
 
-    snackbar.show('Penyertaan modal berhasil dicatat dan disetujui!', 'success')
-    isInflowDrawerOpen.value = false
-    window.dispatchEvent(new Event('refresh-notifications'))
+    showSnackbar('Distribusi modal barang berhasil dikirim!', 'success')
+    showSendDialog.value = false
+    formItems.value = [{ product_id: null, qty: 1, cost_price: 0, subtotal: 0 }]
+    formBranchId.value = null
+    formNotes.value = ''
+    fetchDistributions()
     fetchSummary()
-    fetchTransactions()
-  } catch (error) {
-    console.error('Error submitting injection:', error)
-    snackbar.show(error.response?._data?.message || 'Gagal menyimpan penyertaan modal', 'error')
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
-// Submit Permintaan Modal Tambahan (Cabang -> Owner)
-const handleRequestSubmit = async () => {
-  const numericAmount = parseInputRupiah(requestForm.value.amount)
-  if (!requestForm.value.branch_id || !numericAmount || numericAmount <= 0) {
-    snackbar.show('Mohon lengkapi cabang dan nominal permintaan modal', 'warning')
-    return
-  }
-
-  isSubmitting.value = true
-  try {
-    const formData = new FormData()
-    formData.append('branch_id', requestForm.value.branch_id)
-    formData.append('type', 'injection')
-    formData.append('is_request', '1')
-    formData.append('category', requestForm.value.category)
-    formData.append('amount', numericAmount)
-    formData.append('date', requestForm.value.date)
-    formData.append('payment_method', 'Transfer Bank')
-    if (requestForm.value.proof_file) formData.append('proof_file', requestForm.value.proof_file)
-    if (requestForm.value.notes) formData.append('notes', requestForm.value.notes)
-
-    await $api('/apps/branch-capitals', {
-      method: 'POST',
-      body: formData,
-    })
-
-    snackbar.show('Permintaan modal tambahan berhasil diajukan ke Owner!', 'success')
-    isRequestDrawerOpen.value = false
-    window.dispatchEvent(new Event('refresh-notifications'))
-    fetchSummary()
-    fetchTransactions()
-  } catch (error) {
-    console.error('Error submitting request:', error)
-    snackbar.show(error.response?._data?.message || 'Gagal mengajukan permintaan modal', 'error')
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
-// Submit Outflow Pengembalian Modal (Cabang -> Owner)
-const handleOutflowSubmit = async () => {
-  const numericAmount = parseInputRupiah(outflowForm.value.amount)
-  if (!outflowForm.value.branch_id || !numericAmount || numericAmount <= 0) {
-    snackbar.show('Mohon lengkapi cabang asal dan nominal pengembalian', 'warning')
-    return
-  }
-
-  isSubmitting.value = true
-  try {
-    const formData = new FormData()
-    formData.append('branch_id', outflowForm.value.branch_id)
-    formData.append('type', 'return')
-    formData.append('category', outflowForm.value.category)
-    formData.append('amount', numericAmount)
-    formData.append('date', outflowForm.value.date)
-    formData.append('payment_method', outflowForm.value.payment_method)
-    if (outflowForm.value.bank_account_id) formData.append('bank_account_id', outflowForm.value.bank_account_id)
-    if (outflowForm.value.bank_name) formData.append('bank_name', outflowForm.value.bank_name)
-    if (outflowForm.value.account_number) formData.append('account_number', outflowForm.value.account_number)
-    if (outflowForm.value.account_name) formData.append('account_name', outflowForm.value.account_name)
-    if (outflowForm.value.proof_file) formData.append('proof_file', outflowForm.value.proof_file)
-    if (outflowForm.value.notes) formData.append('notes', outflowForm.value.notes)
-
-    await $api('/apps/branch-capitals', {
-      method: 'POST',
-      body: formData,
-    })
-
-    snackbar.show('Pengajuan setoran pengembalian modal berhasil dikirim!', 'success')
-    isOutflowDrawerOpen.value = false
-    window.dispatchEvent(new Event('refresh-notifications'))
-    fetchSummary()
-    fetchTransactions()
-  } catch (error) {
-    console.error('Error submitting return:', error)
-    snackbar.show(error.response?._data?.message || 'Gagal mengajukan pengembalian modal', 'error')
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
-// Edit Modal
-const openEditDrawer = item => {
-  editForm.value = {
-    id: item.id,
-    branch_id: item.branch_id,
-    type: item.type,
-    category: item.category,
-    amount: formatInputRupiah(item.amount),
-    date: item.date ? item.date.substring(0, 10) : new Date().toISOString().substring(0, 10),
-    payment_method: item.payment_method || 'Transfer Bank',
-    bank_account_id: item.bank_account_id || null,
-    bank_name: item.bank_name || '',
-    account_number: item.account_number || '',
-    account_name: item.account_name || '',
-    proof_file: null,
-    current_proof: item.proof_file,
-    notes: item.notes || '',
-  }
-  isEditDrawerOpen.value = true
-}
-
-const handleEditSubmit = async () => {
-  const numericAmount = parseInputRupiah(editForm.value.amount)
-  if (!editForm.value.branch_id || !numericAmount || numericAmount <= 0) {
-    snackbar.show('Mohon lengkapi data dan nominal transaksi', 'warning')
-    return
-  }
-
-  isSubmitting.value = true
-  try {
-    const formData = new FormData()
-    formData.append('branch_id', editForm.value.branch_id)
-    formData.append('type', editForm.value.type)
-    formData.append('category', editForm.value.category)
-    formData.append('amount', numericAmount)
-    formData.append('date', editForm.value.date)
-    formData.append('payment_method', editForm.value.payment_method)
-    if (editForm.value.bank_account_id) formData.append('bank_account_id', editForm.value.bank_account_id)
-    if (editForm.value.bank_name) formData.append('bank_name', editForm.value.bank_name)
-    if (editForm.value.account_number) formData.append('account_number', editForm.value.account_number)
-    if (editForm.value.account_name) formData.append('account_name', editForm.value.account_name)
-    if (editForm.value.proof_file) formData.append('proof_file', editForm.value.proof_file)
-    if (editForm.value.notes) formData.append('notes', editForm.value.notes)
-
-    await $api(`/apps/branch-capitals/${editForm.value.id}`, {
-      method: 'POST',
-      body: formData,
-    })
-
-    snackbar.show('Transaksi modal berhasil diperbarui!', 'success')
-    isEditDrawerOpen.value = false
-    fetchSummary()
-    fetchTransactions()
-  } catch (error) {
-    console.error('Error updating capital:', error)
-    snackbar.show(error.response?._data?.message || 'Gagal memperbarui transaksi modal', 'error')
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
-// Approve Transaction
-const confirmApprove = item => {
-  selectedTransaction.value = item
-  const defaultBank = bankAccounts.value.find(b => b.is_default) || bankAccounts.value[0] || null
-  approveForm.value = {
-    payment_method: item.payment_method || 'Transfer Bank',
-    bank_account_id: item.bank_account_id || (defaultBank ? defaultBank.id : null),
-    bank_name: item.bank_name || (defaultBank ? defaultBank.bank_name : ''),
-    account_number: item.account_number || (defaultBank ? defaultBank.account_number : ''),
-    account_name: item.account_name || (defaultBank ? defaultBank.account_name : ''),
-    proof_file: null,
-  }
-  isApproveDialogVisible.value = true
-}
-
-const handleApprove = async () => {
-  if (!selectedTransaction.value) return
-  isSubmitting.value = true
-  try {
-    const formData = new FormData()
-    if (approveForm.value.payment_method) formData.append('payment_method', approveForm.value.payment_method)
-    if (approveForm.value.bank_account_id) formData.append('bank_account_id', approveForm.value.bank_account_id)
-    if (approveForm.value.bank_name) formData.append('bank_name', approveForm.value.bank_name)
-    if (approveForm.value.account_number) formData.append('account_number', approveForm.value.account_number)
-    if (approveForm.value.account_name) formData.append('account_name', approveForm.value.account_name)
-    if (approveForm.value.proof_file) formData.append('proof_file', approveForm.value.proof_file)
-
-    await $api(`/apps/branch-capitals/${selectedTransaction.value.id}/approve`, {
-      method: 'POST',
-      body: formData,
-    })
-
-    const msg = selectedTransaction.value.type === 'injection'
-      ? 'Permintaan modal tambahan telah disetujui & disalurkan!'
-      : 'Setoran pengembalian modal telah disetujui!'
-
-    snackbar.show(msg, 'success')
-    isApproveDialogVisible.value = false
-    fetchSummary()
-    fetchTransactions()
-  } catch (error) {
-    console.error('Error approving:', error)
-    snackbar.show('Gagal menyetujui transaksi modal', 'error')
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
-// Reject Transaction
-const confirmReject = item => {
-  selectedTransaction.value = item
-  rejectReason.value = ''
-  isRejectDialogVisible.value = true
-}
-
-const handleReject = async () => {
-  if (!selectedTransaction.value || !rejectReason.value.trim()) {
-    snackbar.show('Wajib mengisi alasan penolakan', 'warning')
-    return
-  }
-  isSubmitting.value = true
-  try {
-    await $api(`/apps/branch-capitals/${selectedTransaction.value.id}/reject`, {
-      method: 'POST',
-      body: { reason: rejectReason.value },
-    })
-    snackbar.show('Transaksi modal telah ditolak.', 'info')
-    isRejectDialogVisible.value = false
-    fetchSummary()
-    fetchTransactions()
-  } catch (error) {
-    console.error('Error rejecting:', error)
-    snackbar.show('Gagal menolak transaksi', 'error')
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
-// Void (Batalkan Persetujuan)
-const confirmVoid = item => {
-  selectedTransaction.value = item
-  voidReason.value = ''
-  isVoidDialogVisible.value = true
-}
-
-const handleVoid = async () => {
-  if (!selectedTransaction.value || !voidReason.value.trim()) {
-    snackbar.show('Wajib mengisi alasan pembatalan persetujuan', 'warning')
-    return
-  }
-  isSubmitting.value = true
-  try {
-    await $api(`/apps/branch-capitals/${selectedTransaction.value.id}/void`, {
-      method: 'POST',
-      body: { reason: voidReason.value },
-    })
-    snackbar.show('Persetujuan transaksi berhasil dibatalkan (void).', 'warning')
-    isVoidDialogVisible.value = false
-    fetchSummary()
-    fetchTransactions()
-  } catch (error) {
-    console.error('Error voiding:', error)
-    snackbar.show('Gagal membatalkan persetujuan', 'error')
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
-// Delete Transaction
-const confirmDelete = item => {
-  selectedTransaction.value = item
-  isDeleteDialogVisible.value = true
-}
-
-const handleDelete = async () => {
-  if (!selectedTransaction.value) return
-  isSubmitting.value = true
-  try {
-    await $api(`/apps/branch-capitals/${selectedTransaction.value.id}`, { method: 'DELETE' })
-    snackbar.show('Transaksi modal berhasil dihapus.', 'success')
-    isDeleteDialogVisible.value = false
-    fetchSummary()
-    fetchTransactions()
-  } catch (error) {
-    console.error('Error deleting:', error)
-    snackbar.show('Gagal menghapus transaksi modal', 'error')
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
-// Detail Dialog
-const showDetail = item => {
-  selectedTransaction.value = item
-  isDetailDialogVisible.value = true
-  fetchCapitalEmailLogs(item.id)
-}
-
-// ==================== EMAIL NOTIFICATIONS & AUDIT LOGS ====================
-const isSendSummaryEmailDialogVisible = ref(false)
-const summaryEmailInput = ref('')
-const isSendingSummaryEmail = ref(false)
-
-const isSendCapitalEmailDialogVisible = ref(false)
-const capitalEmailInput = ref('')
-const isSendingCapitalEmail = ref(false)
-
-const capitalEmailLogs = ref([])
-const isLoadingCapitalEmailLogs = ref(false)
-const isRetryingCapitalEmail = ref({})
-
-const fetchCapitalEmailLogs = async id => {
-  if (!id) return
-  isLoadingCapitalEmailLogs.value = true
-  try {
-    const res = await $api(`/apps/branch-capitals/${id}/email-logs`)
-    capitalEmailLogs.value = res.data || []
   } catch (e) {
-    console.error('Failed to fetch capital email logs:', e)
+    showSnackbar(e?.data?.message || 'Gagal mengirim distribusi modal barang.', 'error')
   } finally {
-    isLoadingCapitalEmailLogs.value = false
+    isSubmitting.value = false
   }
 }
 
-const openSendSummaryEmailDialog = () => {
-  summaryEmailInput.value = ''
-  isSendSummaryEmailDialogVisible.value = true
-}
-
-const submitSendSummaryEmail = async () => {
-  isSendingSummaryEmail.value = true
-  try {
-    const res = await $api('/apps/branch-capitals/send-summary-email', {
-      method: 'POST',
-      body: { email: summaryEmailInput.value || undefined },
-    })
-    snackbar.show(res.message || 'Laporan rekap modal & ROI berhasil dikirim ke email Owner', 'success')
-    isSendSummaryEmailDialogVisible.value = false
-  } catch (error) {
-    console.error(error)
-    const errText = error.response?._data?.message || error.data?.message || error.message || 'Gagal mengirim rekap modal ke email'
-    snackbar.show(errText, 'error')
-  } finally {
-    isSendingSummaryEmail.value = false
-  }
-}
-
-const openSendCapitalEmailDialog = () => {
-  capitalEmailInput.value = ''
-  isSendCapitalEmailDialogVisible.value = true
-}
-
-const submitSendCapitalEmail = async () => {
-  if (!selectedTransaction.value) return
-  isSendingCapitalEmail.value = true
-  try {
-    const res = await $api(`/apps/branch-capitals/${selectedTransaction.value.id}/send-email`, {
-      method: 'POST',
-      body: { email: capitalEmailInput.value || undefined },
-    })
-    snackbar.show(res.message || 'Laporan setoran modal berhasil dikirim ke email', 'success')
-    isSendCapitalEmailDialogVisible.value = false
-    await fetchCapitalEmailLogs(selectedTransaction.value.id)
-  } catch (error) {
-    console.error(error)
-    const errText = error.response?._data?.message || error.data?.message || error.message || 'Gagal mengirim email setoran modal'
-    snackbar.show(errText, 'error')
-    await fetchCapitalEmailLogs(selectedTransaction.value.id)
-  } finally {
-    isSendingCapitalEmail.value = false
-  }
-}
-
-const retryCapitalEmail = async logId => {
-  isRetryingCapitalEmail.value[logId] = true
-  try {
-    const res = await $api(`/apps/email-logs/${logId}/retry`, {
-      method: 'POST',
-    })
-    snackbar.show(res.message || 'Email berhasil dikirim ulang', 'success')
-    if (selectedTransaction.value) {
-      await fetchCapitalEmailLogs(selectedTransaction.value.id)
-    }
-  } catch (error) {
-    console.error(error)
-    const errText = error.response?._data?.message || error.data?.message || error.message || 'Gagal mengirim ulang email'
-    snackbar.show(errText, 'error')
-    if (selectedTransaction.value) {
-      await fetchCapitalEmailLogs(selectedTransaction.value.id)
-    }
-  } finally {
-    isRetryingCapitalEmail.value[logId] = false
-  }
-}
-
-// Preview Proof / Open PDF
-const previewProof = item => {
-  if (!item.proof_file) return
-  if (item.proof_file.toLowerCase().endsWith('.pdf')) {
-    window.open(`/storage/${item.proof_file}`, '_blank')
-    return
-  }
-  previewImage.value = `/storage/${item.proof_file}`
-  isPreviewDialogVisible.value = true
-}
-
-// Reset form helpers
-const resetInflowForm = () => {
-  const defaultBank = bankAccounts.value.find(b => b.is_default) || bankAccounts.value[0] || null
-  inflowForm.value = {
-    branch_id: branches.value[0]?.id || null,
-    category: 'Modal Awal',
-    amount: '',
-    date: new Date().toISOString().substring(0, 10),
-    payment_method: 'Transfer Bank',
-    bank_account_id: defaultBank ? defaultBank.id : null,
-    bank_name: defaultBank ? defaultBank.bank_name : '',
-    account_number: defaultBank ? defaultBank.account_number : '',
-    account_name: defaultBank ? defaultBank.account_name : '',
-    proof_file: null,
-    notes: '',
-  }
-}
-
-const resetRequestForm = () => {
-  requestForm.value = {
-    branch_id: branches.value[0]?.id || null,
-    category: 'Permintaan Tambahan Stok',
-    amount: '',
-    date: new Date().toISOString().substring(0, 10),
-    proof_file: null,
-    notes: '',
-  }
-}
-
-const resetOutflowForm = () => {
-  const defaultBank = bankAccounts.value.find(b => b.is_default) || bankAccounts.value[0] || null
-  outflowForm.value = {
-    branch_id: branches.value[0]?.id || null,
-    category: 'Setoran Laba Closing Shift',
-    amount: '',
-    date: new Date().toISOString().substring(0, 10),
-    payment_method: 'Transfer Bank',
-    bank_account_id: defaultBank ? defaultBank.id : null,
-    bank_name: defaultBank ? defaultBank.bank_name : '',
-    account_number: defaultBank ? defaultBank.account_number : '',
-    account_name: defaultBank ? defaultBank.account_name : '',
-    proof_file: null,
-    notes: '',
-  }
-}
-
-onMounted(async () => {
-  await Promise.all([fetchBranches(), fetchBankAccounts()])
-  if (branches.value.length > 0) {
-    inflowForm.value.branch_id = branches.value[0].id
-    requestForm.value.branch_id = branches.value[0].id
-    outflowForm.value.branch_id = branches.value[0].id
-  }
-  const defaultBank = bankAccounts.value.find(b => b.is_default) || bankAccounts.value[0] || null
-  if (defaultBank) {
-    inflowForm.value.bank_account_id = defaultBank.id
-    inflowForm.value.bank_name = defaultBank.bank_name
-    inflowForm.value.account_number = defaultBank.account_number
-    inflowForm.value.account_name = defaultBank.account_name
-
-    outflowForm.value.bank_account_id = defaultBank.id
-    outflowForm.value.bank_name = defaultBank.bank_name
-    outflowForm.value.account_number = defaultBank.account_number
-    outflowForm.value.account_name = defaultBank.account_name
-  }
+// ============================
+// Watchers
+// ============================
+watch([filterBranch, filterStatus, filterPeriod, filterSearch], () => {
+  distribPage.value = 1
+  fetchDistributions()
   fetchSummary()
-  fetchTransactions()
+})
+
+watch([rekonPeriod, rekonBranch], () => { fetchRekonsiliasi() })
+
+watch(activeTab, val => {
+  if (val === 'rekonsiliasi') fetchRekonsiliasi()
+})
+
+// ============================
+// Init
+// ============================
+onMounted(async () => {
+  await fetchBranches()
+  fetchProducts()
+  fetchSummary()
+  fetchDistributions()
 })
 </script>
 
 <template>
-  <div class="pa-4">
-    <!-- Header Banner -->
-    <VCard elevation="2" class="mb-4 pa-4 rounded-xl border bg-var-theme-surface">
-      <div class="d-flex flex-wrap align-center justify-space-between gap-4">
-        <!-- Title & Subtitle -->
-        <div class="d-flex align-center gap-3">
-          <VAvatar color="primary" variant="tonal" rounded size="48">
-            <VIcon icon="ri-hand-coin-line" size="28" />
-          </VAvatar>
-          <div>
-            <h2 class="text-h5 font-weight-bold mb-0">
-              Manajemen Modal & ROI Cabang
-            </h2>
-            <p class="text-caption text-medium-emphasis mb-0">
-              Monitoring penyertaan modal usaha, permintaan modal tambahan, dan pengembalian modal cabang ke Owner
-            </p>
-          </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="d-flex flex-wrap align-center gap-2">
-          <!-- 1. Injeksi Langsung Owner -->
-          <VBtn
-            v-if="$can('approve', 'Modal & ROI Cabang') || $can('write', 'Modal & ROI Cabang') || $can('manage', 'all')"
-            color="primary"
-            variant="elevated"
-            prepend-icon="ri-hand-coin-line"
-            class="text-none font-weight-medium"
-            @click="openInflowDrawer"
-          >
-            Injeksi Modal (Owner)
-          </VBtn>
-
-          <!-- 2. Permintaan Modal Cabang -->
-          <VBtn
-            v-if="$can('create', 'Modal & ROI Cabang') || $can('manage', 'all')"
-            color="warning"
-            variant="tonal"
-            prepend-icon="ri-add-circle-line"
-            class="text-none font-weight-medium"
-            @click="openRequestDrawer"
-          >
-            Ajukan Permintaan Modal
-          </VBtn>
-
-          <!-- 3. Setor Pengembalian Modal -->
-          <VBtn
-            v-if="$can('create', 'Modal & ROI Cabang') || $can('manage', 'all')"
-            color="success"
-            variant="elevated"
-            prepend-icon="ri-arrow-go-back-line"
-            class="text-none font-weight-medium"
-            @click="openOutflowDrawer"
-          >
-            Setor Pengembalian Modal
-          </VBtn>
-
-          <!-- 4. Kirim Rekap Modal ke Email Owner -->
-          <VBtn
-            color="primary"
-            variant="tonal"
-            prepend-icon="ri-mail-send-line"
-            class="text-none font-weight-medium"
-            @click="openSendSummaryEmailDialog"
-          >
-            Kirim Rekap Modal ke Email Owner
-          </VBtn>
-        </div>
+  <div>
+    <!-- Header -->
+    <div class="d-flex align-center justify-space-between mb-6">
+      <div>
+        <h4 class="text-h4 mb-1">
+          <VIcon icon="ri-store-3-line" color="primary" class="mr-2" />
+          Distribusi Modal Barang
+        </h4>
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          Kelola pengiriman barang dari Pusat/Gudang ke Cabang dan pantau rekonsiliasi omset akhir bulan.
+        </p>
       </div>
-    </VCard>
+      <VBtn
+        color="primary"
+        prepend-icon="ri-send-plane-line"
+        @click="showSendDialog = true"
+      >
+        Kirim Modal Barang ke Cabang
+      </VBtn>
+    </div>
 
-    <!-- Top 4 Executive KPI Cards -->
-    <VRow class="mb-4 match-height">
-      <!-- 1. Total Modal Disuntikkan -->
-      <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary h-100 d-flex flex-column justify-space-between" :loading="isSummaryLoading">
-          <div>
-            <div class="d-flex align-center justify-space-between">
-              <span class="text-caption text-primary font-weight-bold text-uppercase">Total Modal Diberikan</span>
-              <VAvatar color="primary" variant="tonal" rounded size="40">
-                <VIcon icon="ri-hand-coin-line" size="22" />
-              </VAvatar>
+    <!-- KPI Summary Cards -->
+    <VRow class="mb-6">
+      <VCol cols="12" md="4">
+        <VCard variant="tonal" color="primary" class="h-100">
+          <VCardText class="d-flex align-center gap-4">
+            <VAvatar color="primary" size="52" rounded="lg">
+              <VIcon icon="ri-store-3-line" size="28" />
+            </VAvatar>
+            <div>
+              <div class="text-caption text-medium-emphasis text-uppercase font-weight-bold">Total Nilai Modal Barang Dikirim</div>
+              <div class="text-h5 font-weight-bold text-primary">{{ fmtCurrency(summary.total_capital_value) }}</div>
+              <div class="text-caption text-medium-emphasis">{{ summary.total_transactions }} distribusi • {{ filterPeriod }}</div>
             </div>
-            <div class="text-h5 font-weight-bold text-primary mt-2">
-              {{ formatCurrency(summary.total_injected) }}
-            </div>
-          </div>
-          <div class="d-flex align-center gap-1 mt-3 text-caption text-medium-emphasis">
-            <VIcon icon="ri-shield-check-line" size="14" color="primary" class="me-1" />
-            <span>Penyertaan modal riil Owner</span>
-          </div>
+          </VCardText>
         </VCard>
       </VCol>
-
-      <!-- 2. Total Modal Dikembalikan -->
-      <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success h-100 d-flex flex-column justify-space-between" :loading="isSummaryLoading">
-          <div>
-            <div class="d-flex align-center justify-space-between">
-              <span class="text-caption text-success font-weight-bold text-uppercase">Modal Dikembalikan</span>
-              <VAvatar color="success" variant="tonal" rounded size="40">
-                <VIcon icon="ri-arrow-left-right-line" size="22" />
-              </VAvatar>
+      <VCol cols="12" md="4">
+        <VCard variant="tonal" color="success" class="h-100">
+          <VCardText class="d-flex align-center gap-4">
+            <VAvatar color="success" size="52" rounded="lg">
+              <VIcon icon="ri-money-dollar-circle-line" size="28" />
+            </VAvatar>
+            <div>
+              <div class="text-caption text-medium-emphasis text-uppercase font-weight-bold">Total Omset Penjualan Cabang</div>
+              <div class="text-h5 font-weight-bold text-success">{{ fmtCurrency(summary.total_sales) }}</div>
+              <div class="text-caption text-medium-emphasis">Periode {{ filterPeriod }}</div>
             </div>
-            <div class="text-h5 font-weight-bold text-success mt-2">
-              {{ formatCurrency(summary.total_returned) }}
-            </div>
-          </div>
-          <div class="d-flex align-center justify-space-between mt-3 text-caption">
-            <span class="text-medium-emphasis">Menunggu Approval:</span>
-            <span class="font-weight-bold text-warning">{{ formatCurrency(summary.pending_returned) }}</span>
-          </div>
+          </VCardText>
         </VCard>
       </VCol>
-
-      <!-- 3. Sisa Modal Tertanam (Outstanding) -->
-      <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-warning h-100 d-flex flex-column justify-space-between" :loading="isSummaryLoading">
-          <div>
-            <div class="d-flex align-center justify-space-between">
-              <span class="text-caption text-warning font-weight-bold text-uppercase">Sisa Modal Tertanam</span>
-              <VAvatar color="warning" variant="tonal" rounded size="40">
-                <VIcon icon="ri-wallet-3-line" size="22" />
-              </VAvatar>
+      <VCol cols="12" md="4">
+        <VCard variant="tonal" color="warning" class="h-100">
+          <VCardText class="d-flex align-center gap-4">
+            <VAvatar color="warning" size="52" rounded="lg">
+              <VIcon icon="ri-scales-3-line" size="28" />
+            </VAvatar>
+            <div>
+              <div class="text-caption text-medium-emphasis text-uppercase font-weight-bold">Estimasi Sisa Modal Belum Terjual</div>
+              <div class="text-h5 font-weight-bold text-warning">
+                {{ fmtCurrency(Math.max(0, summary.total_capital_value - summary.total_sales)) }}
+              </div>
+              <div class="text-caption text-medium-emphasis">
+                {{ summary.total_capital_value > 0 ? Math.round(Math.min(100, (summary.total_sales / summary.total_capital_value) * 100)) : 0 }}% Terjual
+              </div>
             </div>
-            <div class="text-h5 font-weight-bold text-warning mt-2">
-              {{ formatCurrency(summary.remaining_capital) }}
-            </div>
-          </div>
-          <div class="d-flex align-center gap-1 mt-3 text-caption text-medium-emphasis">
-            <span>Dana belum kembali ke kas Owner</span>
-          </div>
-        </VCard>
-      </VCol>
-
-      <!-- 4. Payback Progress Bar (% ROI) -->
-      <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info h-100 d-flex flex-column justify-space-between" :loading="isSummaryLoading">
-          <div>
-            <div class="d-flex align-center justify-space-between">
-              <span class="text-caption text-info font-weight-bold text-uppercase">Progres Pengembalian</span>
-              <VChip color="info" size="x-small" variant="tonal" class="font-weight-bold">
-                ROI: {{ summary.payback_percentage }}%
-              </VChip>
-            </div>
-            <div class="text-h5 font-weight-bold text-info mt-2">
-              {{ summary.payback_percentage }}%
-            </div>
-          </div>
-          <div class="mt-3">
-            <VProgressLinear
-              :model-value="summary.payback_percentage"
-              color="info"
-              height="8"
-              rounded
-              striped
-            />
-          </div>
+          </VCardText>
         </VCard>
       </VCol>
     </VRow>
 
-    <!-- Branch Breakdown Cards (If multi-branch) -->
-    <VCard v-if="summary?.branch_breakdown && summary.branch_breakdown.length > 1 && selectedBranch === 'all'" elevation="2" class="mb-4 pa-4 rounded-xl border">
-      <div class="d-flex align-center gap-2 mb-3">
-        <VIcon icon="ri-store-2-line" color="primary" size="20" />
-        <span class="text-subtitle-2 font-weight-bold">Progres Pengembalian Modal per Cabang Toko</span>
-      </div>
-      <VRow>
-        <VCol
-          v-for="b in (summary?.branch_breakdown || [])"
-          :key="b.branch_id"
-          cols="12"
-          sm="6"
-          md="4"
-        >
-          <VCard variant="outlined" class="pa-3 rounded-lg bg-var-theme-background">
-            <div class="d-flex align-center justify-space-between mb-1">
-              <span class="font-weight-bold text-body-2">{{ b.branch_name }}</span>
-              <VChip size="x-small" color="primary" variant="tonal" class="font-weight-bold">
-                {{ b.payback_percentage }}% Balik
-              </VChip>
-            </div>
-            <div class="d-flex align-center justify-space-between text-caption text-medium-emphasis mb-2">
-              <span>Modal: <strong>{{ formatCurrency(b.total_injected) }}</strong></span>
-              <span>Sisa: <strong class="text-warning">{{ formatCurrency(b.remaining_capital) }}</strong></span>
-            </div>
-            <VProgressLinear
-              :model-value="b.payback_percentage"
-              :color="b.payback_percentage >= 100 ? 'success' : 'primary'"
-              height="6"
-              rounded
-            />
-          </VCard>
-        </VCol>
-      </VRow>
-    </VCard>
+    <!-- Tabs -->
+    <VTabs v-model="activeTab" class="mb-4">
+      <VTab value="distribusi">
+        <VIcon icon="ri-truck-line" class="mr-2" size="18" /> Riwayat Distribusi Modal
+      </VTab>
+      <VTab value="rekonsiliasi">
+        <VIcon icon="ri-bar-chart-grouped-line" class="mr-2" size="18" /> Rekonsiliasi Akhir Bulan
+      </VTab>
+    </VTabs>
 
-    <!-- Main Table Card -->
-    <VCard elevation="2" class="rounded-xl border" :loading="isLoading">
-      <!-- Filter Bar -->
-      <VCardText class="pa-4 border-b">
-        <div class="d-flex flex-wrap align-center justify-space-between gap-3">
-          <div class="d-flex flex-wrap align-center gap-3 flex-grow-1">
-            <!-- Branch Filter -->
-            <VAutocomplete
-              v-model="selectedBranch"
-              :items="[{ id: 'all', name: 'Semua Cabang Toko' }, ...branches]"
-              item-title="name"
-              item-value="id"
-              density="compact"
-              variant="outlined"
-              label="Pilih Cabang"
-              style="min-width: 220px; max-width: 280px;"
-              hide-details
-            />
+    <VWindow v-model="activeTab">
+      <!-- =========================================== -->
+      <!-- TAB 1: DISTRIBUSI MODAL BARANG             -->
+      <!-- =========================================== -->
+      <VWindowItem value="distribusi">
 
-            <!-- Type Filter -->
-            <VSelect
-              v-model="selectedType"
-              :items="[
-                { value: 'all', title: 'Semua Jenis Mutasi' },
-                { value: 'injection', title: 'Penyertaan / Injeksi Modal' },
-                { value: 'withdrawal', title: 'Penarikan / Setoran Laba' },
-              ]"
-              density="compact"
-              variant="outlined"
-              label="Jenis Mutasi"
-              style="min-width: 200px; max-width: 250px;"
-              hide-details
-            />
-
-            <!-- Status Filter -->
-            <VSelect
-              v-model="selectedStatus"
-              :items="[
-                { value: 'all', title: 'Semua Status' },
-                { value: 'approved', title: 'Disetujui / Selesai' },
-                { value: 'pending', title: 'Menunggu Persetujuan' },
-                { value: 'rejected', title: 'Ditolak' },
-              ]"
-              density="compact"
-              variant="outlined"
-              label="Status Transaksi"
-              style="min-width: 180px; max-width: 230px;"
-              hide-details
-            />
-
-            <!-- Search -->
-            <VTextField
-              v-model="search"
-              placeholder="Cari referensi, catatan, bank..."
-              density="compact"
-              variant="outlined"
-              prepend-inner-icon="ri-search-line"
-              clearable
-              hide-details
-            />
-          </div>
-        </div>
-      </VCardText>
-
-      <VProgressLinear v-if="isLoading" indeterminate color="primary" height="2" />
-
-      <!-- Table Body -->
-      <div class="table-responsive">
-        <VTable class="text-no-wrap" hover>
-          <thead>
-            <tr>
-              <th class="text-uppercase font-weight-bold">No. Referensi</th>
-              <th class="text-uppercase font-weight-bold">Tanggal</th>
-              <th class="text-uppercase font-weight-bold">Cabang</th>
-              <th class="text-uppercase font-weight-bold">Jenis & Kategori</th>
-              <th class="text-uppercase font-weight-bold text-end">Nominal (Rp)</th>
-              <th class="text-uppercase font-weight-bold">Metode & Rekening</th>
-              <th class="text-uppercase font-weight-bold text-center">Bukti / PDF</th>
-              <th class="text-uppercase font-weight-bold text-center">Status</th>
-              <th class="text-uppercase font-weight-bold text-center" style="min-width: 140px;">Aksi</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <tr v-if="isLoading">
-              <td colspan="9" class="text-center pa-6 text-medium-emphasis">
-                <VProgressCircular indeterminate color="primary" size="28" class="me-2" />
-                <span>Memuat riwayat transaksi modal...</span>
-              </td>
-            </tr>
-
-            <tr v-else-if="transactions.length === 0">
-              <td colspan="9" class="text-center pa-6 text-medium-emphasis">
-                <VIcon icon="ri-inbox-line" size="36" class="d-block mx-auto mb-2 opacity-50" />
-                <span>Belum ada riwayat transaksi modal cabang.</span>
-              </td>
-            </tr>
-
-            <tr v-for="item in transactions" :key="item.id">
-              <!-- No Ref -->
-              <td>
-                <span class="font-weight-medium text-body-2 cursor-pointer text-primary" @click="showDetail(item)">
-                  {{ item.reference_no }}
-                </span>
-                <div v-if="item.cash_shift_id" class="text-caption text-secondary">
-                  Shift Kasir #{{ item.cash_shift_id }}
-                </div>
-              </td>
-
-              <!-- Date -->
-              <td>{{ formatDate(item.date) }}</td>
-
-              <!-- Branch -->
-              <td>
-                <span class="font-weight-medium">{{ item.branch?.name || '-' }}</span>
-              </td>
-
-              <!-- Type & Category -->
-              <td>
-                <div class="d-flex align-center gap-1">
-                  <VChip
-                    size="x-small"
-                    :color="item.type === 'injection' ? 'primary' : 'success'"
-                    variant="tonal"
-                    class="font-weight-bold"
-                  >
-                    {{ item.type === 'injection' ? 'Injeksi' : 'Pengembalian' }}
-                  </VChip>
-                  <span class="text-caption font-weight-medium">{{ item.category }}</span>
-                </div>
-              </td>
-
-              <!-- Amount -->
-              <td class="text-end">
-                <span :class="['font-weight-bold font-mono', item.type === 'injection' ? 'text-primary' : 'text-success']">
-                  {{ item.type === 'injection' ? '+' : '-' }} {{ formatCurrency(item.amount) }}
-                </span>
-              </td>
-
-              <!-- Method & Bank -->
-              <td>
-                <div v-if="item.payment_method === 'Kas Tunai' || item.payment_method === 'cash'" class="d-flex align-center gap-1">
-                  <VChip size="small" color="success" variant="tonal" class="font-weight-medium">
-                    <VIcon icon="ri-money-dollar-circle-line" start size="14" />
-                    Kas Tunai
-                  </VChip>
-                </div>
-                <div v-else class="d-flex flex-column gap-1">
-                  <VChip size="small" color="primary" variant="tonal" class="font-weight-medium">
-                    <VIcon icon="ri-bank-card-line" start size="14" />
-                    {{ item.bankAccount?.bank_name || item.bank_name || 'Transfer Bank' }}
-                  </VChip>
-                  <span v-if="item.bankAccount?.account_number || item.account_number" class="text-caption text-medium-emphasis">
-                    {{ item.bankAccount?.account_number || item.account_number }} ({{ item.bankAccount?.account_name || item.account_name || '-' }})
-                  </span>
-                </div>
-              </td>
-
-              <!-- Proof / PDF -->
-              <td class="text-center">
-                <template v-if="item.proof_file">
-                  <VBtn
-                    v-if="item.proof_file.toLowerCase().endsWith('.pdf')"
-                    size="x-small"
-                    color="error"
-                    variant="tonal"
-                    prepend-icon="ri-file-pdf-2-line"
-                    :href="'/storage/' + item.proof_file"
-                    target="_blank"
-                  >
-                    PDF
-                  </VBtn>
-                  <VAvatar
-                    v-else
-                    size="32"
-                    rounded
-                    class="cursor-pointer border"
-                    @click="openPreview('/storage/' + item.proof_file)"
-                  >
-                    <VImg :src="'/storage/' + item.proof_file" cover />
-                  </VAvatar>
-                </template>
-                <span v-else class="text-caption text-disabled">-</span>
-              </td>
-
-              <!-- Status -->
-              <td class="text-center">
-                <VChip
-                  size="small"
-                  :color="item.status === 'approved' ? 'success' : (item.status === 'pending' ? (item.type === 'injection' ? 'warning' : 'amber') : 'error')"
-                  variant="tonal"
-                  class="font-weight-bold"
-                >
-                  {{ item.status === 'approved' ? 'Disetujui' : (item.status === 'pending' ? (item.type === 'injection' ? 'Menunggu Injeksi' : 'Menunggu Setoran') : 'Ditolak / Batal') }}
-                </VChip>
-                <div v-if="item.approved_by && item.status === 'approved'" class="text-caption text-medium-emphasis">
-                  Oleh: {{ item.approved_by?.name }}
-                </div>
-              </td>
-
-              <!-- Actions -->
-              <td class="text-center">
-                <div class="d-flex align-center justify-center gap-1">
-                  <!-- Detail (Eye icon) -->
-                  <IconBtn
-                    v-if="$can('read', 'Modal & ROI Cabang') || $can('manage', 'all')"
-                    size="small"
-                    color="info"
-                    title="Lihat Detail Transaksi & Audit"
-                    @click="showDetail(item)"
-                  >
-                    <VIcon icon="ri-eye-line" />
-                  </IconBtn>
-
-                  <!-- Approve Button (If pending) -->
-                  <VBtn
-                    v-if="item.status === 'pending' && ($can('approve', 'Modal & ROI Cabang') || $can('manage', 'all'))"
-                    size="x-small"
-                    color="success"
-                    class="px-2 font-weight-bold"
-                    @click="confirmApprove(item)"
-                  >
-                    Approve
-                  </VBtn>
-
-                  <!-- Reject Button (If pending) -->
-                  <VBtn
-                    v-if="item.status === 'pending' && ($can('approve', 'Modal & ROI Cabang') || $can('manage', 'all'))"
-                    size="x-small"
-                    color="error"
-                    variant="tonal"
-                    class="px-2"
-                    @click="confirmReject(item)"
-                  >
-                    Tolak
-                  </VBtn>
-
-                  <!-- Edit Button -->
-                  <IconBtn
-                    v-if="$can('write', 'Modal & ROI Cabang') || $can('manage', 'all')"
-                    size="small"
-                    color="primary"
-                    title="Edit Transaksi"
-                    @click="openEditDrawer(item)"
-                  >
-                    <VIcon icon="ri-edit-box-line" />
-                  </IconBtn>
-
-                  <!-- Void Button (If approved) -->
-                  <IconBtn
-                    v-if="item.status === 'approved' && ($can('approve', 'Modal & ROI Cabang') || $can('write', 'Modal & ROI Cabang') || $can('manage', 'all'))"
-                    size="small"
-                    color="warning"
-                    title="Batalkan Persetujuan (Void)"
-                    @click="confirmVoid(item)"
-                  >
-                    <VIcon icon="ri-arrow-go-forward-line" />
-                  </IconBtn>
-
-                  <!-- Delete Button -->
-                  <IconBtn
-                    v-if="$can('delete', 'Modal & ROI Cabang') || $can('manage', 'all')"
-                    size="small"
-                    color="error"
-                    title="Hapus Transaksi"
-                    @click="confirmDelete(item)"
-                  >
-                    <VIcon icon="ri-delete-bin-line" />
-                  </IconBtn>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </VTable>
-      </div>
-
-      <!-- Pagination -->
-      <VDivider />
-
-      <div class="d-flex justify-end flex-wrap gap-x-6 px-4 py-2">
-        <div class="d-flex align-center gap-x-2 text-medium-emphasis text-body-2">
-          Baris per halaman:
-          <VSelect
-            v-model="itemsPerPage"
-            class="per-page-select"
-            variant="plain"
-            density="compact"
-            :items="[10, 20, 25, 50, 100]"
-            hide-details
-          />
-        </div>
-
-        <p class="d-flex align-center text-body-2 text-high-emphasis me-2 mb-0">
-          {{ paginationMeta({ page, itemsPerPage }, totalItems) }}
-        </p>
-
-        <div class="d-flex gap-x-2 align-center me-2">
-          <VBtn
-            class="flip-in-rtl"
-            icon="ri-arrow-left-s-line"
-            variant="text"
-            density="comfortable"
-            color="high-emphasis"
-            :disabled="page <= 1"
-            @click="page <= 1 ? page = 1 : page--"
-          />
-
-          <VBtn
-            class="flip-in-rtl"
-            icon="ri-arrow-right-s-line"
-            density="comfortable"
-            variant="text"
-            color="high-emphasis"
-            :disabled="page >= Math.ceil(totalItems / itemsPerPage)"
-            @click="page >= Math.ceil(totalItems / itemsPerPage) ? page = Math.ceil(totalItems / itemsPerPage) : page++"
-          />
-        </div>
-      </div>
-    </VCard>
-
-    <!-- DRAWER 1: INJEKSI MODAL LANGSUNG (OWNER -> CABANG) -->
-    <VNavigationDrawer
-      v-model="isInflowDrawerOpen"
-      temporary
-      location="end"
-      :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 480)"
-      class="scrollable-content"
-    >
-      <div class="pa-4 border-b d-flex align-center justify-space-between bg-var-theme-surface">
-        <div class="d-flex align-center gap-2">
-          <VAvatar color="primary" variant="tonal" size="36">
-            <VIcon icon="ri-hand-coin-line" size="20" />
-          </VAvatar>
-          <span class="text-subtitle-1 font-weight-bold">Injeksi Modal Langsung (Owner &rarr; Cabang)</span>
-        </div>
-        <VBtn icon="ri-close-line" variant="text" density="compact" @click="isInflowDrawerOpen = false" />
-      </div>
-
-      <PerfectScrollbar :options="{ wheelPropagation: false }" style="max-height: calc(100vh - 75px); overflow-y: auto;">
-        <div class="pa-4">
-          <VForm @submit.prevent="handleInflowSubmit">
-            <VRow>
-              <!-- Cabang Tujuan -->
-              <VCol cols="12">
+        <!-- Filters -->
+        <VCard class="mb-4">
+          <VCardText>
+            <VRow dense>
+              <VCol cols="12" md="3">
                 <VSelect
-                  v-model="inflowForm.branch_id"
-                  :items="branches"
-                  item-title="name"
-                  item-value="id"
-                  label="Cabang Penerima Modal *"
-                  density="compact"
+                  v-model="filterBranch"
+                  :items="[{ title: 'Semua Cabang', value: 'all' }, ...branches]"
+                  label="Filter Cabang"
                   variant="outlined"
+                  density="compact"
+                  hide-details
                 />
               </VCol>
-
-              <!-- Kategori Modal -->
-              <VCol cols="12">
+              <VCol cols="12" md="3">
                 <VSelect
-                  v-model="inflowForm.category"
-                  :items="['Modal Awal', 'Modal Tambahan Stok', 'Modal Aset & Renovasi', 'Modal Kerja Operasional', 'Dana Talangan Darurat']"
-                  label="Kategori / Peruntukan Modal *"
-                  density="compact"
-                  variant="outlined"
-                />
-              </VCol>
-
-              <!-- Nominal Modal -->
-              <VCol cols="12">
-                <VTextField
-                  :model-value="formatInputRupiah(inflowForm.amount)"
-                  label="Nominal Modal (Rp) *"
-                  prefix="Rp"
-                  placeholder="50.000.000"
-                  density="compact"
-                  variant="outlined"
-                  hint="Ketik angka, otomatis terformat ribuan Rupiah"
-                  persistent-hint
-                  @update:model-value="val => inflowForm.amount = formatInputRupiah(val)"
-                />
-                <!-- Quick Suggestion Chips -->
-                <div class="d-flex flex-wrap gap-1 mt-2">
-                  <VChip
-                    size="x-small"
-                    variant="tonal"
-                    color="primary"
-                    class="cursor-pointer font-weight-medium"
-                    @click="inflowForm.amount = '10.000.000'"
-                  >
-                    +10 Jt
-                  </VChip>
-                  <VChip
-                    size="x-small"
-                    variant="tonal"
-                    color="primary"
-                    class="cursor-pointer font-weight-medium"
-                    @click="inflowForm.amount = '25.000.000'"
-                  >
-                    +25 Jt
-                  </VChip>
-                  <VChip
-                    size="x-small"
-                    variant="tonal"
-                    color="primary"
-                    class="cursor-pointer font-weight-medium"
-                    @click="inflowForm.amount = '50.000.000'"
-                  >
-                    +50 Jt
-                  </VChip>
-                  <VChip
-                    size="x-small"
-                    variant="tonal"
-                    color="primary"
-                    class="cursor-pointer font-weight-medium"
-                    @click="inflowForm.amount = '100.000.000'"
-                  >
-                    +100 Jt
-                  </VChip>
-                </div>
-              </VCol>
-
-              <!-- Tanggal Injeksi -->
-              <VCol cols="12">
-                <VTextField
-                  v-model="inflowForm.date"
-                  label="Tanggal Transaksi *"
-                  type="date"
-                  density="compact"
-                  variant="outlined"
-                />
-              </VCol>
-
-              <!-- Metode Pembayaran -->
-              <VCol cols="12">
-                <VLabel class="mb-1 font-weight-bold text-body-2">Metode Penyaluran Modal *</VLabel>
-                <VRadioGroup
-                  v-model="inflowForm.payment_method"
-                  inline
-                  density="compact"
-                >
-                  <VRadio value="Transfer Bank">
-                    <template #label>
-                      <div class="d-flex align-center gap-1 text-body-2">
-                        <VIcon icon="ri-bank-card-line" size="18" color="primary" />
-                        <span>Transfer Bank</span>
-                      </div>
-                    </template>
-                  </VRadio>
-                  <VRadio value="Kas Tunai">
-                    <template #label>
-                      <div class="d-flex align-center gap-1 text-body-2">
-                        <VIcon icon="ri-money-dollar-circle-line" size="18" color="success" />
-                        <span>Kas Tunai</span>
-                      </div>
-                    </template>
-                  </VRadio>
-                </VRadioGroup>
-              </VCol>
-
-              <!-- Bank & Rekening Sumber -->
-              <VCol cols="12" v-if="inflowForm.payment_method === 'Transfer Bank'">
-                <VSelect
-                  v-model="inflowForm.bank_account_id"
-                  :items="bankAccounts"
-                  item-value="id"
-                  :item-title="item => `${item.bank_name} - ${item.account_number} (${item.account_name}) [Saldo: ${formatCurrency(item.current_balance)}]`"
-                  label="Pilih Rekening Bank Sumber (Owner) *"
-                  density="compact"
-                  variant="outlined"
-                  placeholder="Pilih rekening bank sumber owner"
-                  class="mb-2"
-                  @update:model-value="() => onBankAccountChange(inflowForm)"
-                />
-                <VAlert
-                  type="info"
-                  variant="tonal"
-                  density="compact"
-                  class="text-caption mb-0"
-                  icon="ri-information-line"
-                >
-                  Saldo rekening bank yang dipilih akan <strong>otomatis terpotong</strong> saat penyaluran modal ini disimpan.
-                </VAlert>
-              </VCol>
-              <VCol cols="12" v-else-if="inflowForm.payment_method === 'Kas Tunai'">
-                <VAlert
-                  type="success"
-                  variant="tonal"
-                  density="compact"
-                  class="text-caption mb-0"
-                  icon="ri-checkbox-circle-line"
-                >
-                  Modal diserahkan secara tunai langsung ke kas fisik cabang.
-                </VAlert>
-              </VCol>
-
-              <!-- Bukti Transfer -->
-              <VCol cols="12">
-                <VFileInput
-                  v-model="inflowForm.proof_file"
-                  label="Lampirkan Bukti Transfer / Nota"
-                  density="compact"
-                  variant="outlined"
-                  prepend-icon=""
-                  prepend-inner-icon="ri-attachment-line"
-                  accept="image/*,application/pdf"
-                />
-              </VCol>
-
-              <!-- Catatan -->
-              <VCol cols="12">
-                <VTextarea
-                  v-model="inflowForm.notes"
-                  label="Catatan / Keterangan"
-                  placeholder="Contoh: Modal pembukaan gerai baru dan pengadaan stok awal..."
-                  density="compact"
-                  variant="outlined"
-                  rows="3"
-                />
-              </VCol>
-
-              <!-- Submit Button -->
-              <VCol cols="12" class="d-flex gap-2 justify-end mt-2">
-                <VBtn variant="outlined" color="secondary" @click="isInflowDrawerOpen = false">
-                  Batal
-                </VBtn>
-                <VBtn color="primary" type="submit" :loading="isSubmitting">
-                  Simpan Injeksi Modal
-                </VBtn>
-              </VCol>
-            </VRow>
-          </VForm>
-        </div>
-      </PerfectScrollbar>
-    </VNavigationDrawer>
-
-    <!-- DRAWER 2: AJUKAN PERMINTAAN MODAL TAMBAHAN (CABANG -> OWNER) -->
-    <VNavigationDrawer
-      v-model="isRequestDrawerOpen"
-      temporary
-      location="end"
-      :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 480)"
-      class="scrollable-content"
-    >
-      <div class="pa-4 border-b d-flex align-center justify-space-between bg-var-theme-surface">
-        <div class="d-flex align-center gap-2">
-          <VAvatar color="warning" variant="tonal" size="36">
-            <VIcon icon="ri-hand-heart-line" size="20" />
-          </VAvatar>
-          <span class="text-subtitle-1 font-weight-bold">Ajukan Permintaan Modal (Cabang &rarr; Owner)</span>
-        </div>
-        <VBtn icon="ri-close-line" variant="text" density="compact" @click="isRequestDrawerOpen = false" />
-      </div>
-
-      <PerfectScrollbar :options="{ wheelPropagation: false }" style="max-height: calc(100vh - 75px); overflow-y: auto;">
-        <div class="pa-4">
-          <VForm @submit.prevent="handleRequestSubmit">
-            <VRow>
-              <!-- Cabang Pemohon -->
-              <VCol cols="12">
-                <VSelect
-                  v-model="requestForm.branch_id"
-                  :items="branches"
-                  item-title="name"
-                  item-value="id"
-                  label="Cabang Pemohon Modal *"
-                  density="compact"
-                  variant="outlined"
-                />
-              </VCol>
-
-              <!-- Kategori Permintaan -->
-              <VCol cols="12">
-                <VSelect
-                  v-model="requestForm.category"
-                  :items="['Permintaan Tambahan Stok', 'Pengadaan Aset & Renovasi', 'Kas Darurat Operasional', 'Kebutuhan Operasional Lainnya']"
-                  label="Tujuan / Kategori Kebutuhan *"
-                  density="compact"
-                  variant="outlined"
-                />
-              </VCol>
-
-              <!-- Nominal Permintaan -->
-              <VCol cols="12">
-                <VTextField
-                  :model-value="formatInputRupiah(requestForm.amount)"
-                  label="Nominal Modal yang Diajukan (Rp) *"
-                  prefix="Rp"
-                  placeholder="20.000.000"
-                  density="compact"
-                  variant="outlined"
-                  hint="Ketik nominal yang dibutuhkan toko"
-                  persistent-hint
-                  @update:model-value="val => requestForm.amount = formatInputRupiah(val)"
-                />
-                <!-- Quick Suggestion Chips -->
-                <div class="d-flex flex-wrap gap-1 mt-2">
-                  <VChip
-                    size="x-small"
-                    variant="tonal"
-                    color="warning"
-                    class="cursor-pointer font-weight-medium"
-                    @click="requestForm.amount = '5.000.000'"
-                  >
-                    +5 Jt
-                  </VChip>
-                  <VChip
-                    size="x-small"
-                    variant="tonal"
-                    color="warning"
-                    class="cursor-pointer font-weight-medium"
-                    @click="requestForm.amount = '10.000.000'"
-                  >
-                    +10 Jt
-                  </VChip>
-                  <VChip
-                    size="x-small"
-                    variant="tonal"
-                    color="warning"
-                    class="cursor-pointer font-weight-medium"
-                    @click="requestForm.amount = '20.000.000'"
-                  >
-                    +20 Jt
-                  </VChip>
-                  <VChip
-                    size="x-small"
-                    variant="tonal"
-                    color="warning"
-                    class="cursor-pointer font-weight-medium"
-                    @click="requestForm.amount = '50.000.000'"
-                  >
-                    +50 Jt
-                  </VChip>
-                </div>
-              </VCol>
-
-              <!-- Tanggal Pengajuan -->
-              <VCol cols="12">
-                <VTextField
-                  v-model="requestForm.date"
-                  label="Tanggal Dibutuhkan *"
-                  type="date"
-                  density="compact"
-                  variant="outlined"
-                />
-              </VCol>
-
-              <!-- Proposal File (PDF / Gambar) -->
-              <VCol cols="12">
-                <VFileInput
-                  v-model="requestForm.proof_file"
-                  label="Lampirkan Proposal / Rincian Kebutuhan"
-                  density="compact"
-                  variant="outlined"
-                  prepend-icon=""
-                  prepend-inner-icon="ri-file-pdf-2-line"
-                  accept="image/*,application/pdf"
-                  hint="Format PDF atau Foto Gambar (Maks 5MB)"
-                  persistent-hint
-                />
-              </VCol>
-
-              <!-- Catatan -->
-              <VCol cols="12">
-                <VTextarea
-                  v-model="requestForm.notes"
-                  label="Uraian Rencana Penggunaan Dana *"
-                  placeholder="Jelaskan kebutuhan pengadaan stok, perbaikan peralatan, atau kebutuhan modal kerja..."
-                  density="compact"
-                  variant="outlined"
-                  rows="3"
-                />
-              </VCol>
-
-              <!-- Submit Button -->
-              <VCol cols="12" class="d-flex gap-2 justify-end mt-2">
-                <VBtn variant="outlined" color="secondary" @click="isRequestDrawerOpen = false">
-                  Batal
-                </VBtn>
-                <VBtn color="warning" type="submit" :loading="isSubmitting">
-                  Kirim Permintaan Modal
-                </VBtn>
-              </VCol>
-            </VRow>
-          </VForm>
-        </div>
-      </PerfectScrollbar>
-    </VNavigationDrawer>
-
-    <!-- DRAWER 3: SETOR PENGEMBALIAN MODAL (CABANG -> OWNER) -->
-    <VNavigationDrawer
-      v-model="isOutflowDrawerOpen"
-      temporary
-      location="end"
-      :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 480)"
-      class="scrollable-content"
-    >
-      <div class="pa-4 border-b d-flex align-center justify-space-between bg-var-theme-surface">
-        <div class="d-flex align-center gap-2">
-          <VAvatar color="success" variant="tonal" size="36">
-            <VIcon icon="ri-arrow-go-back-line" size="20" />
-          </VAvatar>
-          <span class="text-subtitle-1 font-weight-bold">Setor Pengembalian Modal (Cabang &rarr; Owner)</span>
-        </div>
-        <VBtn icon="ri-close-line" variant="text" density="compact" @click="isOutflowDrawerOpen = false" />
-      </div>
-
-      <PerfectScrollbar :options="{ wheelPropagation: false }" style="max-height: calc(100vh - 75px); overflow-y: auto;">
-        <div class="pa-4">
-          <VForm @submit.prevent="handleOutflowSubmit">
-            <VRow>
-              <!-- Cabang Asal -->
-              <VCol cols="12">
-                <VSelect
-                  v-model="outflowForm.branch_id"
-                  :items="branches"
-                  item-title="name"
-                  item-value="id"
-                  label="Cabang Pengirim Setoran *"
-                  density="compact"
-                  variant="outlined"
-                />
-              </VCol>
-
-              <!-- Kategori Setoran -->
-              <VCol cols="12">
-                <VSelect
-                  v-model="outflowForm.category"
-                  :items="['Setoran Laba Closing Shift', 'Cicilan Pengembalian Modal', 'Pelunasan Sisa Modal Toko', 'Bagi Hasil / Dividen Keuntungan']"
-                  label="Kategori Setoran *"
-                  density="compact"
-                  variant="outlined"
-                />
-              </VCol>
-
-              <!-- Nominal Setoran -->
-              <VCol cols="12">
-                <VTextField
-                  :model-value="formatInputRupiah(outflowForm.amount)"
-                  label="Nominal Setoran (Rp) *"
-                  prefix="Rp"
-                  placeholder="10.000.000"
-                  density="compact"
-                  variant="outlined"
-                  hint="Ketik angka, otomatis terformat ribuan Rupiah"
-                  persistent-hint
-                  @update:model-value="val => outflowForm.amount = formatInputRupiah(val)"
-                />
-                <!-- Quick Suggestion Chips -->
-                <div class="d-flex flex-wrap gap-1 mt-2">
-                  <VChip
-                    size="x-small"
-                    variant="tonal"
-                    color="success"
-                    class="cursor-pointer font-weight-medium"
-                    @click="outflowForm.amount = '5.000.000'"
-                  >
-                    +5 Jt
-                  </VChip>
-                  <VChip
-                    size="x-small"
-                    variant="tonal"
-                    color="success"
-                    class="cursor-pointer font-weight-medium"
-                    @click="outflowForm.amount = '10.000.000'"
-                  >
-                    +10 Jt
-                  </VChip>
-                  <VChip
-                    size="x-small"
-                    variant="tonal"
-                    color="success"
-                    class="cursor-pointer font-weight-medium"
-                    @click="outflowForm.amount = '20.000.000'"
-                  >
-                    +20 Jt
-                  </VChip>
-                  <VChip
-                    size="x-small"
-                    variant="tonal"
-                    color="success"
-                    class="cursor-pointer font-weight-medium"
-                    @click="outflowForm.amount = '50.000.000'"
-                  >
-                    +50 Jt
-                  </VChip>
-                </div>
-              </VCol>
-
-              <!-- Tanggal Setor -->
-              <VCol cols="12">
-                <VTextField
-                  v-model="outflowForm.date"
-                  label="Tanggal Setor *"
-                  type="date"
-                  density="compact"
-                  variant="outlined"
-                />
-              </VCol>
-
-              <!-- Metode Pembayaran -->
-              <VCol cols="12">
-                <VLabel class="mb-1 font-weight-bold text-body-2">Metode Setoran Modal *</VLabel>
-                <VRadioGroup
-                  v-model="outflowForm.payment_method"
-                  inline
-                  density="compact"
-                >
-                  <VRadio value="Transfer Bank">
-                    <template #label>
-                      <div class="d-flex align-center gap-1 text-body-2">
-                        <VIcon icon="ri-bank-card-line" size="18" color="primary" />
-                        <span>Transfer Bank</span>
-                      </div>
-                    </template>
-                  </VRadio>
-                  <VRadio value="Kas Tunai">
-                    <template #label>
-                      <div class="d-flex align-center gap-1 text-body-2">
-                        <VIcon icon="ri-money-dollar-circle-line" size="18" color="success" />
-                        <span>Kas Tunai Toko</span>
-                      </div>
-                    </template>
-                  </VRadio>
-                </VRadioGroup>
-              </VCol>
-
-              <!-- Bank & Rekening Tujuan Owner -->
-              <VCol cols="12" v-if="outflowForm.payment_method === 'Transfer Bank'">
-                <VSelect
-                  v-model="outflowForm.bank_account_id"
-                  :items="bankAccounts"
-                  item-value="id"
-                  :item-title="item => `${item.bank_name} - ${item.account_number} (${item.account_name})`"
-                  label="Pilih Rekening Bank Tujuan Owner *"
-                  density="compact"
-                  variant="outlined"
-                  placeholder="Pilih rekening bank tujuan owner"
-                  class="mb-2"
-                  @update:model-value="() => onBankAccountChange(outflowForm)"
-                />
-                <VAlert
-                  type="info"
-                  variant="tonal"
-                  density="compact"
-                  class="text-caption mb-0"
-                  icon="ri-information-line"
-                >
-                  Saldo rekening bank Owner akan <strong>otomatis bertambah</strong> begitu setoran disetujui.
-                </VAlert>
-              </VCol>
-              <VCol cols="12" v-else-if="outflowForm.payment_method === 'Kas Tunai'">
-                <VAlert
-                  type="warning"
-                  variant="tonal"
-                  density="compact"
-                  class="text-caption mb-0"
-                  icon="ri-information-line"
-                >
-                  Setoran tunai akan <strong>otomatis memotong saldo Kas Toko / Kas Kecil</strong> cabang begitu disetujui Owner.
-                </VAlert>
-              </VCol>
-
-              <!-- Bukti Transfer -->
-              <VCol cols="12">
-                <VFileInput
-                  v-model="outflowForm.proof_file"
-                  label="Lampirkan Struk / Bukti Transfer Bank"
-                  density="compact"
-                  variant="outlined"
-                  prepend-icon=""
-                  prepend-inner-icon="ri-attachment-line"
-                  accept="image/*,application/pdf"
-                />
-              </VCol>
-
-              <!-- Catatan -->
-              <VCol cols="12">
-                <VTextarea
-                  v-model="outflowForm.notes"
-                  label="Catatan / Keterangan"
-                  placeholder="Contoh: Setoran cicilan modal tahap 1 dari surplus kas toko..."
-                  density="compact"
-                  variant="outlined"
-                  rows="3"
-                />
-              </VCol>
-
-              <!-- Submit Button -->
-              <VCol cols="12" class="d-flex gap-2 justify-end mt-2">
-                <VBtn variant="outlined" color="secondary" @click="isOutflowDrawerOpen = false">
-                  Batal
-                </VBtn>
-                <VBtn color="success" type="submit" :loading="isSubmitting">
-                  Ajukan Pengembalian Modal
-                </VBtn>
-              </VCol>
-            </VRow>
-          </VForm>
-        </div>
-      </PerfectScrollbar>
-    </VNavigationDrawer>
-
-    <!-- DRAWER 4: EDIT TRANSAKSI MODAL -->
-    <VNavigationDrawer
-      v-model="isEditDrawerOpen"
-      temporary
-      location="end"
-      :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 480)"
-      class="scrollable-content"
-    >
-      <div class="pa-4 border-b d-flex align-center justify-space-between bg-var-theme-surface">
-        <div class="d-flex align-center gap-2">
-          <VAvatar color="primary" variant="tonal" size="36">
-            <VIcon icon="ri-edit-box-line" size="20" />
-          </VAvatar>
-          <span class="text-subtitle-1 font-weight-bold">Edit Data Transaksi Modal</span>
-        </div>
-        <VBtn icon="ri-close-line" variant="text" density="compact" @click="isEditDrawerOpen = false" />
-      </div>
-
-      <PerfectScrollbar :options="{ wheelPropagation: false }" style="max-height: calc(100vh - 75px); overflow-y: auto;">
-        <div class="pa-4">
-          <VForm @submit.prevent="handleEditSubmit">
-            <VRow>
-              <!-- Cabang -->
-              <VCol cols="12">
-                <VSelect
-                  v-model="editForm.branch_id"
-                  :items="branches"
-                  item-title="name"
-                  item-value="id"
-                  label="Cabang Toko *"
-                  density="compact"
-                  variant="outlined"
-                />
-              </VCol>
-
-              <!-- Tipe & Kategori -->
-              <VCol cols="12">
-                <VSelect
-                  v-model="editForm.type"
+                  v-model="filterStatus"
                   :items="[
-                    { value: 'injection', title: 'Injeksi / Penambahan Modal' },
-                    { value: 'return', title: 'Pengembalian Modal' }
+                    { title: 'Semua Status', value: 'all' },
+                    { title: 'Menunggu', value: 'pending' },
+                    { title: 'Dalam Pengiriman', value: 'in_transit' },
+                    { title: 'Selesai Diterima', value: 'completed' },
+                    { title: 'Dibatalkan', value: 'cancelled' },
                   ]"
-                  label="Jenis Mutasi *"
-                  density="compact"
+                  label="Status"
                   variant="outlined"
+                  density="compact"
+                  hide-details
                 />
               </VCol>
-
-              <VCol cols="12">
+              <VCol cols="12" md="2">
                 <VTextField
-                  v-model="editForm.category"
-                  label="Kategori / Peruntukan *"
-                  density="compact"
+                  v-model="filterPeriod"
+                  type="month"
+                  label="Periode"
                   variant="outlined"
+                  density="compact"
+                  hide-details
                 />
               </VCol>
-
-              <!-- Nominal -->
-              <VCol cols="12">
+              <VCol cols="12" md="4">
                 <VTextField
-                  :model-value="formatInputRupiah(editForm.amount)"
-                  label="Nominal (Rp) *"
-                  prefix="Rp"
-                  density="compact"
+                  v-model="filterSearch"
+                  label="Cari No. Referensi"
                   variant="outlined"
-                  @update:model-value="val => editForm.amount = formatInputRupiah(val)"
-                />
-              </VCol>
-
-              <!-- Tanggal -->
-              <VCol cols="12">
-                <VTextField
-                  v-model="editForm.date"
-                  label="Tanggal Transaksi *"
-                  type="date"
                   density="compact"
-                  variant="outlined"
+                  hide-details
+                  prepend-inner-icon="ri-search-line"
+                  clearable
                 />
-              </VCol>
-
-              <!-- Metode & Bank -->
-              <VCol cols="12">
-                <VLabel class="mb-1 font-weight-bold text-body-2">Metode Pembayaran *</VLabel>
-                <VRadioGroup
-                  v-model="editForm.payment_method"
-                  inline
-                  density="compact"
-                >
-                  <VRadio value="Transfer Bank">
-                    <template #label>
-                      <div class="d-flex align-center gap-1 text-body-2">
-                        <VIcon icon="ri-bank-card-line" size="18" color="primary" />
-                        <span>Transfer Bank</span>
-                      </div>
-                    </template>
-                  </VRadio>
-                  <VRadio value="Kas Tunai">
-                    <template #label>
-                      <div class="d-flex align-center gap-1 text-body-2">
-                        <VIcon icon="ri-money-dollar-circle-line" size="18" color="success" />
-                        <span>Kas Tunai</span>
-                      </div>
-                    </template>
-                  </VRadio>
-                </VRadioGroup>
-              </VCol>
-
-              <VCol cols="12" v-if="editForm.payment_method === 'Transfer Bank'">
-                <VSelect
-                  v-model="editForm.bank_account_id"
-                  :items="bankAccounts"
-                  item-value="id"
-                  :item-title="item => `${item.bank_name} - ${item.account_number} (${item.account_name})`"
-                  label="Pilih Rekening Bank *"
-                  density="compact"
-                  variant="outlined"
-                  class="mb-2"
-                  @update:model-value="() => onBankAccountChange(editForm)"
-                />
-              </VCol>
-
-              <!-- Bukti Transfer / Proposal (Ganti File) -->
-              <VCol cols="12">
-                <div v-if="editForm.current_proof" class="mb-2 text-caption">
-                  <span>File Bukti / Proposal Saat Ini:</span>
-                  <a :href="'/storage/' + editForm.current_proof" target="_blank" class="text-primary font-weight-medium ms-1">
-                    Lihat Dokumen
-                  </a>
-                </div>
-                <VFileInput
-                  v-model="editForm.proof_file"
-                  label="Ganti File Bukti / Dokumen (Opsional)"
-                  density="compact"
-                  variant="outlined"
-                  prepend-icon=""
-                  prepend-inner-icon="ri-attachment-line"
-                  accept="image/*,application/pdf"
-                />
-              </VCol>
-
-              <!-- Catatan -->
-              <VCol cols="12">
-                <VTextarea
-                  v-model="editForm.notes"
-                  label="Catatan / Keterangan"
-                  density="compact"
-                  variant="outlined"
-                  rows="3"
-                />
-              </VCol>
-
-              <!-- Action Buttons -->
-              <VCol cols="12" class="d-flex gap-2 justify-end mt-2">
-                <VBtn variant="outlined" color="secondary" @click="isEditDrawerOpen = false">
-                  Batal
-                </VBtn>
-                <VBtn color="primary" type="submit" :loading="isSubmitting">
-                  Simpan Perubahan
-                </VBtn>
               </VCol>
             </VRow>
-          </VForm>
-        </div>
-      </PerfectScrollbar>
-    </VNavigationDrawer>
-
-    <!-- DIALOG 1: APPROVAL MODAL (RETURN / INJEKSI DENGAN BUKTI DANA) -->
-    <VDialog
-      v-model="isApproveDialogVisible"
-      :fullscreen="$vuetify.display.xs"
-      max-width="500"
-    >
-      <VCard class="pa-4 rounded-xl">
-        <div class="d-flex align-center gap-2 mb-3">
-          <VAvatar color="success" variant="tonal" size="36">
-            <VIcon icon="ri-checkbox-circle-line" size="22" />
-          </VAvatar>
-          <span class="text-h6 font-weight-bold">
-            {{ selectedTransaction?.type === 'injection' ? 'Setujui & Salurkan Modal Cabang' : 'Persetujuan Setoran Pengembalian Modal' }}
-          </span>
-        </div>
-
-        <VCardText class="pa-0 mb-4">
-          <p class="text-body-2 mb-3">
-            Apakah Anda yakin ingin menyetujui transaksi berikut?
-          </p>
-
-          <VCard variant="outlined" class="pa-3 rounded-lg mb-3 bg-var-theme-background">
-            <div class="d-flex justify-space-between text-body-2 mb-1">
-              <span class="text-medium-emphasis">No. Referensi:</span>
-              <span class="font-weight-medium">{{ selectedTransaction?.reference_no }}</span>
-            </div>
-            <div class="d-flex justify-space-between text-body-2 mb-1">
-              <span class="text-medium-emphasis">Cabang:</span>
-              <span class="font-weight-medium">{{ selectedTransaction?.branch?.name }}</span>
-            </div>
-            <div class="d-flex justify-space-between text-body-2">
-              <span class="text-medium-emphasis">Nominal:</span>
-              <span class="font-weight-bold text-primary">{{ formatCurrency(selectedTransaction?.amount) }}</span>
-            </div>
-          </VCard>
-
-          <!-- Extra Input for Injection Request Funding / Return Confirmation -->
-          <div v-if="selectedTransaction?.type === 'injection'">
-            <div class="text-subtitle-2 font-weight-bold mb-2">Penyaluran Dana Modal (Owner):</div>
-            <VRadioGroup
-              v-model="approveForm.payment_method"
-              inline
-              density="compact"
-              class="mb-2"
-            >
-              <VRadio value="Transfer Bank" label="Transfer Bank (Rekening)" />
-              <VRadio value="Kas Tunai" label="Kas Tunai" />
-            </VRadioGroup>
-            <div v-if="approveForm.payment_method === 'Transfer Bank'">
-              <VSelect
-                v-model="approveForm.bank_account_id"
-                :items="bankAccounts"
-                item-value="id"
-                :item-title="item => `${item.bank_name} - ${item.account_number} (${item.account_name}) [Saldo: ${formatCurrency(item.current_balance)}]`"
-                label="Rekening Bank Sumber (Owner) *"
-                density="compact"
-                variant="outlined"
-                class="mb-2"
-                @update:model-value="() => onBankAccountChange(approveForm)"
-              />
-              <VAlert
-                type="info"
-                variant="tonal"
-                density="compact"
-                class="text-caption mb-3"
-                icon="ri-information-line"
-              >
-                Saldo rekening bank ini akan <strong>otomatis terpotong</strong> sebesar nominal modal.
-              </VAlert>
-            </div>
-            <VFileInput
-              v-model="approveForm.proof_file"
-              label="Lampirkan Struk Transfer Penyaluran Dana"
-              density="compact"
-              variant="outlined"
-              prepend-icon=""
-              prepend-inner-icon="ri-attachment-line"
-              accept="image/*,application/pdf"
-            />
-          </div>
-          <div v-else>
-            <VAlert
-              v-if="selectedTransaction?.payment_method === 'Kas Tunai' || selectedTransaction?.payment_method === 'cash'"
-              type="warning"
-              variant="tonal"
-              density="compact"
-              class="text-caption mb-0"
-              icon="ri-information-line"
-            >
-              Setoran tunai ini akan <strong>otomatis memotong kas fisik / petty cash</strong> cabang saat disetujui.
-            </VAlert>
-            <VAlert
-              v-else
-              type="info"
-              variant="tonal"
-              density="compact"
-              class="text-caption mb-0"
-              icon="ri-information-line"
-            >
-              Setoran transfer bank ini akan <strong>otomatis menambah saldo rekening bank Owner</strong> ({{ selectedTransaction?.bankAccount?.bank_name || selectedTransaction?.bank_name || 'Bank' }}).
-            </VAlert>
-          </div>
-        </VCardText>
-
-        <div class="d-flex justify-end gap-2">
-          <VBtn variant="outlined" color="secondary" @click="isApproveDialogVisible = false">
-            Batal
-          </VBtn>
-          <VBtn color="success" :loading="isSubmitting" @click="handleApprove">
-            Ya, Setujui Sekarang
-          </VBtn>
-        </div>
-      </VCard>
-    </VDialog>
-
-    <!-- DIALOG 2: TOLAK TRANSAKSI MODAL -->
-    <VDialog
-      v-model="isRejectDialogVisible"
-      :fullscreen="$vuetify.display.xs"
-      max-width="500"
-    >
-      <VCard class="pa-4 rounded-xl">
-        <div class="d-flex align-center gap-2 mb-3">
-          <VAvatar color="error" variant="tonal" size="36">
-            <VIcon icon="ri-close-circle-line" size="22" />
-          </VAvatar>
-          <span class="text-h6 font-weight-bold">Tolak Transaksi Modal</span>
-        </div>
-
-        <p class="text-body-2 mb-3">
-          Apakah Anda yakin ingin menolak transaksi <strong>{{ selectedTransaction?.reference_no }}</strong>?
-        </p>
-
-        <VTextarea
-          v-model="rejectReason"
-          label="Alasan Penolakan *"
-          placeholder="Tuliskan alasan penolakan secara jelas (contoh: proposal kurang lengkap, mutasi kas belum masuk)..."
-          density="compact"
-          variant="outlined"
-          rows="3"
-          class="mb-4"
-        />
-
-        <div class="d-flex justify-end gap-2">
-          <VBtn variant="outlined" color="secondary" @click="isRejectDialogVisible = false">
-            Batal
-          </VBtn>
-          <VBtn color="error" :loading="isSubmitting" @click="handleReject">
-            Tolak Transaksi
-          </VBtn>
-        </div>
-      </VCard>
-    </VDialog>
-
-    <!-- DIALOG 3: VOID / BATALKAN PERSETUJUAN (APPROVED -> VOID) -->
-    <VDialog
-      v-model="isVoidDialogVisible"
-      :fullscreen="$vuetify.display.xs"
-      max-width="500"
-    >
-      <VCard class="pa-4 rounded-xl">
-        <div class="d-flex align-center gap-2 mb-3">
-          <VAvatar color="warning" variant="tonal" size="36">
-            <VIcon icon="ri-arrow-go-forward-line" size="22" />
-          </VAvatar>
-          <span class="text-h6 font-weight-bold">Batalkan Persetujuan (Void)</span>
-        </div>
-
-        <p class="text-body-2 text-warning mb-3">
-          <strong>Perhatian:</strong> Membatalkan persetujuan akan mengoreksi kembali total modal & sisa modal cabang.
-        </p>
-
-        <VCard variant="outlined" class="pa-3 rounded-lg mb-3 bg-var-theme-background">
-          <div class="d-flex justify-space-between text-body-2 mb-1">
-            <span class="text-medium-emphasis">No. Referensi:</span>
-            <span class="font-weight-medium">{{ selectedTransaction?.reference_no }}</span>
-          </div>
-          <div class="d-flex justify-space-between text-body-2">
-            <span class="text-medium-emphasis">Nominal:</span>
-            <span class="font-weight-bold">{{ formatCurrency(selectedTransaction?.amount) }}</span>
-          </div>
+          </VCardText>
         </VCard>
 
-        <VTextarea
-          v-model="voidReason"
-          label="Alasan Pembatalan Persetujuan (Void) *"
-          placeholder="Jelaskan alasan pembatalan (contoh: salah input nominal oleh kasir, mutasi bank tidak valid)..."
-          density="compact"
-          variant="outlined"
-          rows="3"
-          class="mb-4"
-        />
-
-        <div class="d-flex justify-end gap-2">
-          <VBtn variant="outlined" color="secondary" @click="isVoidDialogVisible = false">
-            Kembali
-          </VBtn>
-          <VBtn color="warning" :loading="isSubmitting" @click="handleVoid">
-            Batalkan Persetujuan
-          </VBtn>
-        </div>
-      </VCard>
-    </VDialog>
-
-    <!-- DIALOG 4: KONFIRMASI HAPUS TRANSAKSI -->
-    <VDialog
-      v-model="isDeleteDialogVisible"
-      :fullscreen="$vuetify.display.xs"
-      max-width="450"
-    >
-      <VCard class="pa-4 rounded-xl">
-        <div class="d-flex align-center gap-2 mb-3">
-          <VAvatar color="error" variant="tonal" size="36">
-            <VIcon icon="ri-delete-bin-line" size="22" />
-          </VAvatar>
-          <span class="text-h6 font-weight-bold">Hapus Transaksi Modal</span>
-        </div>
-
-        <p class="text-body-2 mb-4">
-          Apakah Anda yakin ingin menghapus permanen transaksi <strong>{{ selectedTransaction?.reference_no }}</strong> senilai <strong>{{ formatCurrency(selectedTransaction?.amount) }}</strong>?
-        </p>
-
-        <div class="d-flex justify-end gap-2">
-          <VBtn variant="outlined" color="secondary" @click="isDeleteDialogVisible = false">
-            Batal
-          </VBtn>
-          <VBtn color="error" :loading="isSubmitting" @click="handleDelete">
-            Ya, Hapus Permanen
-          </VBtn>
-        </div>
-      </VCard>
-    </VDialog>
-
-    <!-- DIALOG 5: DETAIL TRANSAKSI & AUDIT LOG -->
-    <VDialog
-      v-model="isDetailDialogVisible"
-      :fullscreen="$vuetify.display.xs"
-      max-width="600"
-    >
-      <VCard class="pa-4 rounded-xl">
-        <div class="d-flex align-center justify-space-between mb-3 border-b pb-3">
-          <div class="d-flex align-center gap-2">
-            <VAvatar :color="selectedTransaction?.type === 'injection' ? 'primary' : 'success'" variant="tonal" size="36">
-              <VIcon :icon="selectedTransaction?.type === 'injection' ? 'ri-download-2-line' : 'ri-upload-2-line'" size="20" />
-            </VAvatar>
-            <div>
-              <span class="text-subtitle-1 font-weight-bold d-block">{{ selectedTransaction?.reference_no }}</span>
-              <span class="text-caption text-medium-emphasis">Detail Transaksi Modal & Riwayat Audit</span>
-            </div>
-          </div>
-          <div class="d-flex align-center gap-2">
-            <VBtn
-              size="small"
-              color="info"
-              variant="flat"
-              class="font-weight-bold"
-              prepend-icon="ri-mail-send-line"
-              @click="openSendCapitalEmailDialog"
-            >
-              Kirim Bukti ke Email
-            </VBtn>
-            <VBtn icon="ri-close-line" variant="text" density="compact" @click="isDetailDialogVisible = false" />
-          </div>
-        </div>
-
-        <div v-if="selectedTransaction">
-          <!-- Summary Header in Dialog -->
-          <div class="d-flex align-center justify-space-between pa-3 rounded-lg bg-var-theme-background mb-3">
-            <div>
-              <span class="text-caption text-medium-emphasis d-block">Nominal Transaksi</span>
-              <span :class="['text-h6 font-weight-bold', selectedTransaction.type === 'injection' ? 'text-primary' : 'text-success']">
-                {{ selectedTransaction.type === 'injection' ? '+' : '-' }} {{ formatCurrency(selectedTransaction.amount) }}
+        <!-- Table -->
+        <VCard>
+          <VDataTableServer
+            :headers="[
+              { title: 'Ref. Distribusi', key: 'reference_no' },
+              { title: 'Tgl Dibuat', key: 'created_at' },
+              { title: 'Dari', key: 'source_branch_id' },
+              { title: 'Ke Cabang', key: 'destination_branch_id' },
+              { title: 'Jml Item', key: 'items_count', align: 'center' },
+              { title: 'Nilai Modal (HPP)', key: 'capital_value', align: 'end' },
+              { title: 'Status', key: 'status', align: 'center' },
+              { title: 'Aksi', key: 'actions', sortable: false, align: 'center' },
+            ]"
+            :items="distributions"
+            :items-length="totalDistrib"
+            :loading="isLoading"
+            :page="distribPage"
+            :items-per-page="distribPerPage"
+            class="text-no-wrap"
+            show-expand
+            @update:page="distribPage = $event; fetchDistributions()"
+            @update:items-per-page="distribPerPage = $event; fetchDistributions()"
+          >
+            <template #item.reference_no="{ item }">
+              <span class="font-weight-bold text-primary font-mono">{{ item.reference_no }}</span>
+            </template>
+            <template #item.created_at="{ item }">
+              {{ fmtDate(item.created_at) }}
+            </template>
+            <template #item.source_branch_id="{ item }">
+              <VChip size="small" color="secondary" variant="tonal">
+                <VIcon icon="ri-building-line" size="12" class="mr-1" />
+                {{ item.source_branch?.name || '-' }}
+              </VChip>
+            </template>
+            <template #item.destination_branch_id="{ item }">
+              <VChip size="small" color="primary" variant="tonal">
+                <VIcon icon="ri-store-2-line" size="12" class="mr-1" />
+                {{ item.destination_branch?.name || '-' }}
+              </VChip>
+            </template>
+            <template #item.items_count="{ item }">
+              <VChip size="small" color="info" variant="tonal">
+                {{ item.items?.length || 0 }} produk
+              </VChip>
+            </template>
+            <template #item.capital_value="{ item }">
+              <span class="font-weight-bold text-primary font-mono">
+                {{ item.capital_value ? fmtCurrency(item.capital_value) : '-' }}
               </span>
-            </div>
-            <VChip
-              :color="selectedTransaction.status === 'approved' ? 'success' : (selectedTransaction.status === 'pending' ? 'warning' : 'error')"
-              variant="tonal"
-              class="font-weight-bold"
-            >
-              {{ selectedTransaction.status === 'approved' ? 'Disetujui' : (selectedTransaction.status === 'pending' ? 'Menunggu Approval' : 'Ditolak / Batal') }}
-            </VChip>
-          </div>
-
-          <!-- Transaction Fields Grid -->
-          <VRow class="mb-3 text-body-2">
-            <VCol cols="6" class="py-1">
-              <span class="text-medium-emphasis d-block">Cabang:</span>
-              <strong>{{ selectedTransaction.branch?.name || '-' }}</strong>
-            </VCol>
-            <VCol cols="6" class="py-1">
-              <span class="text-medium-emphasis d-block">Tanggal:</span>
-              <strong>{{ formatDate(selectedTransaction.date) }}</strong>
-            </VCol>
-            <VCol cols="6" class="py-1">
-              <span class="text-medium-emphasis d-block">Jenis Mutasi:</span>
-              <strong>{{ selectedTransaction.type === 'injection' ? 'Injeksi / Permintaan Modal' : 'Setor Pengembalian Modal' }}</strong>
-            </VCol>
-            <VCol cols="6" class="py-1">
-              <span class="text-medium-emphasis d-block">Kategori:</span>
-              <strong>{{ selectedTransaction.category }}</strong>
-            </VCol>
-            <VCol cols="6" class="py-1">
-              <span class="text-medium-emphasis d-block">Metode:</span>
-              <strong>{{ selectedTransaction.payment_method }}</strong>
-            </VCol>
-            <VCol cols="6" class="py-1" v-if="selectedTransaction.bank_name || selectedTransaction.bankAccount">
-              <span class="text-medium-emphasis d-block">Rekening Bank:</span>
-              <strong>{{ selectedTransaction.bankAccount?.bank_name || selectedTransaction.bank_name }} - {{ selectedTransaction.bankAccount?.account_number || selectedTransaction.account_number || '-' }} ({{ selectedTransaction.bankAccount?.account_name || selectedTransaction.account_name || '-' }})</strong>
-            </VCol>
-          </VRow>
-
-          <!-- Audit Timeline -->
-          <div class="pa-3 rounded-lg border mb-3">
-            <span class="text-caption font-weight-bold text-uppercase d-block mb-2 text-primary">Jejak Audit Transaksi</span>
-            <div class="text-caption text-medium-emphasis mb-1">
-              • <strong>Dibuat Oleh:</strong> {{ selectedTransaction.user?.name || 'Kasir / Sistem' }} ({{ formatDateTime(selectedTransaction.created_at) }})
-            </div>
-            <div v-if="selectedTransaction.approved_by" class="text-caption text-medium-emphasis mb-1">
-              • <strong>Disetujui Oleh:</strong> {{ selectedTransaction.approved_by?.name }} ({{ formatDateTime(selectedTransaction.approved_at) }})
-            </div>
-            <div v-if="selectedTransaction.cash_shift_id" class="text-caption text-medium-emphasis">
-              • <strong>Terhubung ke Shift POS:</strong> Shift #{{ selectedTransaction.cash_shift_id }}
-            </div>
-          </div>
-
-          <!-- Riwayat Email Log Section -->
-          <div class="d-flex align-center justify-space-between mt-3 mb-2">
-            <span class="text-caption font-weight-bold text-uppercase d-flex align-center gap-1 text-primary">
-              <VIcon icon="ri-mail-check-line" size="16" />
-              Riwayat Log Pengiriman Email
-            </span>
-            <VBtn
-              size="x-small"
-              variant="text"
-              icon="ri-refresh-line"
-              :loading="isLoadingCapitalEmailLogs"
-              @click="fetchCapitalEmailLogs(selectedTransaction.id)"
-            />
-          </div>
-
-          <VCard class="border rounded-lg mb-3" variant="flat">
-            <VTable density="compact">
-              <thead>
-                <tr>
-                  <th>Penerima</th>
-                  <th>Mode</th>
-                  <th>Status</th>
-                  <th class="text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="capitalEmailLogs.length === 0">
-                  <td colspan="4" class="text-center text-medium-emphasis py-3 text-caption">
-                    Belum ada riwayat email untuk transaksi modal ini
-                  </td>
-                </tr>
-                <tr v-for="log in capitalEmailLogs" :key="log.id">
-                  <td class="py-2">
-                    <div class="font-weight-medium text-caption">{{ log.recipient_email }}</div>
-                    <div class="text-disabled" style="font-size: 10px;">{{ log.created_at ? formatDate(log.created_at) : '-' }}</div>
-                  </td>
-                  <td>
-                    <span class="text-caption font-weight-medium">{{ log.trigger_mode === 'automatic' ? 'Otomatis' : 'Manual' }}</span>
-                  </td>
-                  <td>
-                    <VChip
-                      :color="log.status === 'sent' ? 'success' : (log.status === 'failed' ? 'error' : 'warning')"
-                      size="x-small"
-                      variant="elevated"
-                      class="font-weight-bold"
-                    >
-                      {{ log.status === 'sent' ? 'Terkirim' : (log.status === 'failed' ? 'Gagal' : 'Pending') }}
-                    </VChip>
-                    <div v-if="log.error_message" class="text-error mt-1 text-truncate" style="max-width: 130px; font-size: 10px;" :title="log.error_message">
-                      {{ log.error_message }}
-                    </div>
-                  </td>
-                  <td class="text-right">
-                    <VBtn
-                      v-if="log.status === 'failed'"
-                      size="x-small"
-                      color="error"
-                      variant="tonal"
-                      prepend-icon="ri-refresh-line"
-                      :loading="isRetryingCapitalEmail[log.id]"
-                      @click="retryCapitalEmail(log.id)"
-                    >
-                      Kirim Ulang
-                    </VBtn>
-                    <VIcon v-else-if="log.status === 'sent'" icon="ri-check-double-line" color="success" size="16" />
-                  </td>
-                </tr>
-              </tbody>
-            </VTable>
-          </VCard>
-
-          <!-- Notes -->
-          <div v-if="selectedTransaction.notes" class="pa-3 rounded-lg bg-var-theme-background mb-3 text-caption">
-            <span class="font-weight-bold d-block mb-1">Catatan / Alasan:</span>
-            <span class="text-pre-wrap">{{ selectedTransaction.notes }}</span>
-          </div>
-
-          <!-- Proof File / PDF Proposal Preview -->
-          <div v-if="selectedTransaction.proof_file" class="pa-3 border rounded-lg mb-3">
-            <span class="text-caption font-weight-bold d-block mb-2">Lampiran Bukti / Dokumen Proposal:</span>
-            
-            <!-- If PDF Document -->
-            <div v-if="selectedTransaction.proof_file.toLowerCase().endsWith('.pdf')" class="d-flex align-center justify-space-between pa-3 rounded-lg bg-var-theme-background">
-              <div class="d-flex align-center gap-2">
-                <VAvatar color="error" variant="tonal" size="36">
-                  <VIcon icon="ri-file-pdf-2-line" size="20" />
-                </VAvatar>
-                <div>
-                  <span class="font-weight-medium text-body-2 d-block">Dokumen Proposal (PDF)</span>
-                  <span class="text-caption text-medium-emphasis">Klik tombol untuk membaca PDF di tab baru</span>
-                </div>
-              </div>
+            </template>
+            <template #item.status="{ item }">
+              <VChip :color="statusColor(item.status)" size="small" variant="tonal" class="font-weight-bold">
+                {{ statusLabel(item.status) }}
+              </VChip>
+            </template>
+            <template #item.actions="{ item }">
               <VBtn
-                color="error"
+                icon="ri-eye-line"
+                variant="text"
                 size="small"
-                variant="tonal"
-                prepend-icon="ri-external-link-line"
-                :href="'/storage/' + selectedTransaction.proof_file"
-                target="_blank"
-              >
-                Buka PDF
-              </VBtn>
-            </div>
+                color="primary"
+                :href="`/mutasi-stok?id=${item.id}`"
+              />
+            </template>
 
-            <!-- If Image -->
-            <div v-else class="text-center">
-              <a :href="'/storage/' + selectedTransaction.proof_file" target="_blank">
-                <img
-                  :src="'/storage/' + selectedTransaction.proof_file"
-                  alt="Bukti Transaksi"
-                  class="rounded-lg"
-                  style="max-width: 100%; max-height: 250px; object-fit: contain;"
+            <!-- Expanded row: daftar produk -->
+            <template #expanded-row="{ columns, item }">
+              <tr>
+                <td :colspan="columns.length" class="pa-4" style="background: rgba(var(--v-theme-primary), 0.04);">
+                  <div class="text-subtitle-2 text-primary font-weight-bold mb-3">
+                    <VIcon icon="ri-list-unordered" size="16" class="mr-1" />
+                    Daftar Barang Modal — {{ item.reference_no }}
+                  </div>
+                  <VTable density="compact" class="rounded border">
+                    <thead>
+                      <tr>
+                        <th>Produk</th>
+                        <th class="text-center">Qty Dikirim</th>
+                        <th class="text-end">Harga Pokok (HPP)</th>
+                        <th class="text-end">Nilai Modal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="row in (item.items || [])" :key="row.id">
+                        <td>
+                          <span class="font-weight-medium">{{ row.product?.name || '-' }}</span>
+                          <span v-if="row.product?.sku" class="text-caption text-medium-emphasis ml-2">[{{ row.product.sku }}]</span>
+                        </td>
+                        <td class="text-center font-mono">{{ row.qty }} pcs</td>
+                        <td class="text-end font-mono">{{ fmtCurrency(row.product?.cost_price || 0) }}</td>
+                        <td class="text-end font-weight-bold font-mono text-primary">{{ fmtCurrency((row.qty || 0) * (row.product?.cost_price || 0)) }}</td>
+                      </tr>
+                      <tr v-if="!(item.items?.length)">
+                        <td colspan="4" class="text-center text-medium-emphasis py-3">Tidak ada detail item.</td>
+                      </tr>
+                    </tbody>
+                    <tfoot v-if="item.capital_value">
+                      <tr class="bg-var-theme-surface">
+                        <td colspan="3" class="font-weight-bold text-uppercase text-right">Total Nilai Modal HPP:</td>
+                        <td class="text-end font-weight-bold text-primary font-mono text-subtitle-2">{{ fmtCurrency(item.capital_value) }}</td>
+                      </tr>
+                    </tfoot>
+                  </VTable>
+                </td>
+              </tr>
+            </template>
+            <template #no-data>
+              <div class="text-center py-8 text-medium-emphasis">
+                <VIcon icon="ri-store-3-line" size="48" class="mb-3 opacity-30" />
+                <div>Belum ada distribusi modal barang.</div>
+              </div>
+            </template>
+          </VDataTableServer>
+        </VCard>
+      </VWindowItem>
+
+      <!-- =========================================== -->
+      <!-- TAB 2: REKONSILIASI AKHIR BULAN            -->
+      <!-- =========================================== -->
+      <VWindowItem value="rekonsiliasi">
+        <!-- Filter rekonsiliasi -->
+        <VCard class="mb-4">
+          <VCardText>
+            <VRow dense align="center">
+              <VCol cols="12" md="3">
+                <VTextField
+                  v-model="rekonPeriod"
+                  type="month"
+                  label="Periode Rekonsiliasi"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
                 />
-              </a>
-              <div class="text-caption text-medium-emphasis mt-1">Klik gambar untuk membuka ukuran penuh</div>
-            </div>
-          </div>
+              </VCol>
+              <VCol cols="12" md="3">
+                <VSelect
+                  v-model="rekonBranch"
+                  :items="[{ title: 'Semua Cabang', value: 'all' }, ...branches]"
+                  label="Filter Cabang"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                />
+              </VCol>
+              <VCol cols="auto">
+                <VBtn
+                  color="primary"
+                  variant="tonal"
+                  prepend-icon="ri-refresh-line"
+                  :loading="isRekonLoading"
+                  @click="fetchRekonsiliasi"
+                >
+                  Refresh
+                </VBtn>
+              </VCol>
+            </VRow>
+          </VCardText>
+        </VCard>
+
+        <div v-if="isRekonLoading" class="text-center py-12">
+          <VProgressCircular indeterminate color="primary" size="48" />
+          <div class="mt-3 text-medium-emphasis">Menghitung rekonsiliasi...</div>
         </div>
-      </VCard>
-    </VDialog>
 
-    <!-- DIALOG KIRIM EMAIL REKAP MODAL & ROI KE OWNER -->
-    <VDialog
-      v-model="isSendSummaryEmailDialogVisible"
-      :fullscreen="$vuetify.display.xs"
-      max-width="480"
-    >
+        <div v-else-if="rekonData.length === 0" class="text-center py-12 text-medium-emphasis">
+          <VIcon icon="ri-bar-chart-grouped-line" size="64" class="mb-3 opacity-30" />
+          <div>Tidak ada data distribusi modal barang pada periode ini.</div>
+        </div>
+
+        <VRow v-else>
+          <VCol
+            v-for="branch in rekonData"
+            :key="branch.branch_id"
+            cols="12"
+            md="6"
+            lg="4"
+          >
+            <VCard class="h-100" :class="{
+              'border-success': branch.status === 'seimbang',
+              'border-error': branch.status === 'selisih',
+              'border-warning': branch.status === 'surplus',
+            }">
+              <VCardTitle class="d-flex align-center justify-space-between pt-4 px-4 pb-2">
+                <div class="d-flex align-center gap-2">
+                  <VAvatar color="primary" size="36" rounded="lg">
+                    <VIcon icon="ri-store-2-line" size="20" />
+                  </VAvatar>
+                  <div>
+                    <div class="text-subtitle-1 font-weight-bold">{{ branch.branch_name }}</div>
+                    <div class="text-caption text-medium-emphasis">{{ branch.period }}</div>
+                  </div>
+                </div>
+                <VChip
+                  :color="branch.status === 'seimbang' ? 'success' : branch.status === 'selisih' ? 'error' : 'warning'"
+                  size="small"
+                  class="font-weight-bold"
+                >
+                  <VIcon :icon="branch.status === 'seimbang' ? 'ri-check-line' : branch.status === 'selisih' ? 'ri-alert-line' : 'ri-arrow-up-line'" size="14" class="mr-1" />
+                  {{ branch.status === 'seimbang' ? 'Seimbang ✓' : branch.status === 'selisih' ? 'Ada Selisih' : 'Surplus' }}
+                </VChip>
+              </VCardTitle>
+
+              <VCardText class="pt-0">
+                <!-- Progress bar penjualan -->
+                <div class="mb-3">
+                  <div class="d-flex justify-space-between text-caption mb-1">
+                    <span class="text-medium-emphasis">Progress Terjual</span>
+                    <span class="font-weight-bold text-primary">{{ branch.pct_terjual }}%</span>
+                  </div>
+                  <VProgressLinear
+                    :model-value="branch.pct_terjual"
+                    :color="branch.pct_terjual >= 80 ? 'success' : branch.pct_terjual >= 50 ? 'warning' : 'error'"
+                    rounded
+                    height="8"
+                    bg-color="rgba(var(--v-theme-on-surface), 0.08)"
+                  />
+                </div>
+
+                <!-- Rincian angka -->
+                <VDivider class="mb-3" />
+                <div class="d-flex justify-space-between mb-2">
+                  <div class="text-caption text-medium-emphasis d-flex align-center gap-1">
+                    <VIcon icon="ri-store-3-line" size="14" color="primary" />
+                    Modal Barang Dikirim
+                  </div>
+                  <span class="font-weight-bold font-mono text-caption text-primary">{{ fmtCurrency(branch.modal_value) }}</span>
+                </div>
+                <div class="d-flex justify-space-between mb-2">
+                  <div class="text-caption text-medium-emphasis d-flex align-center gap-1">
+                    <VIcon icon="ri-money-dollar-circle-line" size="14" color="success" />
+                    Omset Penjualan
+                  </div>
+                  <span class="font-weight-bold font-mono text-caption text-success">{{ fmtCurrency(branch.omset_penjualan) }}</span>
+                </div>
+                <div class="d-flex justify-space-between mb-2">
+                  <div class="text-caption text-medium-emphasis d-flex align-center gap-1">
+                    <VIcon icon="ri-archive-line" size="14" color="warning" />
+                    Estimasi Sisa Stok (Nilai HPP)
+                  </div>
+                  <span class="font-weight-bold font-mono text-caption text-warning">{{ fmtCurrency(branch.sisa_stok_nilai) }}</span>
+                </div>
+                <VDivider class="my-2" />
+                <div class="d-flex justify-space-between">
+                  <div class="text-caption font-weight-bold d-flex align-center gap-1">
+                    <VIcon
+                      :icon="branch.selisih === 0 ? 'ri-check-double-line' : branch.selisih > 0 ? 'ri-arrow-up-circle-line' : 'ri-arrow-down-circle-line'"
+                      :color="branch.selisih === 0 ? 'success' : branch.selisih > 0 ? 'info' : 'error'"
+                      size="14"
+                    />
+                    Selisih / Susut
+                  </div>
+                  <span
+                    class="font-weight-bold font-mono text-caption"
+                    :class="branch.selisih < 0 ? 'text-error' : branch.selisih > 0 ? 'text-info' : 'text-success'"
+                  >
+                    {{ branch.selisih >= 0 ? '+' : '' }}{{ fmtCurrency(branch.selisih) }}
+                  </span>
+                </div>
+
+                <!-- Detail produk per cabang -->
+                <VExpansionPanels class="mt-3" variant="accordion">
+                  <VExpansionPanel>
+                    <VExpansionPanelTitle class="text-caption font-weight-bold py-2 px-3">
+                      <VIcon icon="ri-list-check-2" size="14" class="mr-2" />
+                      Detail Per Produk ({{ branch.product_details?.length || 0 }} item)
+                    </VExpansionPanelTitle>
+                    <VExpansionPanelText class="pa-0">
+                      <VTable density="compact" class="text-caption">
+                        <thead>
+                          <tr>
+                            <th>Produk</th>
+                            <th class="text-center">Dikirim</th>
+                            <th class="text-center">Terjual</th>
+                            <th class="text-center">Sisa</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="pd in branch.product_details" :key="pd.product_id">
+                            <td>{{ pd.product_name }}</td>
+                            <td class="text-center font-mono">{{ pd.qty_dikirim }}</td>
+                            <td class="text-center font-mono text-success">{{ pd.qty_terjual }}</td>
+                            <td class="text-center font-mono text-warning">{{ pd.qty_dikirim - pd.qty_terjual }}</td>
+                          </tr>
+                          <tr v-if="!branch.product_details?.length">
+                            <td colspan="4" class="text-center text-medium-emphasis py-2">Tidak ada data.</td>
+                          </tr>
+                        </tbody>
+                      </VTable>
+                    </VExpansionPanelText>
+                  </VExpansionPanel>
+                </VExpansionPanels>
+              </VCardText>
+            </VCard>
+          </VCol>
+        </VRow>
+      </VWindowItem>
+    </VWindow>
+
+    <!-- =========================================== -->
+    <!-- DIALOG: Kirim Modal Barang ke Cabang       -->
+    <!-- =========================================== -->
+    <VDialog v-model="showSendDialog" max-width="800" scrollable>
       <VCard>
-        <VCardTitle class="bg-primary text-white pa-4 d-flex align-center justify-space-between">
-          <div class="d-flex align-center gap-2">
-            <VIcon icon="ri-mail-send-line" />
-            <span>Kirim Rekap Modal ke Email Owner</span>
-          </div>
-          <VBtn icon="ri-close-line" variant="text" size="small" @click="isSendSummaryEmailDialogVisible = false" />
+        <VCardTitle class="text-h5 pt-5 px-5 pb-0 d-flex align-center gap-2">
+          <VIcon icon="ri-send-plane-line" color="primary" />
+          Kirim Modal Barang ke Cabang
         </VCardTitle>
+        <VCardText class="px-5 pt-4">
+          <VAlert color="info" variant="tonal" class="mb-4" density="compact">
+            <VIcon icon="ri-information-line" /> Barang akan otomatis diproses sebagai <strong>Distribusi Stok Modal</strong> dari Gudang Pusat ke cabang tujuan. Stok Gudang Pusat akan berkurang setelah diterima.
+          </VAlert>
 
-        <VCardText class="pa-5">
-          <p class="text-body-2 text-medium-emphasis mb-4">
-            Kirimkan laporan ringkasan portofolio permodalan konsolidasi dan tingkat pengembalian (ROI) ke inbox email Owner:
-          </p>
-
-          <VTextField
-            v-model="summaryEmailInput"
-            label="Alamat Email Tujuan (Opsional)"
-            placeholder="Kosongkan untuk kirim otomatis ke email Owner terdaftar"
-            prepend-inner-icon="ri-mail-line"
-            type="email"
+          <!-- Cabang tujuan -->
+          <VSelect
+            v-model="formBranchId"
+            :items="branches"
+            label="Cabang Tujuan *"
             variant="outlined"
-            density="compact"
-            class="mb-3"
+            class="mb-4"
           />
 
-          <div class="pa-3 rounded bg-light-primary border text-caption">
-            <div class="d-flex justify-space-between mb-1">
-              <span>Total Modal Diberikan:</span>
-              <strong>{{ formatCurrency(summary.total_injected) }}</strong>
-            </div>
-            <div class="d-flex justify-space-between mb-1">
-              <span>Modal Dikembalikan:</span>
-              <strong class="text-success">{{ formatCurrency(summary.total_returned) }}</strong>
-            </div>
-            <div class="d-flex justify-space-between">
-              <span>Sisa Modal Tertanam:</span>
-              <strong class="text-warning">{{ formatCurrency(summary.remaining_capital) }}</strong>
-            </div>
-          </div>
-        </VCardText>
-
-        <VCardActions class="pa-4 pt-0 justify-end gap-2">
-          <VBtn variant="tonal" color="secondary" @click="isSendSummaryEmailDialogVisible = false">
-            Batal
+          <!-- Daftar produk -->
+          <div class="text-subtitle-2 font-weight-bold mb-2">Daftar Barang Modal</div>
+          <VTable class="mb-3 border rounded">
+            <thead>
+              <tr>
+                <th style="width: 40%">Produk</th>
+                <th style="width: 15%">Qty</th>
+                <th style="width: 25%">HPP / Unit (Rp)</th>
+                <th style="width: 15%">Subtotal</th>
+                <th style="width: 5%"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, idx) in formItems" :key="idx">
+                <td class="pa-2">
+                  <VAutocomplete
+                    v-model="item.product_id"
+                    :items="products"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    placeholder="Pilih produk..."
+                    @update:model-value="onProductSelect(idx)"
+                  />
+                </td>
+                <td class="pa-2">
+                  <VTextField
+                    v-model.number="item.qty"
+                    type="number"
+                    min="1"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    @update:model-value="recalcSubtotal(idx)"
+                  />
+                </td>
+                <td class="pa-2">
+                  <VTextField
+                    v-model.number="item.cost_price"
+                    type="number"
+                    min="0"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    @update:model-value="recalcSubtotal(idx)"
+                  />
+                </td>
+                <td class="pa-2 text-right font-mono font-weight-bold text-primary">
+                  {{ fmtCurrency(item.subtotal) }}
+                </td>
+                <td class="pa-1 text-center">
+                  <VBtn
+                    icon="ri-delete-bin-line"
+                    size="small"
+                    variant="text"
+                    color="error"
+                    :disabled="formItems.length <= 1"
+                    @click="removeItem(idx)"
+                  />
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="3" class="pa-3 font-weight-bold text-right text-uppercase">Total Nilai Modal HPP:</td>
+                <td class="pa-3 font-weight-bold font-mono text-primary text-subtitle-2">{{ fmtCurrency(totalModalValue) }}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </VTable>
+          <VBtn variant="tonal" color="primary" prepend-icon="ri-add-line" size="small" @click="addItem" class="mb-4">
+            + Tambah Produk
           </VBtn>
+
+          <!-- Catatan -->
+          <VTextField
+            v-model="formNotes"
+            label="Catatan (opsional)"
+            variant="outlined"
+            placeholder="Misal: Modal awal toko baru, tambahan stok September..."
+          />
+        </VCardText>
+        <VCardActions class="px-5 pb-5">
+          <VSpacer />
+          <VBtn variant="outlined" color="secondary" @click="showSendDialog = false">Batal</VBtn>
           <VBtn
             color="primary"
-            class="font-weight-bold"
-            prepend-icon="ri-send-plane-fill"
-            :loading="isSendingSummaryEmail"
-            @click="submitSendSummaryEmail"
+            :loading="isSubmitting"
+            prepend-icon="ri-send-plane-line"
+            @click="submitKirimModal"
           >
-            Kirim Laporan
+            Kirim Modal Barang
           </VBtn>
         </VCardActions>
-      </VCard>
-    </VDialog>
-
-    <!-- DIALOG KIRIM BUKTI SETORAN MODAL KE EMAIL -->
-    <VDialog
-      v-model="isSendCapitalEmailDialogVisible"
-      :fullscreen="$vuetify.display.xs"
-      max-width="480"
-    >
-      <VCard>
-        <VCardTitle class="bg-success text-white pa-4 d-flex align-center justify-space-between">
-          <div class="d-flex align-center gap-2">
-            <VIcon icon="ri-mail-send-line" />
-            <span>Kirim Bukti Setoran ke Email</span>
-          </div>
-          <VBtn icon="ri-close-line" variant="text" size="small" @click="isSendCapitalEmailDialogVisible = false" />
-        </VCardTitle>
-
-        <VCardText class="pa-5">
-          <p class="text-body-2 text-medium-emphasis mb-4">
-            Kirimkan rincian setoran dan verifikasi mutasi modal ini ke alamat email:
-          </p>
-
-          <VTextField
-            v-model="capitalEmailInput"
-            label="Alamat Email Tujuan (Opsional)"
-            placeholder="Kosongkan untuk kirim otomatis ke email Owner terdaftar"
-            prepend-inner-icon="ri-mail-line"
-            type="email"
-            variant="outlined"
-            density="compact"
-            class="mb-3"
-          />
-
-          <div class="pa-3 rounded bg-light-primary border text-caption">
-            <div class="d-flex justify-space-between mb-1">
-              <span>No. Referensi:</span>
-              <strong>{{ selectedTransaction?.reference_no }}</strong>
-            </div>
-            <div class="d-flex justify-space-between mb-1">
-              <span>Cabang:</span>
-              <strong>{{ selectedTransaction?.branch?.name }}</strong>
-            </div>
-            <div class="d-flex justify-space-between">
-              <span>Nominal:</span>
-              <strong class="text-success">{{ formatCurrency(selectedTransaction?.amount) }}</strong>
-            </div>
-          </div>
-        </VCardText>
-
-        <VCardActions class="pa-4 pt-0 justify-end gap-2">
-          <VBtn variant="tonal" color="secondary" @click="isSendCapitalEmailDialogVisible = false">
-            Batal
-          </VBtn>
-          <VBtn
-            color="success"
-            class="font-weight-bold"
-            prepend-icon="ri-send-plane-fill"
-            :loading="isSendingCapitalEmail"
-            @click="submitSendCapitalEmail"
-          >
-            Kirim Email
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
-    <!-- PREVIEW BUKTI TRANSFER DIALOG -->
-    <VDialog
-      v-model="isPreviewDialogVisible"
-      :fullscreen="$vuetify.display.xs"
-      max-width="550"
-    >
-      <VCard class="pa-4 rounded-xl">
-        <div class="d-flex align-center justify-space-between mb-3">
-          <span class="text-subtitle-1 font-weight-bold">Lampiran Bukti Transaksi</span>
-          <VBtn icon="ri-close-line" variant="text" density="compact" @click="isPreviewDialogVisible = false" />
-        </div>
-        <div class="text-center pa-2">
-          <a :href="previewImage" target="_blank">
-            <img :src="previewImage" alt="Bukti Transfer" class="rounded-lg" style="max-width: 100%; max-height: 480px; object-fit: contain;" />
-          </a>
-          <div class="text-caption text-medium-emphasis mt-2">
-            Klik gambar untuk membuka di tab baru
-          </div>
-        </div>
       </VCard>
     </VDialog>
   </div>
 </template>
 
-<style scoped>
-.cursor-pointer {
-  cursor: pointer;
-}
-.text-pre-wrap {
-  white-space: pre-wrap;
-}
-.per-page-select {
-  inline-size: 5.5rem;
-}
-</style>
+<route lang="yaml">
+meta:
+  action: read
+  subject: Modal & ROI Cabang
+</route>

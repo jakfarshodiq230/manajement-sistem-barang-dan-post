@@ -31,8 +31,15 @@ const credentials = ref({
 const rememberMe = ref(true)
 const isLoading = ref(false)
 
+const isUnverified = ref(false)
+const unverifiedEmail = ref('')
+const isResending = ref(false)
+const resendSuccess = ref(false)
+
 const login = async () => {
   isLoading.value = true
+  isUnverified.value = false
+  resendSuccess.value = false
   errors.value = { email: undefined, password: undefined }
   try {
     const res = await $api('/auth/login', {
@@ -43,11 +50,18 @@ const login = async () => {
         remember_me: rememberMe.value,
       },
       onResponseError({ response }) {
+        if (response._data?.unverified) {
+          isUnverified.value = true
+          unverifiedEmail.value = response._data.email || credentials.value.email
+        }
+        
         errors.value = response._data?.errors || {
           email: [response._data?.message || 'Email atau kata sandi tidak valid. Silakan periksa kembali.']
         }
       },
     })
+
+    if (!res) return // Stop execution if there was an error (handled in onResponseError)
 
     const { accessToken, userData, userAbilityRules } = res
 
@@ -70,11 +84,51 @@ const login = async () => {
   }
 }
 
+const resendVerification = async () => {
+  isResending.value = true
+  resendSuccess.value = false
+  
+  try {
+    const res = await $api('/auth/email/verification-notification', {
+      method: 'POST',
+      body: {
+        email: unverifiedEmail.value
+      }
+    })
+    
+    if (res?.message) {
+      resendSuccess.value = true
+    }
+  } catch (err) {
+    console.error(err)
+  } finally {
+    isResending.value = false
+  }
+}
+
 const onSubmit = () => {
   refVForm.value?.validate().then(({ valid: isValid }) => {
     if (isValid) login()
   })
 }
+
+// Handle email verification redirect
+const verificationSuccess = ref(false)
+const verificationFailed = ref(false)
+const verificationAlready = ref(false)
+
+onMounted(() => {
+  if (route.query.verification === 'success') {
+    verificationSuccess.value = true
+    setTimeout(() => verificationSuccess.value = false, 8000)
+  } else if (route.query.verification === 'failed') {
+    verificationFailed.value = true
+    setTimeout(() => verificationFailed.value = false, 8000)
+  } else if (route.query.verification === 'already') {
+    verificationAlready.value = true
+    setTimeout(() => verificationAlready.value = false, 8000)
+  }
+})
 </script>
 
 <template>
@@ -94,16 +148,69 @@ const onSubmit = () => {
           </p>
         </div>
 
+        <!-- Verification Success/Error Alerts -->
+        <VAlert
+          v-if="verificationSuccess"
+          color="success"
+          variant="tonal"
+          class="mb-6 rounded-lg text-body-2"
+          closable
+        >
+          Email berhasil diverifikasi! Silakan masuk menggunakan akun Anda.
+        </VAlert>
+
+        <VAlert
+          v-if="verificationFailed"
+          color="error"
+          variant="tonal"
+          class="mb-6 rounded-lg text-body-2"
+          closable
+        >
+          Tautan verifikasi tidak valid atau telah kedaluwarsa.
+        </VAlert>
+
+        <VAlert
+          v-if="verificationAlready"
+          color="info"
+          variant="tonal"
+          class="mb-6 rounded-lg text-body-2"
+          closable
+        >
+          Email Anda sudah diverifikasi sebelumnya. Silakan masuk.
+        </VAlert>
+
         <!-- Alert Error -->
         <VAlert
           v-if="errors.email || errors.password"
           color="error"
           variant="tonal"
-          closable
-          density="compact"
-          class="mb-4 rounded-lg text-caption font-weight-medium"
+          class="mb-6 rounded-lg text-body-2"
         >
-          {{ Array.isArray(errors.email) ? errors.email[0] : (errors.email || 'Email atau kata sandi tidak valid.') }}
+          <template v-if="isUnverified">
+            <div class="d-flex flex-column align-center text-center">
+              <VIcon icon="ri-error-warning-line" size="32" class="mb-2" />
+              <div class="mb-3 font-weight-medium">
+                {{ errors.email ? errors.email[0] : (errors.password ? errors.password[0] : '') }}
+              </div>
+              <div v-if="resendSuccess" class="text-success font-weight-bold mb-2">
+                Tautan verifikasi telah dikirim ulang ke {{ unverifiedEmail }}.
+              </div>
+              <VBtn
+                v-else
+                color="primary"
+                variant="outlined"
+                size="small"
+                rounded="lg"
+                :loading="isResending"
+                @click="resendVerification"
+              >
+                Kirim Ulang Email Verifikasi
+              </VBtn>
+            </div>
+          </template>
+          <template v-else>
+            {{ errors.email ? errors.email[0] : (errors.password ? errors.password[0] : '') }}
+          </template>
         </VAlert>
 
         <!-- Form -->
@@ -208,8 +315,8 @@ const onSubmit = () => {
   max-height: 100vh;
   width: 100vw;
   overflow: hidden;
-  background-color: #f8fafc;
-  background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+  background-color: rgb(var(--v-theme-background));
+  background-image: radial-gradient(rgba(var(--v-theme-on-surface), 0.1) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 
@@ -218,8 +325,8 @@ const onSubmit = () => {
 }
 
 .login-card {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
+  background-color: rgb(var(--v-theme-surface)) !important;
+  border-color: rgba(var(--v-theme-border-color)) !important;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02) !important;
 }
 

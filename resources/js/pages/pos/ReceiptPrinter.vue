@@ -334,10 +334,10 @@ defineExpose({ print })
                 <td>:</td>
                 <td style="text-align: right;">-{{ formatCurrency(sale.discount) }}</td>
               </tr>
-              <tr v-if="sale.tax_amount > 0">
-                <td>PPN</td>
+              <tr v-if="sale.total_tax > 0">
+                <td>PPN 11%</td>
                 <td>:</td>
-                <td style="text-align: right;">{{ formatCurrency(sale.tax_amount) }}</td>
+                <td style="text-align: right;">{{ formatCurrency(sale.total_tax) }}</td>
               </tr>
               <tr class="dotmatrix-grand-total">
                 <td>GRAND TOTAL</td>
@@ -446,9 +446,9 @@ defineExpose({ print })
             <td>Diskon</td>
             <td style="text-align: right;">-{{ formatCurrency(sale.discount) }}</td>
           </tr>
-          <tr v-if="sale.tax_amount > 0">
-            <td>Pajak</td>
-            <td style="text-align: right;">{{ formatCurrency(sale.tax_amount) }}</td>
+          <tr v-if="sale.total_tax > 0">
+            <td>PPN 11%</td>
+            <td style="text-align: right;">{{ formatCurrency(sale.total_tax) }}</td>
           </tr>
           <tr style="font-weight: bold; font-size: 12px;">
             <td class="pt-1">Total</td>

@@ -35,12 +35,16 @@ class StockTransfer extends Model
         'received_photo',
         'receive_notes',
         'pickup_notes',
+        'is_capital_transfer',
+        'capital_value',
     ];
 
     protected $casts = [
-        'prepared_at' => 'datetime',
-        'picked_up_at' => 'datetime',
-        'received_at' => 'datetime',
+        'prepared_at'         => 'datetime',
+        'picked_up_at'        => 'datetime',
+        'received_at'         => 'datetime',
+        'is_capital_transfer' => 'boolean',
+        'capital_value'       => 'decimal:2',
     ];
 
     protected static function booted()

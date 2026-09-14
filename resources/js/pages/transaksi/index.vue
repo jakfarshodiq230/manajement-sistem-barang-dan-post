@@ -8,7 +8,9 @@ const sales = ref([])
 const search = ref('')
 const selectedStatus = ref(null)
 const selectedBank = ref(null)
+const selectedBranch = ref(null)
 const bankAccounts = ref([])
+const branches = ref([])
 const dateRange = ref('')
 const isLoading = ref(false)
 const summary = ref({ cash: 0, transfer: 0, qris: 0, tempo: 0, by_bank: [] })
@@ -33,6 +35,15 @@ const fetchBankAccounts = async () => {
     bankAccounts.value = res.data || []
   } catch (e) {
     console.error('Failed to fetch bank accounts for filter:', e)
+  }
+}
+
+const fetchBranches = async () => {
+  try {
+    const res = await $api('/apps/branches')
+    branches.value = res.data || res || []
+  } catch (e) {
+    console.error('Failed to fetch branches for filter:', e)
   }
 }
 
@@ -76,6 +87,9 @@ const fetchSales = async () => {
     if (selectedBank.value) {
       params.bank_account_id = selectedBank.value
     }
+    if (selectedBranch.value) {
+      params.branch_id = selectedBranch.value
+    }
     if (dateRange.value) {
       const dates = dateRange.value.split(' to ')
       params.start_date = dates[0]
@@ -109,6 +123,7 @@ const handleSearch = () => {
 
 onMounted(() => {
   fetchBankAccounts()
+  fetchBranches()
   fetchSales()
 })
 
@@ -117,6 +132,7 @@ const tableHeaders = [
   { title: 'TANGGAL', key: 'date' },
   { title: 'CABANG', key: 'branch.name' },
   { title: 'KASIR', key: 'user.name' },
+  { title: 'PPN (RP)', key: 'total_tax' },
   { title: 'TOTAL (RP)', key: 'total_amount' },
   { title: 'METODE & BANK PENERIMA', key: 'payment_method' },
   { title: 'STATUS', key: 'status' },
@@ -184,51 +200,77 @@ const executeVoidSale = async () => {
   }
 }
 
-const exportToExcel = () => {
+const exportToExcel = async () => {
   if (!dateRange.value) {
     snackbar.show('Silakan pilih rentang tanggal periode terlebih dahulu!', 'warning')
     
     return
   }
   
-  if (!filteredSales.value || filteredSales.value.length === 0) {
-    snackbar.show('Tidak ada data untuk diekspor pada periode ini', 'warning')
+  isLoading.value = true
+  try {
+    const params = {
+      itemsPerPage: -1,
+    }
     
-    return
+    if (search.value) params.search = search.value
+    if (selectedStatus.value) params.payment_status = selectedStatus.value
+    if (selectedBank.value) params.bank_account_id = selectedBank.value
+    if (selectedBranch.value) params.branch_id = selectedBranch.value
+    
+    if (dateRange.value) {
+      const dates = dateRange.value.split(' to ')
+      params.start_date = dates[0]
+      params.end_date = dates[1] || dates[0]
+    }
+    
+    const data = await $api('/apps/sales', { query: params })
+    const allSales = data.data || data
+    
+    if (!allSales || allSales.length === 0) {
+      snackbar.show('Tidak ada data untuk diekspor pada periode ini', 'warning')
+      return
+    }
+    
+    // Create CSV Header
+    const headers = ['NO. BON', 'TANGGAL', 'CABANG', 'KASIR', 'PPN (RP)', 'TOTAL (RP)', 'METODE BAYAR', 'STATUS']
+    const csvRows = [headers.join(',')]
+    
+    // Format rows
+    allSales.forEach(sale => {
+      const row = [
+        `"${sale.invoice_number}"`,
+        `"${sale.date || ''}"`,
+        `"${sale.branch?.name || ''}"`,
+        `"${sale.user?.name || ''}"`,
+        `"${sale.total_tax || 0}"`,
+        `"${sale.total_amount}"`,
+        `"${sale.payment_method === 'transfer' ? 'Transfer Bank' : (sale.payment_method === 'qris' ? 'QRIS' : (sale.payment_method === 'tempo' ? 'Tempo (Utang)' : 'Tunai'))}"`,
+        `"${sale.status?.toUpperCase() || ''}"`,
+      ]
+
+      csvRows.push(row.join(','))
+    })
+    
+    // Create Blob
+    const csvData = csvRows.join('\n')
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    
+    // Create download link
+    const link = document.createElement('a')
+
+    link.href = url
+    link.setAttribute('download', `Riwayat_Transaksi_${new Date().toISOString().split('T')[0]}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } catch (error) {
+    console.error('Failed to export:', error)
+    snackbar.show('Gagal mengekspor data', 'error')
+  } finally {
+    isLoading.value = false
   }
-  
-  // Create CSV Header
-  const headers = ['NO. BON', 'TANGGAL', 'CABANG', 'KASIR', 'TOTAL (RP)', 'METODE BAYAR', 'STATUS']
-  const csvRows = [headers.join(',')]
-  
-  // Format rows
-  sales.value.forEach(sale => {
-    const row = [
-      `"${sale.invoice_number}"`,
-      `"${sale.date || ''}"`,
-      `"${sale.branch?.name || ''}"`,
-      `"${sale.user?.name || ''}"`,
-      `"${sale.total_amount}"`,
-      `"${sale.payment_method === 'transfer' ? 'Transfer Bank' : (sale.payment_method === 'qris' ? 'QRIS' : (sale.payment_method === 'tempo' ? 'Tempo (Utang)' : 'Tunai'))}"`,
-      `"${sale.status?.toUpperCase() || ''}"`,
-    ]
-
-    csvRows.push(row.join(','))
-  })
-  
-  // Create Blob
-  const csvData = csvRows.join('\n')
-  const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  
-  // Create download link
-  const link = document.createElement('a')
-
-  link.href = url
-  link.setAttribute('download', `Riwayat_Transaksi_${new Date().toISOString().split('T')[0]}.csv`)
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
 }
 </script>
 
@@ -293,6 +335,19 @@ const exportToExcel = () => {
           </VCardText>
         </VCard>
       </VCol>
+      <VCol cols="12" sm="6" md="3">
+        <VCard>
+          <VCardText class="d-flex align-center justify-space-between">
+            <div>
+              <div class="text-subtitle-2 text-medium-emphasis">PPN (Terkumpul)</div>
+              <div class="text-h6 font-weight-semibold text-error">{{ formatRupiah(summary.total_ppn || 0) }}</div>
+            </div>
+            <VAvatar rounded color="error" variant="tonal">
+              <VIcon icon="ri-percent-line" size="24" />
+            </VAvatar>
+          </VCardText>
+        </VCard>
+      </VCol>
     </VRow>
     </div>
 
@@ -315,6 +370,20 @@ const exportToExcel = () => {
           clearable
           @update:model-value="handleSearch"
         />
+        <div style="min-width: 200px;">
+          <VSelect
+            v-model="selectedBranch"
+            :items="[{ title: 'Semua Cabang', value: null }, ...branches.map(b => ({ title: b.name, value: b.id }))]"
+            item-title="title"
+            item-value="value"
+            placeholder="Filter Cabang"
+            density="compact"
+            variant="outlined"
+            clearable
+            hide-details
+            @update:model-value="fetchSales"
+          />
+        </div>
         <div style="min-width: 200px;">
           <VSelect
             v-model="selectedBank"
@@ -368,6 +437,10 @@ const exportToExcel = () => {
           <span class="font-weight-bold text-primary font-mono cursor-pointer" @click="viewDetail(item)">
             {{ item.invoice_number }}
           </span>
+        </template>
+        
+        <template #item.total_tax="{ item }">
+          <span class="font-weight-medium font-mono text-error">{{ formatRupiah(item.total_tax || 0) }}</span>
         </template>
         
         <template #item.total_amount="{ item }">

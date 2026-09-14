@@ -301,39 +301,18 @@ class CashReconciliationController extends Controller
             ->where('receivable_payments.payment_method', 'cash')
             ->sum('receivable_payments.amount');
 
-        // 4. Injeksi / Tambahan Modal Masuk Tunai (+)
-        $capitalInjections = DB::table('branch_capitals')
-            ->where('branch_id', $branchId)
-            ->whereDate('date', $date)
-            ->where('type', 'injection')
-            ->whereNotIn('status', ['rejected', 'void'])
-            ->where(function ($q) {
-                $q->where('payment_method', 'Kas Tunai')
-                  ->orWhere('payment_method', 'cash')
-                  ->orWhereNull('payment_method');
-            })
-            ->sum('amount');
+        // 4. Modal sekarang berbentuk BARANG (bukan uang tunai), sehingga tidak mempengaruhi kalkulasi kas laci kasir.
+        // Distribusi modal barang dari Pusat ke Cabang dicatat via modul Distribusi Stok Modal.
+        $capitalInjections = 0;
+        $capitalReturns    = 0;
 
-        // 5. Setoran / Cicilan Pengembalian Modal ke Owner Tunai (-)
-        $capitalReturns = DB::table('branch_capitals')
-            ->where('branch_id', $branchId)
-            ->whereDate('date', $date)
-            ->where('type', 'return')
-            ->whereNotIn('status', ['rejected', 'void'])
-            ->where(function ($q) {
-                $q->where('payment_method', 'Kas Tunai')
-                  ->orWhere('payment_method', 'cash')
-                  ->orWhereNull('payment_method');
-            })
-            ->sum('amount');
-
-        // 6. Pengeluaran Kas Kecil Operasional Tunai (-)
+        // 5. Pengeluaran Kas Kecil Operasional Tunai (-)
         $pettyCashAmount = DB::table('petty_cashes')
             ->where('branch_id', $branchId)
             ->whereDate('date', $date)
             ->sum('amount');
 
-        $expectedCash = ($cashSales + $dpCashSales + $receivableCashPayments + $capitalInjections) - ($capitalReturns + $pettyCashAmount);
+        $expectedCash = ($cashSales + $dpCashSales + $receivableCashPayments) - $pettyCashAmount;
 
         // =========================================================================
         // 7. RINCIAN PENDAPATAN PER REKENING BANK / NON-TUNAI (TRANSFER, QRIS, EDC)
@@ -432,8 +411,8 @@ class CashReconciliationController extends Controller
             'cash_sales_amount'          => (float) $cashSales,
             'dp_cash_amount'             => (float) $dpCashSales,
             'receivable_payments_amount' => (float) $receivableCashPayments,
-            'capital_injections_amount'  => (float) $capitalInjections,
-            'capital_returns_amount'     => (float) $capitalReturns,
+            'capital_injections_amount'  => 0, // Modal kini berbentuk barang, tidak mempengaruhi kas kasir
+            'capital_returns_amount'     => 0, // Modal kini berbentuk barang, tidak mempengaruhi kas kasir
             'petty_cash_amount'          => (float) $pettyCashAmount,
             'expected_cash'              => (float) $expectedCash,
 

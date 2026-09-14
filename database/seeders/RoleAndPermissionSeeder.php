@@ -60,9 +60,7 @@ class RoleAndPermissionSeeder extends Seeder
         $mManajemenOwner = Module::updateOrCreate(['slug' => 'apps/owners'], [
             'name' => 'Manajemen Owner', 'parent_id' => $mMasterData->id, 'sequence' => 6, 'status' => 'Aktif', 'icon' => 'ri-user-star-line'
         ]);
-        $mManajemenKaryawan = Module::updateOrCreate(['slug' => 'apps/employees'], [
-            'name' => 'Manajemen Karyawan', 'parent_id' => $mMasterData->id, 'sequence' => 7, 'status' => 'Aktif', 'icon' => 'ri-user-2-line'
-        ]);
+        // Karyawan moved to Personalia section below
         $mRekeningBank = Module::updateOrCreate(['slug' => 'bank-accounts'], [
             'name' => 'Rekening Bank & Kas', 'parent_id' => $mMasterData->id, 'sequence' => 8, 'status' => 'Aktif', 'icon' => 'ri-bank-card-line'
         ]);
@@ -162,9 +160,29 @@ class RoleAndPermissionSeeder extends Seeder
             'name' => 'Rekap Keuangan & Laba Rugi', 'parent_id' => $mAuditLaporan->id, 'sequence' => 7, 'status' => 'Aktif', 'icon' => 'ri-file-chart-line'
         ]);
 
-        // --- 7. PENGATURAN ---
+        // --- 7. PERSONALIA / HRIS ---
+        $mPersonalia = Module::updateOrCreate(['slug' => 'personalia-main'], [
+            'name' => 'Personalia', 'sequence' => 7, 'category' => 'Personalia', 'status' => 'Aktif', 'icon' => 'ri-team-line', 'parent_id' => null
+        ]);
+        $mManajemenKaryawan = Module::updateOrCreate(['slug' => 'personalia/karyawan'], [
+            'name' => 'Master Karyawan', 'parent_id' => $mPersonalia->id, 'sequence' => 1, 'status' => 'Aktif', 'icon' => 'ri-user-2-line'
+        ]);
+        $mJabatan = Module::updateOrCreate(['slug' => 'personalia/jabatan'], [
+            'name' => 'Jabatan & Departemen', 'parent_id' => $mPersonalia->id, 'sequence' => 2, 'status' => 'Aktif', 'icon' => 'ri-medal-line'
+        ]);
+        $mMasterPotongan = Module::updateOrCreate(['slug' => 'personalia/potongan'], [
+            'name' => 'Master Potongan', 'parent_id' => $mPersonalia->id, 'sequence' => 3, 'status' => 'Aktif', 'icon' => 'ri-money-dollar-box-line'
+        ]);
+        $mPresensi = Module::updateOrCreate(['slug' => 'personalia/presensi'], [
+            'name' => 'Presensi', 'parent_id' => $mPersonalia->id, 'sequence' => 4, 'status' => 'Aktif', 'icon' => 'ri-calendar-check-line'
+        ]);
+        $mPenggajian = Module::updateOrCreate(['slug' => 'personalia/penggajian'], [
+            'name' => 'Penggajian', 'parent_id' => $mPersonalia->id, 'sequence' => 5, 'status' => 'Aktif', 'icon' => 'ri-wallet-3-line'
+        ]);
+
+        // --- 8. PENGATURAN ---
         $mPengaturan = Module::updateOrCreate(['slug' => 'pengaturan'], [
-            'name' => 'Pengaturan', 'sequence' => 7, 'category' => 'Sistem', 'status' => 'Aktif', 'icon' => 'ri-settings-3-line', 'parent_id' => null
+            'name' => 'Pengaturan', 'sequence' => 8, 'category' => 'Sistem', 'status' => 'Aktif', 'icon' => 'ri-settings-3-line', 'parent_id' => null
         ]);
         $mPengguna = Module::updateOrCreate(['slug' => 'apps/pengaturan-pengguna'], [
             'name' => 'Pengguna & PIN Kasir', 'parent_id' => $mPengaturan->id, 'sequence' => 1, 'status' => 'Aktif', 'icon' => 'ri-user-settings-line'
@@ -244,6 +262,13 @@ class RoleAndPermissionSeeder extends Seeder
             'Stock Opname'                => $mStockOpname->id,
             'Closing Shift Kasir'         => $mClosingHarian->id,
             'Rekap Keuangan & Laba Rugi'  => $mRekapTahunan->id,
+            // Personalia
+            'Personalia'                  => $mPersonalia->id,
+            'Master Karyawan'             => $mManajemenKaryawan->id,
+            'Jabatan & Departemen'        => $mJabatan->id,
+            'Master Potongan'             => $mMasterPotongan->id,
+            'Presensi'                    => $mPresensi->id,
+            'Penggajian'                  => $mPenggajian->id,
             // Pengaturan
             'Pengaturan'                  => $mPengaturan->id,
             'Pengguna & PIN Kasir'        => $mPengguna->id,
