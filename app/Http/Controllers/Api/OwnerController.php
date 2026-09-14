@@ -80,12 +80,12 @@ class OwnerController extends Controller
         $data['status'] = in_array(strtolower($rawStatus), ['aktif', 'active']) ? 'Aktif' : 'Nonaktif';
 
         if ($request->hasFile('logo')) {
-            $request->validate(['logo' => 'image|mimes:jpeg,png,jpg|max:2048']);
+            $request->validate(['logo' => 'image|mimes:jpeg,png,jpg|max:5120']);
             $data['logo'] = $request->file('logo')->store('logos', 'public');
         }
 
         if ($request->hasFile('qris_image')) {
-            $request->validate(['qris_image' => 'image|mimes:jpeg,png,jpg|max:2048']);
+            $request->validate(['qris_image' => 'image|mimes:jpeg,png,jpg|max:5120']);
             $data['qris_image'] = $request->file('qris_image')->store('qris', 'public');
         }
 
@@ -128,7 +128,7 @@ class OwnerController extends Controller
         }
 
         if ($request->hasFile('logo')) {
-            $request->validate(['logo' => 'image|mimes:jpeg,png,jpg|max:2048']);
+            $request->validate(['logo' => 'image|mimes:jpeg,png,jpg|max:5120']);
             // Delete old logo
             if ($owner->logo && Storage::disk('public')->exists($owner->logo)) {
                 Storage::disk('public')->delete($owner->logo);
@@ -144,7 +144,7 @@ class OwnerController extends Controller
         }
 
         if ($request->hasFile('qris_image')) {
-            $request->validate(['qris_image' => 'image|mimes:jpeg,png,jpg|max:2048']);
+            $request->validate(['qris_image' => 'image|mimes:jpeg,png,jpg|max:5120']);
             if ($owner->qris_image && Storage::disk('public')->exists($owner->qris_image)) {
                 Storage::disk('public')->delete($owner->qris_image);
             }
