@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y \
     unzip \
     git \
     curl \
+    gnupg \
+    ca-certificates \
     libonig-dev \
     libzip-dev
 
