@@ -74,6 +74,11 @@
   </div>
   
   <script>
+    window.appConfig = {
+      appName: {!! json_encode($ownerName) !!},
+      appLogo: {!! json_encode($seoImage) !!}
+    };
+
     const loaderColor = localStorage.getItem('materialize-initial-loader-bg') || '#FFFFFF'
     const primaryColor = localStorage.getItem('materialize-initial-loader-color') || '#666CFF'
 
