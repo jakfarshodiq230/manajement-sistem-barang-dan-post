@@ -46,7 +46,7 @@ class PermissionController extends Controller
 
     public function store(Request $request)
     {
-        if (!request()->user()->can('Permissions Create')) {
+        if (!request()->user()->can('Hak Akses (Permissions) Create') && !request()->user()->can('Permissions Create')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -58,7 +58,7 @@ class PermissionController extends Controller
 
     public function update(Request $request, $id)
     {
-        if (!request()->user()->can('Permissions Write')) {
+        if (!request()->user()->can('Hak Akses (Permissions) Write') && !request()->user()->can('Permissions Write')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -72,7 +72,7 @@ class PermissionController extends Controller
 
     public function destroy($id)
     {
-        if (!request()->user()->can('Permissions Delete')) {
+        if (!request()->user()->can('Hak Akses (Permissions) Delete') && !request()->user()->can('Permissions Delete')) {
             abort(403, 'Unauthorized action.');
         }
 
