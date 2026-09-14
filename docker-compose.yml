@@ -9,6 +9,8 @@ services:
     tty: true
     ports:
       - "8080:80"
+    volumes:
+      - appstorage:/var/www/storage
     networks:
       - app-network
     environment:
@@ -24,6 +26,8 @@ services:
     depends_on:
       - app
       - redis
+    volumes:
+      - appstorage:/var/www/storage
     networks:
       - app-network
     environment:
@@ -48,4 +52,6 @@ networks:
 
 volumes:
   redisdata:
+    driver: local
+  appstorage:
     driver: local
