@@ -52,7 +52,7 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
-        if (!request()->user()->can('Produk Create')) {
+        if (!request()->user()->can('Data Produk & Barang Create') && !request()->user()->can('Produk Create')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -101,7 +101,7 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
-        if (!request()->user()->can('Produk Write')) {
+        if (!request()->user()->can('Data Produk & Barang Write') && !request()->user()->can('Produk Write')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -151,7 +151,7 @@ class ProductController extends Controller
 
     public function destroy(Product $product)
     {
-        if (!request()->user()->can('Produk Delete')) {
+        if (!request()->user()->can('Data Produk & Barang Delete') && !request()->user()->can('Produk Delete')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -176,7 +176,7 @@ class ProductController extends Controller
 
     public function import(Request $request)
     {
-        if (!$request->user()->can('Produk Create')) {
+        if (!$request->user()->can('Data Produk & Barang Create') && !$request->user()->can('Produk Create')) {
             abort(403, 'Unauthorized action.');
         }
 

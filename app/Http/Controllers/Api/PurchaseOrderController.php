@@ -94,7 +94,7 @@ class PurchaseOrderController extends Controller
     public function store(Request $request)
     {
         $user = $request->user() ?: auth()->user();
-        if ($user && !$user->can('Purchase Order Create') && !$user->can('manage all')) {
+        if ($user && !$user->can('Purchase Order (PO) Create') && !$user->can('Purchase Order Create') && !$user->can('manage all')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -253,7 +253,7 @@ class PurchaseOrderController extends Controller
     public function update(Request $request, $id)
     {
         $user = $request->user() ?: auth()->user();
-        if ($user && !$user->can('Purchase Order Write') && !$user->can('manage all')) {
+        if ($user && !$user->can('Purchase Order (PO) Write') && !$user->can('Purchase Order Write') && !$user->can('manage all')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -398,7 +398,7 @@ class PurchaseOrderController extends Controller
     public function destroy($id)
     {
         $user = request()->user() ?: auth()->user();
-        if ($user && !$user->can('Purchase Order Delete') && !$user->can('manage all')) {
+        if ($user && !$user->can('Purchase Order (PO) Delete') && !$user->can('Purchase Order Delete') && !$user->can('manage all')) {
             abort(403, 'Unauthorized action.');
         }
 

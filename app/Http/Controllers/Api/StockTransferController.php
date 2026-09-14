@@ -300,7 +300,7 @@ class StockTransferController extends Controller
     public function prepare(Request $request, $id)
     {
         $user = $request->user();
-        if ($user && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
+        if ($user && !$user->can('Mutasi Stok Antar Cabang Approve') && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Antar Cabang Validate') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Antar Cabang Write') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses (permission) untuk memvalidasi / menyiapkan mutasi stok.'], 403);
         }
 
@@ -501,7 +501,7 @@ class StockTransferController extends Controller
     public function pickup(Request $request, $id)
     {
         $user = $request->user();
-        if ($user && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
+        if ($user && !$user->can('Mutasi Stok Antar Cabang Approve') && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Antar Cabang Validate') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Antar Cabang Write') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses untuk memvalidasi penjemputan barang.'], 403);
         }
 
@@ -600,7 +600,7 @@ class StockTransferController extends Controller
     public function receive(Request $request, $id)
     {
         $user = $request->user();
-        if ($user && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
+        if ($user && !$user->can('Mutasi Stok Antar Cabang Approve') && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Antar Cabang Validate') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Antar Cabang Write') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses untuk mengonfirmasi penerimaan mutasi stok.'], 403);
         }
 
@@ -793,7 +793,7 @@ class StockTransferController extends Controller
     public function reject(Request $request, $id)
     {
         $user = $request->user();
-        if ($user && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
+        if ($user && !$user->can('Mutasi Stok Antar Cabang Approve') && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Antar Cabang Validate') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Antar Cabang Write') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses untuk menolak mutasi stok.'], 403);
         }
 
@@ -831,7 +831,7 @@ class StockTransferController extends Controller
     public function cancel(Request $request, $id)
     {
         $user = $request->user();
-        if ($user && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
+        if ($user && !$user->can('Mutasi Stok Antar Cabang Approve') && !$user->can('Mutasi Stok Approve') && !$user->can('Mutasi Stok Antar Cabang Validate') && !$user->can('Mutasi Stok Validate') && !$user->can('Mutasi Stok Antar Cabang Write') && !$user->can('Mutasi Stok Write') && !$user->can('manage all')) {
             return response()->json(['message' => 'Anda tidak memiliki hak akses untuk membatalkan mutasi stok.'], 403);
         }
 

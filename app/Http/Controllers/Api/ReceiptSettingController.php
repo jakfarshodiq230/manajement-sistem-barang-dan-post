@@ -20,7 +20,7 @@ class ReceiptSettingController extends Controller
         $user = auth()->user();
         if (!$user) return false;
 
-        return $user->can('Pengaturan Struk Write') || $user->can('Receipt Settings Write') || $user->can('manage all') || $user->can('all') || $user->can('*');
+        return $user->can('Format Struk Kasir Write') || $user->can('Pengaturan Struk Write') || $user->can('Receipt Settings Write') || $user->can('manage all') || $user->can('all') || $user->can('*');
     }
 
     public function store(Request $request)
