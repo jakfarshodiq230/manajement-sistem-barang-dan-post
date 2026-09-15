@@ -141,6 +141,43 @@ class AuthController extends Controller
                                 $abilityRules[] = ['action' => $action, 'subject' => 'Data Pelanggan'];
                                 $abilityRules[] = ['action' => $action, 'subject' => 'Pelanggan'];
                             }
+
+                            // Alias for Akuntansi
+                            if (in_array(strtolower($subject), ['bagan akun (coa)', 'jurnal umum', 'buku besar', 'neraca & laporan keuangan', 'pusat akuntansi'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Akuntansi'];
+                            }
+
+                            // Alias for Piutang
+                            if (in_array(strtolower($subject), ['buku piutang pelanggan', 'piutang'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Data Piutang'];
+                            }
+
+                            // Alias for Audit & Laporan
+                            if (in_array(strtolower($subject), ['stok global multi-cabang'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Stok Global'];
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Stok Saat Ini'];
+                            }
+                            if (in_array(strtolower($subject), ['analisis stok & usia (fefo)'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Analisis Stok'];
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Fast/Slow Moving'];
+                            }
+                            if (in_array(strtolower($subject), ['riwayat kartu stok'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Riwayat Stok'];
+                            }
+                            if (in_array(strtolower($subject), ['closing shift kasir'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Closing Harian'];
+                            }
+                            if (in_array(strtolower($subject), ['rekap keuangan & laba rugi'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Rekap Tahunan'];
+                            }
+
+                            // Alias for Transaksi / POS
+                            if (in_array(strtolower($subject), ['riwayat penjualan', 'transaksi'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Transaksi'];
+                            }
+                            if (in_array(strtolower($subject), ['kasir (pos)', 'kasir'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Kasir'];
+                            }
                         } else {
                             $abilityRules[] = ['action' => strtolower($permName), 'subject' => 'all'];
                         }
