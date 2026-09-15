@@ -18,7 +18,8 @@ class CashShiftController extends Controller
     public function current(Request $request)
     {
         $user = $request->user();
-        $branchId = $user->branch_id ?: ($request->header('X-Branch-Id') ?: 1);
+        $branchIdHeader = $request->header('X-Branch-Id');
+        $branchId = $user->branch_id ?: (in_array($branchIdHeader, ['null', 'undefined', '']) ? null : $branchIdHeader);
 
         $shift = CashShift::withoutGlobalScopes()
             ->where('user_id', $user->id)
@@ -144,7 +145,9 @@ class CashShiftController extends Controller
         ]);
 
         $user = $request->user();
-        $branchId = $request->branch_id ?: ($user->branch_id ?: ($request->header('X-Branch-Id') ?: 1));
+        $branchIdHeader = $request->header('X-Branch-Id');
+        $headerBranch = in_array($branchIdHeader, ['null', 'undefined', '']) ? null : $branchIdHeader;
+        $branchId = $request->branch_id ?: ($user->branch_id ?: $headerBranch);
 
         // Check if there is already an open shift
         $existing = CashShift::withoutGlobalScopes()
