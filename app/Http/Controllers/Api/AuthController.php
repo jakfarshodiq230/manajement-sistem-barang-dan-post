@@ -96,6 +96,51 @@ class AuthController extends Controller
                                 $abilityRules[] = ['action' => $action, 'subject' => 'Keamanan Sistem'];
                                 $abilityRules[] = ['action' => $action, 'subject' => 'Log Keamanan & Akses IP'];
                             }
+
+                            // Alias for Data Produk
+                            if (in_array(strtolower($subject), ['data produk & barang', 'produk'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Produk'];
+                            }
+
+                            // Alias for Purchase Order
+                            if (in_array(strtolower($subject), ['purchase order (po)', 'purchase order'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Purchase Order'];
+                            }
+
+                            // Alias for Mutasi Stok
+                            if (in_array(strtolower($subject), ['mutasi stok antar cabang', 'mutasi stok'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Mutasi Stok'];
+                            }
+
+                            // Alias for Pengaturan Struk
+                            if (in_array(strtolower($subject), ['format struk kasir', 'pengaturan struk', 'receipt settings'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Pengaturan Struk'];
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Receipt Settings'];
+                            }
+
+                            // Alias for Owner
+                            if (in_array(strtolower($subject), ['manajemen owner & cabang', 'manajemen owner', 'owner'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Manajemen Owner'];
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Owner'];
+                            }
+
+                            // Alias for Cabang
+                            if (in_array(strtolower($subject), ['data cabang & toko', 'data cabang', 'cabang'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Data Cabang'];
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Cabang'];
+                            }
+
+                            // Alias for Supplier
+                            if (in_array(strtolower($subject), ['data supplier', 'supplier'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Data Supplier'];
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Supplier'];
+                            }
+
+                            // Alias for Pelanggan
+                            if (in_array(strtolower($subject), ['data pelanggan', 'pelanggan'])) {
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Data Pelanggan'];
+                                $abilityRules[] = ['action' => $action, 'subject' => 'Pelanggan'];
+                            }
                         } else {
                             $abilityRules[] = ['action' => strtolower($permName), 'subject' => 'all'];
                         }
