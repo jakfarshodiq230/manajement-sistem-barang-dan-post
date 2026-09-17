@@ -20,6 +20,14 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  brands: {
+    type: Array,
+    default: () => [],
+  },
+  types: {
+    type: Array,
+    default: () => [],
+  },
 })
 
 const emit = defineEmits([
@@ -45,6 +53,8 @@ const applyImmediately = ref(true)
 
 // Bulk Calculator State
 const selectedCategory = ref(null)
+const selectedBrand = ref(null)
+const selectedType = ref(null)
 const bulkType = ref('percent_up') // 'percent_up', 'percent_down', 'nominal_up', 'nominal_down', 'margin_from_cost'
 const bulkValue = ref(5)
 
@@ -165,6 +175,9 @@ const resetForm = () => {
   }
   searchProduct.value = ''
   searchResults.value = []
+  selectedCategory.value = null
+  selectedBrand.value = null
+  selectedType.value = null
   itemSearch.value = ''
   itemPage.value = 1
 }
@@ -248,7 +261,8 @@ const addProductToItems = product => {
   const { price: defaultPrice, cost: defaultCost, minNego: defaultMinNego, activeBatchesCount } = resolveProductPrice(product)
 
   items.value.push({
-    product_id: product.id,
+      is_selected: true,
+      product_id: product.id,
     sku: product.sku || product.code,
     name: product.name,
     category_name: product.category?.name || 'Umum',
@@ -268,19 +282,21 @@ const addProductToItems = product => {
   searchResults.value = []
 }
 
-// Load all products by category
-const loadProductsByCategory = async () => {
-  if (!selectedCategory.value) {
-    snackbar.showSnackbar('Pilih kategori terlebih dahulu', 'warning')
+// Load products by filter
+const loadCategoryProducts = async () => {
+  if (!selectedCategory.value && !selectedBrand.value && !selectedType.value) {
+    snackbar.showSnackbar('Pilih minimal satu filter (Kategori, Merk, atau Type) untuk dimuat.', 'warning')
     return
   }
 
   isLoadingProducts.value = true
   try {
     const res = await $api('/apps/products', {
-      query: {
-        category_id: selectedCategory.value,
-        itemsPerPage: 100,
+      params: { 
+        category_id: selectedCategory.value || 'all',
+        brand: selectedBrand.value || 'all',
+        type: selectedType.value || 'all',
+        itemsPerPage: -1 
       },
     })
     const list = res.data || (Array.isArray(res) ? res : [])
@@ -293,10 +309,10 @@ const loadProductsByCategory = async () => {
       }
     })
 
-    snackbar.showSnackbar(`Berhasil menambahkan ${addedCount} produk dari kategori terpilih`, 'success')
+    snackbar.showSnackbar(`Berhasil menambahkan ${addedCount} produk dari filter terpilih`, 'success')
   } catch (e) {
     console.error(e)
-    snackbar.showSnackbar('Gagal memuat produk kategori', 'error')
+    snackbar.showSnackbar('Gagal memuat produk berdasarkan filter', 'error')
   } finally {
     isLoadingProducts.value = false
   }
@@ -339,14 +355,15 @@ const onNewMinNegoInput = (item, valOrEvent) => {
 
 // Apply Bulk Adjustment to all selected items
 const applyBulkCalculation = () => {
-  if (items.value.length === 0) {
-    snackbar.showSnackbar('Belum ada produk yang dipilih dalam daftar.', 'warning')
+  const selectedItems = items.value.filter(i => i.is_selected)
+  if (selectedItems.length === 0) {
+    snackbar.showSnackbar('Belum ada produk yang dipilih (dicentang) dalam daftar.', 'warning')
     return
   }
 
   const val = Math.abs(Number(bulkValue.value) || 0)
 
-  items.value.forEach(item => {
+  selectedItems.forEach(item => {
     let calculated = item.old_price
 
     if (bulkType.value === 'percent' || bulkType.value === 'percent_up') {
@@ -373,7 +390,7 @@ const applyBulkCalculation = () => {
     item.new_min_nego_display = formatRupiahNumber(item.new_min_nego_price)
   })
 
-  snackbar.showSnackbar(`Kalkulasi massal berhasil diterapkan ke ${items.value.length} produk!`, 'success')
+  snackbar.showSnackbar(`Kalkulasi massal berhasil diterapkan ke ${selectedItems.length} produk!`, 'success')
 }
 
 // Close Drawer
@@ -387,13 +404,14 @@ const onSubmit = async () => {
   const isValid = await refForm.value?.validate()
   if (!isValid?.valid) return
 
-  if (items.value.length === 0) {
-    snackbar.showSnackbar('Harap pilih minimal 1 produk untuk disesuaikan harganya.', 'error')
+  const selectedItems = items.value.filter(i => i.is_selected)
+  if (selectedItems.length === 0) {
+    snackbar.showSnackbar('Harap centang minimal 1 produk untuk disesuaikan harganya.', 'error')
     return
   }
 
   // Validate price > 0
-  const invalidItem = items.value.find(i => !i.new_price || i.new_price <= 0)
+  const invalidItem = selectedItems.find(i => !i.new_price || i.new_price <= 0)
   if (invalidItem) {
     snackbar.showSnackbar(`Harga baru untuk produk "${invalidItem.name}" harus lebih dari Rp 0.`, 'error')
     return
@@ -409,7 +427,7 @@ const onSubmit = async () => {
       batch_policy: batchPolicy.value,
       notes: notes.value,
       apply_immediately: applyImmediately.value,
-      items: items.value.map(i => ({
+      items: selectedItems.map(i => ({
         product_id: i.product_id,
         old_cost_price: i.old_cost_price,
         new_cost_price: i.new_cost_price,
@@ -456,8 +474,7 @@ const onSubmit = async () => {
     location="end"
     :width="$vuetify.display.mdAndDown ? 850 : 1050"
     style="max-inline-size: 96vw;"
-    @update:model-value="val =
-      disable-resize-watcher> emit('update:isDrawerOpen', val)"
+    @update:model-value="val => emit('update:isDrawerOpen', val)"
   >
     <!-- Header -->
     <div class="d-flex align-center justify-space-between pa-5 border-b bg-var-theme-surface">
@@ -593,30 +610,61 @@ const onSubmit = async () => {
                 </div>
 
                 <VRow align="center" dense>
-                  <VCol cols="12" sm="8">
+                  <!-- Filter Kategori -->
+                  <VCol cols="12" sm="4">
                     <VSelect
                       v-model="selectedCategory"
                       :items="categories"
                       item-title="name"
                       item-value="id"
-                      label="Pilih Kategori Produk"
-                      placeholder="Semua Kategori"
+                      label="Kategori"
+                      placeholder="Semua"
                       density="compact"
                       variant="outlined"
                       clearable
                       hide-details
                     />
                   </VCol>
+                  
+                  <!-- Filter Merk -->
                   <VCol cols="12" sm="4">
+                    <VSelect
+                      v-model="selectedBrand"
+                      :items="brands"
+                      label="Merk"
+                      placeholder="Semua"
+                      density="compact"
+                      variant="outlined"
+                      clearable
+                      hide-details
+                    />
+                  </VCol>
+
+                  <!-- Filter Type -->
+                  <VCol cols="12" sm="4">
+                    <VSelect
+                      v-model="selectedType"
+                      :items="types"
+                      label="Type/Jenis"
+                      placeholder="Semua"
+                      density="compact"
+                      variant="outlined"
+                      clearable
+                      hide-details
+                    />
+                  </VCol>
+
+                  <!-- Tombol Muat -->
+                  <VCol cols="12" class="mt-2">
                     <VBtn
                       variant="tonal"
                       color="primary"
                       prepend-icon="ri-download-cloud-2-line"
                       block
                       :loading="isLoadingProducts"
-                      @click="loadProductsByCategory"
+                      @click="loadCategoryProducts"
                     >
-                      Muat Kategori
+                      Muat Produk Berdasarkan Filter
                     </VBtn>
                   </VCol>
 
@@ -740,6 +788,16 @@ const onSubmit = async () => {
                 <VTable density="comfortable" class="price-adjust-table text-no-wrap" hover>
                   <thead class="bg-var-theme-surface">
                     <tr>
+                      <th style="inline-size: 40px;" class="px-2">
+                        <VCheckbox
+                          :model-value="filteredItems.length > 0 && filteredItems.every(i => i.is_selected)"
+                          :indeterminate="filteredItems.some(i => i.is_selected) && !filteredItems.every(i => i.is_selected)"
+                          density="compact"
+                          hide-details
+                          color="primary"
+                          @update:model-value="val => filteredItems.forEach(i => i.is_selected = val)"
+                        />
+                      </th>
                       <th class="text-caption font-weight-bold" style="inline-size: 40px;">NO</th>
                       <th class="text-caption font-weight-bold" style="min-inline-size: 200px;">PRODUK & SKU</th>
                       <th class="text-caption font-weight-bold text-center" style="min-inline-size: 100px;">BATCH AKTIF</th>
@@ -752,17 +810,25 @@ const onSubmit = async () => {
                   </thead>
                   <tbody>
                     <tr v-if="items.length === 0">
-                      <td colspan="8" class="text-center py-8 text-medium-emphasis">
+                      <td colspan="9" class="text-center py-8 text-medium-emphasis">
                         <VIcon icon="ri-price-tag-3-line" size="32" class="mb-2 text-disabled d-block mx-auto" />
                         Belum ada produk yang dimasukkan ke dokumen penyesuaian harga ini.
                       </td>
                     </tr>
                     <tr v-else-if="paginatedItems.length === 0">
-                      <td colspan="8" class="text-center py-6 text-medium-emphasis">
+                      <td colspan="9" class="text-center py-6 text-medium-emphasis">
                         Tidak ada produk yang cocok dengan pencarian filter "{{ itemSearch }}".
                       </td>
                     </tr>
-                    <tr v-for="(item, idx) in paginatedItems" :key="item.product_id">
+                    <tr v-for="(item, idx) in paginatedItems" :key="item.product_id" :class="!item.is_selected ? 'bg-var-theme-background opacity-50' : ''">
+                      <td class="px-2">
+                        <VCheckbox
+                          v-model="item.is_selected"
+                          density="compact"
+                          hide-details
+                          color="primary"
+                        />
+                      </td>
                       <td class="text-center font-mono text-caption text-medium-emphasis">
                         {{ (itemPage - 1) * itemPerPage + idx + 1 }}
                       </td>
@@ -866,28 +932,28 @@ const onSubmit = async () => {
               </div>
             </VCol>
 
-            <!-- Option Direct Approval -->
-            <VCol cols="12" class="mt-2">
-              <VCard elevation="0" class="border rounded-lg pa-3 bg-var-theme-surface">
-                <VCheckbox
-                  v-model="applyImmediately"
-                  label="Langsung sahkan & terapkan harga baru ini serentak ke kasir POS"
-                  density="compact"
-                  hide-details
-                >
-                  <template #label>
-                    <div>
-                      <div class="text-body-2 font-weight-bold text-high-emphasis">
-                        Langsung Sahkan & Terapkan Harga ke Kasir
+              <!-- Option Direct Approval -->
+              <VCol cols="12" class="mt-2">
+                <VCard elevation="0" class="border rounded-lg pa-3 bg-var-theme-surface">
+                  <VCheckbox
+                    v-model="applyImmediately"
+                    label="Langsung sahkan & terapkan harga baru ini serentak ke kasir POS"
+                    density="compact"
+                    hide-details
+                  >
+                    <template #label>
+                      <div>
+                        <div class="text-body-2 font-weight-bold text-high-emphasis">
+                          Langsung Sahkan & Terapkan Harga ke Kasir
+                        </div>
+                        <div class="text-caption text-medium-emphasis">
+                          Jika dicentang, dokumen akan otomatis berstatus <strong>APPROVED</strong> dan harga di seluruh cabang/kasir langsung berubah. Jika tidak, akan disimpan sebagai <strong>DRAFT</strong> usulan.
+                        </div>
                       </div>
-                      <div class="text-caption text-medium-emphasis">
-                        Jika dicentang, dokumen akan otomatis berstatus <strong>APPROVED</strong> dan harga di seluruh cabang/kasir langsung berubah. Jika tidak, akan disimpan sebagai <strong>DRAFT</strong> usulan.
-                      </div>
-                    </div>
-                  </template>
-                </VCheckbox>
-              </VCard>
-            </VCol>
+                    </template>
+                  </VCheckbox>
+                </VCard>
+              </VCol>
           </VRow>
 
           <!-- Footer Actions -->

@@ -162,6 +162,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetBranchPermission::cla
     Route::apiResource('bank-accounts', \App\Http\Controllers\Api\BankAccountController::class);
 
     // Products endpoints
+    Route::get('products/filters', [\App\Http\Controllers\Api\ProductController::class, 'getFilters']);
     Route::get('products/import-template', [\App\Http\Controllers\Api\ProductController::class, 'importTemplate']);
     Route::post('products/import', [\App\Http\Controllers\Api\ProductController::class, 'import']);
     Route::apiResource('products', \App\Http\Controllers\Api\ProductController::class);

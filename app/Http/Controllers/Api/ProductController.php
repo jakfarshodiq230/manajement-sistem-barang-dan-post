@@ -9,6 +9,16 @@ use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
+    public function getFilters()
+    {
+        $brands = Product::whereNotNull('brand')->where('brand', '!=', '')->distinct()->pluck('brand');
+        $types = Product::whereNotNull('type')->where('type', '!=', '')->distinct()->pluck('type');
+        return response()->json([
+            'brands' => $brands,
+            'types' => $types
+        ]);
+    }
+
     public function index(Request $request)
     {
         $search = $request->query('search');
@@ -28,6 +38,14 @@ class ProductController extends Controller
 
         if ($request->has('category_id') && $request->category_id !== 'all' && $request->category_id !== '') {
             $query->where('category_id', $request->category_id);
+        }
+
+        if ($request->has('brand') && $request->brand !== 'all' && $request->brand !== '') {
+            $query->where('brand', $request->brand);
+        }
+
+        if ($request->has('type') && $request->type !== 'all' && $request->type !== '') {
+            $query->where('type', $request->type);
         }
 
         if ($request->has('status') && $request->status !== 'all' && $request->status !== '') {

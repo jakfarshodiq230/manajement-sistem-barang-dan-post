@@ -13,6 +13,8 @@ const activeTab = ref('documents') // 'documents' or 'history'
 // Shared options
 const branches = ref([])
 const categories = ref([])
+const brands = ref([])
+const types = ref([])
 
 // -------------------------------------------------------------
 // TAB 1: DOKUMEN PENYESUAIAN HARGA
@@ -95,12 +97,15 @@ const formatDate = dateStr => {
 // Fetch Initial Options
 const fetchOptions = async () => {
   try {
-    const [branchRes, catRes] = await Promise.all([
+    const [branchRes, catRes, filtersRes] = await Promise.all([
       $api('/apps/branches').catch(() => []),
       $api('/apps/categories').catch(() => []),
+      $api('/apps/products/filters').catch(() => ({ brands: [], types: [] })),
     ])
     branches.value = Array.isArray(branchRes) ? branchRes : (branchRes.data || [])
     categories.value = Array.isArray(catRes) ? catRes : (catRes.data || [])
+    brands.value = filtersRes.brands || []
+    types.value = filtersRes.types || []
   } catch (e) {
     console.error('Error fetching options:', e)
   }
@@ -674,6 +679,8 @@ onMounted(() => {
       :adjustment-to-edit="editingAdjustment"
       :branches="branches"
       :categories="categories"
+      :brands="brands"
+      :types="types"
       @saved="fetchDocuments"
     />
 
