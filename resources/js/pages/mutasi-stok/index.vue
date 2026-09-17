@@ -1124,6 +1124,7 @@ const printDeliveryNote = () => {
 
     <!-- Create Mutasi Drawer -->
     <AddNewMutasiDrawer
+      v-if="isAddNewDrawerVisible"
       v-model:is-drawer-open="isAddNewDrawerVisible"
       :branches="branches"
       @save-data="saveMutasi"

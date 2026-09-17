@@ -644,7 +644,8 @@ const handleDrawerModelValueUpdate = val => {
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
     @update:model-value="handleDrawerModelValueUpdate"
-  >
+  
+      disable-resize-watcher>
     <!-- Modern Header with Badges -->
     <div class="pa-5 bg-gradient-header border-b d-flex align-center justify-space-between">
       <div>

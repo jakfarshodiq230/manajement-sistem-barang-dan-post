@@ -381,10 +381,12 @@ const printInvoice = () => {
     </VRow>
 
     <!-- 👉 Add Payment Sidebar -->
-    <InvoiceAddPaymentDrawer v-model:is-drawer-open="isAddPaymentSidebarVisible" />
+    <InvoiceAddPaymentDrawer
+      v-if="isAddPaymentSidebarVisible" v-model:is-drawer-open="isAddPaymentSidebarVisible" />
 
     <!-- 👉 Send Invoice Sidebar -->
-    <InvoiceSendInvoiceDrawer v-model:is-drawer-open="isSendPaymentSidebarVisible" />
+    <InvoiceSendInvoiceDrawer
+      v-if="isSendPaymentSidebarVisible" v-model:is-drawer-open="isSendPaymentSidebarVisible" />
   </section>
   <section v-else>
     <VAlert

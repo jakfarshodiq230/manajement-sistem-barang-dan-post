@@ -99,7 +99,8 @@ const handleDrawerModelValueUpdate = val => {
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
     @update:model-value="handleDrawerModelValueUpdate"
-  >
+  
+      disable-resize-watcher>
     <!-- 👉 Title -->
     <AppDrawerHeaderSection
       :title="props.selectedModule ? 'Edit Module' : 'Add New Module'"

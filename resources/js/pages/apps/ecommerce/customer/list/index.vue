@@ -182,6 +182,7 @@ const totalCustomers = computed(() => customerData.value.total)
         </template>
       </VDataTableServer>
     </VCard>
-    <ECommerceAddCustomerDrawer v-model:is-drawer-open="isAddCustomerDrawerOpen" />
+    <ECommerceAddCustomerDrawer
+      v-if="isAddCustomerDrawerOpen" v-model:is-drawer-open="isAddCustomerDrawerOpen" />
   </div>
 </template>

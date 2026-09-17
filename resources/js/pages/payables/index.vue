@@ -849,6 +849,7 @@ const openDetailDrawer = statementId => {
 
     <!-- Drawer Detail & Cicilan Tagihan Bulanan -->
     <PayableDetailDrawer
+      v-if="isDetailDrawerVisible"
       v-model:is-drawer-open="isDetailDrawerVisible"
       :statement-id="selectedStatementId"
       @payment-recorded="onPaymentUpdated"

@@ -283,7 +283,8 @@ const updateOptions = options => {
       </VDataTable>
     </VCard>
 
-    <ECommerceAddCategoryDrawer v-model:is-drawer-open="isAddProductDrawerOpen" />
+    <ECommerceAddCategoryDrawer
+      v-if="isAddProductDrawerOpen" v-model:is-drawer-open="isAddProductDrawerOpen" />
   </div>
 </template>
 

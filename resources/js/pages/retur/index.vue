@@ -465,6 +465,7 @@ const executeReceiveReplacement = async () => {
 
     <!-- Create Drawer -->
     <CreateReturnDrawer
+      v-if="isCreateDrawerVisible"
       v-model:is-drawer-open="isCreateDrawerVisible"
       :branches="branches"
       @return-data="handleCreateReturn"

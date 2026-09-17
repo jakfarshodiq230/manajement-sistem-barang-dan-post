@@ -477,6 +477,7 @@ const executeDelete = async () => {
 
     <!-- Detail & Payment Drawer -->
     <ReceivableDetailDrawer
+      v-if="isDetailDrawerVisible"
       v-model:is-drawer-open="isDetailDrawerVisible"
       :receivable-id="selectedReceivableId"
       @payment-saved="handlePaymentSaved"

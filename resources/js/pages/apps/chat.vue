@@ -129,6 +129,7 @@ const chatContentContainerBg = computed(() => {
   >
     <!-- 👉 user profile sidebar -->
     <VNavigationDrawer
+      v-if="isUserProfileSidebarOpen"
       v-model="isUserProfileSidebarOpen"
       data-allow-mismatch
       temporary
@@ -137,12 +138,14 @@ const chatContentContainerBg = computed(() => {
       class="user-profile-sidebar"
       location="start"
       width="370"
-    >
+    
+      disable-resize-watcher>
       <ChatUserProfileSidebarContent @close="isUserProfileSidebarOpen = false" />
     </VNavigationDrawer>
 
     <!-- 👉 Active Chat sidebar -->
     <VNavigationDrawer
+      v-if="isActiveChatUserProfileSidebarOpen"
       v-model="isActiveChatUserProfileSidebarOpen"
       data-allow-mismatch
       width="374"
@@ -151,12 +154,14 @@ const chatContentContainerBg = computed(() => {
       location="end"
       touchless
       class="active-chat-user-profile-sidebar"
-    >
+    
+      disable-resize-watcher>
       <ChatActiveChatUserProfileSidebarContent @close="isActiveChatUserProfileSidebarOpen = false" />
     </VNavigationDrawer>
 
     <!-- 👉 Left sidebar   -->
     <VNavigationDrawer
+      v-if="isLeftSidebarOpen"
       v-model="isLeftSidebarOpen"
       data-allow-mismatch
       absolute
@@ -166,7 +171,8 @@ const chatContentContainerBg = computed(() => {
       :temporary="$vuetify.display.smAndDown"
       class="chat-list-sidebar"
       :permanent="$vuetify.display.mdAndUp"
-    >
+    
+      disable-resize-watcher>
       <ChatLeftSidebarContent
         v-model:is-drawer-open="isLeftSidebarOpen"
         v-model:search="q"

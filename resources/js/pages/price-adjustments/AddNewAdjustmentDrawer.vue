@@ -456,7 +456,8 @@ const onSubmit = async () => {
     location="end"
     :width="$vuetify.display.mdAndDown ? 850 : 1050"
     style="max-inline-size: 96vw;"
-    @update:model-value="val => emit('update:isDrawerOpen', val)"
+    @update:model-value="val =
+      disable-resize-watcher> emit('update:isDrawerOpen', val)"
   >
     <!-- Header -->
     <div class="d-flex align-center justify-space-between pa-5 border-b bg-var-theme-surface">
@@ -592,7 +593,7 @@ const onSubmit = async () => {
                 </div>
 
                 <VRow align="center" dense>
-                  <VCol cols="12" sm="4">
+                  <VCol cols="12" sm="8">
                     <VSelect
                       v-model="selectedCategory"
                       :items="categories"
@@ -606,8 +607,7 @@ const onSubmit = async () => {
                       hide-details
                     />
                   </VCol>
-
-                  <VCol cols="12" sm="3">
+                  <VCol cols="12" sm="4">
                     <VBtn
                       variant="tonal"
                       color="primary"
@@ -620,7 +620,7 @@ const onSubmit = async () => {
                     </VBtn>
                   </VCol>
 
-                  <VCol cols="12" sm="3">
+                  <VCol cols="12" sm="6" class="mt-2">
                     <VSelect
                       v-model="bulkType"
                       :items="[
@@ -630,20 +630,22 @@ const onSubmit = async () => {
                         { title: 'Turunkan Nominal (-Rp)', value: 'nominal_down' },
                         { title: 'Target Markup Dari HPP (+%)', value: 'margin_from_cost' },
                       ]"
+                      label="Tipe Penyesuaian"
                       density="compact"
                       variant="outlined"
                       hide-details
                     />
                   </VCol>
-
-                  <VCol cols="12" sm="2">
-                    <div class="d-flex gap-1">
+                  <VCol cols="12" sm="6" class="mt-2">
+                    <div class="d-flex gap-2">
                       <VTextField
                         v-model.number="bulkValue"
                         type="number"
+                        label="Nilai"
                         density="compact"
                         variant="outlined"
                         hide-details
+                        class="flex-grow-1"
                       />
                       <VBtn color="primary" @click="applyBulkCalculation">
                         Terapkan

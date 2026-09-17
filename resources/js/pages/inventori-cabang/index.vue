@@ -945,6 +945,7 @@ const confirmDelete = async id => {
   </VCard>
 
     <AddNewProductBranchDrawer
+      v-if="isAddNewDrawerVisible"
       v-model:is-drawer-open="isAddNewDrawerVisible"
       :is-drawer-open="isAddNewDrawerVisible"
       :selected-data="selectedProductBranch"
@@ -958,6 +959,7 @@ const confirmDelete = async id => {
     />
 
     <StockInboundDrawer
+      v-if="isStockDrawerVisible"
       v-model:is-drawer-open="isStockDrawerVisible"
       :is-drawer-open="isStockDrawerVisible"
       :selected-branch-product="selectedProductBranch"

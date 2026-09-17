@@ -398,6 +398,7 @@ const updateSubItemsState = async ({ parentId, items }) => {
 
     <!-- Slide-out Drawer for Add/Edit -->
     <AddNewModuleDrawer
+      v-if="isAddNewModuleDrawerVisible"
       v-model:is-drawer-open="isAddNewModuleDrawerVisible"
       :selected-module="selectedModuleDetail"
       @module-data="saveModule"

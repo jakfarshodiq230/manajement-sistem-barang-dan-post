@@ -450,6 +450,7 @@ const handleFileUpload = async event => {
 
     <!-- Drawer Add/Edit -->
     <AddNewCategoryDrawer
+      v-if="isAddNewCategoryDrawerVisible"
       v-model:is-drawer-open="isAddNewCategoryDrawerVisible"
       :editing-category="editingCategory"
       @category-data="handleCategoryData"

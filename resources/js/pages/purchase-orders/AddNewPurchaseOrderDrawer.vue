@@ -313,30 +313,13 @@ const handleDrawerModelValueUpdate = val => {
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
     @update:model-value="handleDrawerModelValueUpdate"
-  >
+  
+      disable-resize-watcher>
     <!-- Drawer Header -->
-    <div class="d-flex align-center justify-space-between px-6 py-5 border-b bg-gradient-header">
-      <div class="d-flex align-center gap-3">
-        <VAvatar
-          size="42"
-          color="primary"
-          variant="tonal"
-          class="rounded-lg"
-        >
-          <VIcon
-            :icon="props.selectedPo ? 'ri-edit-box-line' : 'ri-file-add-line'"
-            size="24"
-          />
-        </VAvatar>
-        <div>
-          <h5 class="text-h6 font-weight-bold mb-0">
-            {{ props.selectedPo ? 'Edit Purchase Order' : 'Buat Purchase Order Baru' }}
-          </h5>
-          <span class="text-caption text-medium-emphasis">
-            Pemesanan barang ke supplier secara cepat & praktis
-          </span>
-        </div>
-      </div>
+    <div class="d-flex align-center justify-space-between px-6 py-5 border-b">
+      <h6 class="text-h6 font-weight-bold mb-0">
+        {{ props.selectedPo ? 'Edit Purchase Order' : 'Buat Purchase Order Baru' }}
+      </h6>
       <VBtn
         icon="ri-close-line"
         variant="tonal"

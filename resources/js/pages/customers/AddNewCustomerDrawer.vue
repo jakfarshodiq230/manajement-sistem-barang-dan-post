@@ -71,14 +71,19 @@ const creditLimitDisplay = computed({
   },
 })
 
-const handleDrawerModelValueUpdate = val => {
-  emit('update:isDrawerOpen', val)
-  emit('update:is-drawer-open', val)
-  if (!val) {
-    emit('close')
-    emit('cancel')
+const drawerModel = computed({
+  get() {
+    return props.isDrawerOpen
+  },
+  set(val) {
+    emit('update:isDrawerOpen', val)
+    emit('update:is-drawer-open', val)
+    if (!val) {
+      emit('close')
+      emit('cancel')
+    }
   }
-}
+})
 
 const onSubmit = () => {
   emit('saveData', formData.value)
@@ -88,36 +93,19 @@ const onSubmit = () => {
 
 <template>
   <VNavigationDrawer
-    :model-value="props.isDrawerOpen"
+      v-if="drawerModel"
+    v-model="drawerModel"
+    disable-resize-watcher
     temporary
     location="end"
     :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '92vw' : 520)"
     class="scrollable-content"
-    @update:model-value="handleDrawerModelValueUpdate"
   >
     <!-- Header -->
-    <div class="d-flex align-center justify-space-between px-6 py-5 border-b bg-gradient-header">
-      <div class="d-flex align-center gap-3">
-        <VAvatar
-          size="42"
-          color="primary"
-          variant="tonal"
-          class="rounded-lg"
-        >
-          <VIcon
-            :icon="props.selectedCustomer ? 'ri-user-settings-line' : 'ri-user-add-line'"
-            size="24"
-          />
-        </VAvatar>
-        <div>
-          <h5 class="text-h6 font-weight-bold mb-0">
-            {{ props.selectedCustomer ? 'Edit Data Pelanggan' : 'Tambah Pelanggan Baru' }}
-          </h5>
-          <span class="text-caption text-medium-emphasis">
-            Buku kontak pelanggan & batas limit kredit piutang
-          </span>
-        </div>
-      </div>
+    <div class="d-flex align-center justify-space-between px-6 py-5 border-b">
+      <h6 class="text-h6 font-weight-bold mb-0">
+        {{ props.selectedCustomer ? 'Edit Data Pelanggan' : 'Tambah Pelanggan Baru' }}
+      </h6>
       <VBtn
         icon="ri-close-line"
         variant="tonal"

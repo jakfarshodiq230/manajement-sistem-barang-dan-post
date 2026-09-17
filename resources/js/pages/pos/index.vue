@@ -49,6 +49,9 @@ const unlockScreen = () => {
   isScreenLocked.value = false
   sessionStorage.removeItem('pos_screen_locked')
   resetIdleTimer()
+  if (!hasActiveShift.value) {
+    isStartShiftDialogOpen.value = true
+  }
   setTimeout(() => {
     focusSearchInput()
   }, 100)
@@ -167,6 +170,21 @@ const qrisBankAccounts = computed(() => {
   return bankAccounts.value.filter(b => b.type === 'qris')
 })
 
+const availablePaymentTypes = computed(() => {
+  return [
+    { label: 'Cash (Tunai)', value: 'cash' },
+    { label: 'Transfer Bank', value: 'transfer' },
+    { label: 'QRIS', value: 'qris' },
+    { label: 'EDC Debit / Kredit', value: 'edc' }
+  ]
+})
+
+const filteredBankAccounts = computed(() => {
+  if (['transfer', 'edc'].includes(paymentMethod.value)) return bankAccounts.value.filter(b => b.type === 'bank_transfer')
+  if (paymentMethod.value === 'edc') return bankAccounts.value.filter(b => b.type === 'edc_debit' || b.type === 'edc_credit')
+  return []
+})
+
 const fetchBankAccounts = async () => {
   try {
     const res = await $api('/apps/bank-accounts', {
@@ -283,7 +301,7 @@ const checkCurrentShift = async () => {
     hasActiveShift.value = res.has_active_shift
     currentShift.value = res.shift
     shiftSummary.value = res.summary || null
-    if (!res.has_active_shift) {
+    if (!res.has_active_shift && !isScreenLocked.value) {
       isStartShiftDialogOpen.value = true
     }
   } catch (e) {
@@ -1197,7 +1215,7 @@ const confirmAndSubmitCheckout = () => {
       formData.append('dp_amount', dpAmountRaw.value)
       formData.append('dp_payment_method', paymentMethod.value)
       
-      if (paymentMethod.value === 'transfer') {
+      if (['transfer', 'edc'].includes(paymentMethod.value)) {
         formData.append('bank_name', bankName.value)
         formData.append('bank_account_number', bankAccountNumber.value)
         formData.append('bank_account_name', bankAccountName.value)
@@ -1214,7 +1232,7 @@ const confirmAndSubmitCheckout = () => {
     if (paymentMethod.value === 'cash') {
       formData.append('paid_amount', paidAmountRaw.value)
       formData.append('change_amount', changeAmount.value)
-    } else if (paymentMethod.value === 'transfer' || paymentMethod.value === 'qris') {
+    } else if (['transfer', 'qris', 'edc'].includes(paymentMethod.value)) {
       if (selectedBankAccountId.value) {
         formData.append('bank_account_id', selectedBankAccountId.value)
       }
@@ -1961,7 +1979,8 @@ const startNewTransaction = () => {
       location="bottom"
       style="height: 82vh; max-height: 82vh;"
       class="rounded-t-xl"
-    >
+    
+      disable-resize-watcher>
       <div class="pa-4 bg-primary text-white d-flex align-center justify-space-between">
         <div class="d-flex align-center gap-2 font-weight-bold text-subtitle-1">
           <VIcon icon="ri-shopping-cart-2-line" />
@@ -2229,18 +2248,10 @@ const startNewTransaction = () => {
                 inline
               >
                 <VRadio
-                  label="Cash (Tunai)"
-                  value="cash"
-                  color="primary"
-                />
-                <VRadio
-                  label="Transfer Bank"
-                  value="transfer"
-                  color="primary"
-                />
-                <VRadio
-                  label="QRIS"
-                  value="qris"
+                  v-for="opt in availablePaymentTypes"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
                   color="primary"
                 />
               </VRadioGroup>
@@ -2312,17 +2323,19 @@ const startNewTransaction = () => {
           <!-- Dynamic Bank Transfer / EDC Selection from Database -->
           <VExpandTransition>
             <div
-              v-if="(transactionType === 'lunas' || dpAmountRaw > 0) && paymentMethod === 'transfer'"
+              v-if="(transactionType === 'lunas' || dpAmountRaw > 0) && (paymentMethod === 'transfer' || paymentMethod === 'edc')"
               class="mt-4"
             >
               <div class="mb-2">
-                <span class="text-caption font-weight-bold text-high-emphasis">Pilih Rekening Bank Penerima:</span>
+                <span class="text-caption font-weight-bold text-high-emphasis">
+                  Pilih Rekening {{ paymentMethod === 'edc' ? 'EDC' : 'Bank Penerima' }}:
+                </span>
               </div>
 
               <!-- Dynamic Bank Chips -->
-              <div class="mb-3 d-flex align-center gap-2 flex-wrap" v-if="bankAccounts.length > 0">
+              <div class="mb-3 d-flex align-center gap-2 flex-wrap" v-if="filteredBankAccounts.length > 0">
                 <VChip
-                  v-for="b in bankAccounts.filter(acc => acc.type !== 'qris')"
+                  v-for="b in filteredBankAccounts"
                   :key="b.id"
                   size="small"
                   :color="selectedBankAccountId === b.id ? 'primary' : 'default'"
@@ -3007,6 +3020,7 @@ const startNewTransaction = () => {
     </VDialog>
 
     <AddNewCustomerDrawer
+      v-if="isAddCustomerDrawerVisible"
       v-model:is-drawer-open="isAddCustomerDrawerVisible"
       :selected-customer="null"
       @save-data="saveCustomer"
@@ -3750,6 +3764,85 @@ const startNewTransaction = () => {
 }
 .bg-teal-subtle {
   background: #f0fdfa;
+}
+
+/* ========================================================
+   RESPONSIVE MEDIA QUERIES (TABLET & MOBILE)
+   ======================================================== */
+@media (max-width: 1200px) {
+  /* Tablet Landscape */
+  .pos-cart-section {
+    width: 320px !important;
+    min-width: 280px !important;
+  }
+  .pos-product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)) !important;
+  }
+  .pos-header-bar {
+    padding: 0 4px !important;
+  }
+}
+
+@media (max-width: 991px) {
+  /* Tablet Portrait */
+  .pos-main-content {
+    flex-direction: column !important;
+  }
+  .pos-cart-section {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 40% !important;
+    min-height: 280px !important;
+    flex: none !important;
+  }
+  .pos-catalog-section {
+    height: 60% !important;
+    flex: none !important;
+  }
+  .pos-product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Mobile / Small Devices */
+  .pos-cart-section {
+    height: 50% !important;
+    min-height: 350px !important;
+  }
+  .pos-catalog-section {
+    height: 50% !important;
+  }
+  .pos-header-bar {
+    height: auto !important;
+    flex-wrap: wrap !important;
+    padding: 8px !important;
+    gap: 8px !important;
+  }
+  .pos-header-bar > div:first-child {
+    width: 100% !important;
+    justify-content: center !important;
+    margin-bottom: 4px !important;
+  }
+  .pos-header-bar > .d-flex.align-center.gap-2 {
+    width: 100% !important;
+    justify-content: space-around !important;
+  }
+  .pos-product-card {
+    padding: 8px !important;
+  }
+  .pos-product-image {
+    height: 70px !important;
+  }
+  .pos-product-title {
+    font-size: 0.75rem !important;
+  }
+  .pos-product-price {
+    font-size: 0.8rem !important;
+  }
+  .pos-product-stock {
+    font-size: 0.65rem !important;
+  }
 }
 </style>
 

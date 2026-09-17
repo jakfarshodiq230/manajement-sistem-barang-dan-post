@@ -160,10 +160,12 @@ const paymentMethods = [
     </VCol>
 
     <!-- 👉 Invoice send drawer -->
-    <InvoiceSendInvoiceDrawer v-model:is-drawer-open="isSendSidebarActive" />
+    <InvoiceSendInvoiceDrawer
+      v-if="isSendSidebarActive" v-model:is-drawer-open="isSendSidebarActive" />
 
     <!-- 👉 Invoice add payment drawer -->
-    <InvoiceAddPaymentDrawer v-model:is-drawer-open="isAddPaymentSidebarActive" />
+    <InvoiceAddPaymentDrawer
+      v-if="isAddPaymentSidebarActive" v-model:is-drawer-open="isAddPaymentSidebarActive" />
   </VRow>
 
   <section v-else>

@@ -150,13 +150,15 @@ watch(() => route.params, () => {
     class="email-app-layout"
   >
     <VNavigationDrawer
+      v-if="isLeftSidebarOpen"
       v-model="isLeftSidebarOpen"
       data-allow-mismatch
       absolute
       touchless
       location="start"
       :temporary="$vuetify.display.mdAndDown"
-    >
+    
+      disable-resize-watcher>
       <EmailLeftSidebarContent
         :emails-meta="emailsMeta"
         @toggle-compose-dialog-visibility="isComposeDialogVisible = !isComposeDialogVisible"

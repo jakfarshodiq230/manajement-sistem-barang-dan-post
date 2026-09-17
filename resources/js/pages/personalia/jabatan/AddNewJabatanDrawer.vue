@@ -102,7 +102,8 @@ const updateBaseSalary = (val) => {
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
     @update:model-value="handleDrawerModelValueUpdate"
-  >
+  
+      disable-resize-watcher>
     <div class="d-flex align-center pa-6 pb-1">
       <h6 class="text-h6">
         {{ props.position ? 'Edit Jabatan' : 'Tambah Jabatan' }}

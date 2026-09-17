@@ -371,6 +371,7 @@ const handleFileUpload = async event => {
     </VCard>
     
     <AddNewKaryawanDrawer
+      v-if="isAddNewDrawerVisible"
       v-model:is-drawer-open="isAddNewDrawerVisible"
       :selected-data="selectedEmployee"
       :branches-list="branches"

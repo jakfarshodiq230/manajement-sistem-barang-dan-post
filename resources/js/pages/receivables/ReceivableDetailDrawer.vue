@@ -319,7 +319,8 @@ onMounted(() => {
     location="end"
     :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 580)"
     @update:model-value="emit('update:isDrawerOpen', $event)"
-  >
+  
+      disable-resize-watcher>
     <!-- Header -->
     <div class="d-flex align-center pa-6 pb-4">
       <div class="d-flex align-center gap-2">

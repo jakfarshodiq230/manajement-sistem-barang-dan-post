@@ -328,15 +328,14 @@ const executeDeletePO = async () => {
 
 <template>
   <section>
-    <!-- Page Header -->
-    <div class="d-flex flex-wrap align-center justify-space-between gap-4 mb-4">
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-center justify-space-between mb-4 gap-4">
       <div>
-        <h2 class="text-h4 font-weight-bold mb-1 d-flex align-center gap-2">
-          <VIcon icon="ri-shopping-cart-2-line" color="primary" />
-          Purchase Orders & Alur Penerimaan Gudang
+        <h2 class="text-h4 font-weight-bold mb-1">
+          Data Purchase Order (PO)
         </h2>
-        <p class="text-caption text-medium-emphasis mb-0">
-          SOP 4 Tahap: Input PO (Ka. Divisi) &rarr; Validasi Fisik & Faktur (Gudang) &rarr; Validasi Harga & Diskon (Ka. Divisi) &rarr; Stok Masuk
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          Kelola data pemesanan barang ke supplier dan riwayat penerimaan stok.
         </p>
       </div>
       
@@ -703,6 +702,7 @@ const executeDeletePO = async () => {
     </VCard>
 
     <AddNewPurchaseOrderDrawer
+      v-if="isAddNewDrawerVisible"
       v-model:is-drawer-open="isAddNewDrawerVisible"
       :is-drawer-open="isAddNewDrawerVisible"
       :selected-po="selectedPO"

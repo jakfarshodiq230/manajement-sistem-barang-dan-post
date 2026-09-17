@@ -64,7 +64,7 @@ const fetchTransactions = async () => {
   if (!branchId.value) return
   isLoading.value = true
   try {
-    const endpoint = referenceType.value === 'sale' ? '/apps/transactions' : '/apps/purchase-orders'
+    const endpoint = referenceType.value === 'sale' ? '/apps/sales' : '/apps/purchase-orders'
     const res = await $api(endpoint, {
       query: {
         branch_id: branchId.value,
@@ -88,7 +88,7 @@ watch(referenceId, async newVal => {
   
   isLoading.value = true
   try {
-    const endpoint = referenceType.value === 'sale' ? `/apps/transactions/${newVal}` : `/apps/purchase-orders/${newVal}`
+    const endpoint = referenceType.value === 'sale' ? `/apps/sales/${newVal}` : `/apps/purchase-orders/${newVal}`
     const res = await $api(endpoint)
     const data = res.data || res
 
@@ -188,27 +188,13 @@ function resetForm() {
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
     @update:model-value="handleDrawerModelValueUpdate"
-  >
+  
+      disable-resize-watcher>
     <!-- Header -->
-    <div class="d-flex align-center justify-space-between px-6 py-5 border-b bg-gradient-header">
-      <div class="d-flex align-center gap-3">
-        <VAvatar
-          size="42"
-          color="primary"
-          variant="tonal"
-          class="rounded-lg"
-        >
-          <VIcon icon="ri-refund-2-line" size="24" />
-        </VAvatar>
-        <div>
-          <h5 class="text-h6 font-weight-bold mb-0">
-            Buat Dokumen Retur Barang
-          </h5>
-          <span class="text-caption text-medium-emphasis">
-            Pengembalian retur penjualan customer / pembelian supplier
-          </span>
-        </div>
-      </div>
+    <div class="d-flex align-center justify-space-between px-6 py-5 border-b">
+      <h6 class="text-h6 font-weight-bold mb-0">
+        Buat Dokumen Retur Barang
+      </h6>
       <VBtn
         icon="ri-close-line"
         variant="tonal"

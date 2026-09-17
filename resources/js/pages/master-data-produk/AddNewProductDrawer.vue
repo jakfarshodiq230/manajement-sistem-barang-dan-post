@@ -152,31 +152,14 @@ const onSubmit = () => {
     location="end"
     class="scrollable-content"
     :model-value="props.isDrawerOpen"
-    @update:model-value="val => emit('update:isDrawerOpen', val)"
+    @update:model-value="val =
+      disable-resize-watcher> emit('update:isDrawerOpen', val)"
   >
     <!-- Header -->
-    <div class="d-flex align-center justify-space-between px-6 py-5 border-b bg-gradient-header">
-      <div class="d-flex align-center gap-3">
-        <VAvatar
-          size="42"
-          color="primary"
-          variant="tonal"
-          class="rounded-lg"
-        >
-          <VIcon
-            :icon="id ? 'ri-edit-box-line' : 'ri-box-3-line'"
-            size="24"
-          />
-        </VAvatar>
-        <div>
-          <h5 class="text-h6 font-weight-bold mb-0">
-            {{ id ? 'Edit Master Produk' : 'Tambah Master Produk Baru' }}
-          </h5>
-          <span class="text-caption text-medium-emphasis">
-            Katalog data induk barang & spesifikasi umum
-          </span>
-        </div>
-      </div>
+    <div class="d-flex align-center justify-space-between px-6 py-5 border-b">
+      <h6 class="text-h6 font-weight-bold mb-0">
+        {{ id ? 'Edit Master Produk' : 'Tambah Master Produk Baru' }}
+      </h6>
       <VBtn
         icon="ri-close-line"
         variant="tonal"

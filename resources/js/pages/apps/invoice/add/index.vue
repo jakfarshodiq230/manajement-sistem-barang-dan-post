@@ -166,5 +166,6 @@ const removeProduct = id => {
   </VRow>
 
   <!-- 👉 Send Invoice Sidebar -->
-  <InvoiceSendInvoiceDrawer v-model:is-drawer-open="isSendPaymentSidebarVisible" />
+  <InvoiceSendInvoiceDrawer
+      v-if="isSendPaymentSidebarVisible" v-model:is-drawer-open="isSendPaymentSidebarVisible" />
 </template>

@@ -408,9 +408,10 @@ const executeDeleteSupplier = async isConfirmed => {
     </VCard>
 
     <AddNewSupplierDrawer
+      v-if="isAddNewDrawerVisible"
       v-model:is-drawer-open="isAddNewDrawerVisible"
       :selected-supplier="selectedSupplier"
-      @supplier-data="saveSupplier"
+      @save-data="saveSupplier"
     />
 
     <SimpleConfirmDialog

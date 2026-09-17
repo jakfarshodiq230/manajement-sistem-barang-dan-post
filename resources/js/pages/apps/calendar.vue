@@ -54,6 +54,7 @@ const calendarApi = ref(null)
       <VLayout style="z-index: 0;">
         <!-- 👉 Navigation drawer -->
         <VNavigationDrawer
+      v-if="isLeftSidebarOpen"
           v-model="isLeftSidebarOpen"
           data-allow-mismatch
           width="300"
@@ -62,7 +63,8 @@ const calendarApi = ref(null)
           location="start"
           class="calendar-add-event-drawer"
           :temporary="$vuetify.display.mdAndDown"
-        >
+        
+      disable-resize-watcher>
           <div class="pa-5">
             <VBtn
               block

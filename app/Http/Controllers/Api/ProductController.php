@@ -26,6 +26,14 @@ class ProductController extends Controller
             });
         }
 
+        if ($request->has('category_id') && $request->category_id !== 'all' && $request->category_id !== '') {
+            $query->where('category_id', $request->category_id);
+        }
+
+        if ($request->has('status') && $request->status !== 'all' && $request->status !== '') {
+            $query->where('status', $request->status);
+        }
+
         $query->orderBy('created_at', 'desc');
 
         if ($itemsPerPage == -1) {

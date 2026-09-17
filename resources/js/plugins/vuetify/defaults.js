@@ -144,5 +144,6 @@ export default {
   },
   VNavigationDrawer: {
     touchless: true,
+    disableResizeWatcher: true,
   },
 }

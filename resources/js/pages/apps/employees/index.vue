@@ -487,6 +487,7 @@ const headers = [
     </VCard>
 
     <AddNewEmployeeDrawer
+      v-if="isDrawerOpen"
       v-model:is-drawer-open="isDrawerOpen"
       :selected-employee="selectedEmployee"
       :branches-list="branches"

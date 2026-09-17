@@ -918,11 +918,13 @@ onMounted(() => {
 
     <!-- Drawer Form Tambah / Edit Rekening Bank -->
     <VNavigationDrawer
+      v-if="isDrawerOpen"
       v-model="isDrawerOpen"
       location="end"
       temporary
       :width="$vuetify.display.xs ? '100%' : ($vuetify.display.smAndDown ? '90vw' : 500)"
-    >
+    
+      disable-resize-watcher>
       <div class="d-flex flex-column h-100">
         <div class="pa-5 border-b bg-gradient-header d-flex justify-space-between align-center">
           <div class="d-flex align-center gap-3">

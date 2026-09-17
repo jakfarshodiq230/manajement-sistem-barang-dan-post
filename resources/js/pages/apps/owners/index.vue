@@ -1,7 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import AddNewOwnerDrawer from './AddNewOwnerDrawer.vue'
-import SimpleConfirmDialog from '@/components/dialogs/SimpleConfirmDialog.vue'
+import { ref, onMounted } from 'vue'
 import { useSnackbarStore } from '@/stores/snackbar'
 
 definePage({
@@ -10,434 +8,313 @@ definePage({
   },
 })
 
-const owners = ref([])
-const search = ref('')
-const selectedType = ref('all')
-const isLoading = ref(false)
-
-// Pagination
-const page = ref(1)
-const itemsPerPage = ref(10)
-const totalItems = ref(0)
-let searchTimeout = null
-const isDrawerOpen = ref(false)
-const selectedOwner = ref(null)
-
-const isConfirmDeleteDialogVisible = ref(false)
-const ownerToDelete = ref(null)
-
 const snackbar = useSnackbarStore()
+const isLoading = ref(false)
+const isSaving = ref(false)
 
-const stats = computed(() => {
-  const all = owners.value || []
-  const total = totalItems.value || all.length
-  const main = all.filter(o => !o.parent_id).length
-  const sub = all.filter(o => !!o.parent_id).length
-  return { total, main, sub }
+const ownerForm = ref({
+  id: null,
+  name: '',
+  email: '',
+  phone: '',
+  address: '',
+  logo: null,
+  qris_image: null,
 })
 
-const fetchOwners = async () => {
+const previewLogo = ref(null)
+const previewQris = ref(null)
+
+const fetchOwnerProfile = async () => {
   isLoading.value = true
   try {
-    const params = {
-      page: page.value,
-      itemsPerPage: itemsPerPage.value,
-    }
-    
-    if (search.value) {
-      params.search = search.value
-    }
-    
-    const data = await $api('/apps/owners', { query: params })
-
-    owners.value = data.data || data
-    if (data.total !== undefined) {
-      totalItems.value = data.total
+    // Assuming we fetch all and take the first one since it's a single owner system
+    const data = await $api('/apps/owners', { query: { page: 1, itemsPerPage: 1 } })
+    const ownersList = data.data || data
+    if (ownersList && ownersList.length > 0) {
+      const owner = ownersList[0]
+      ownerForm.value = {
+        id: owner.id,
+        name: owner.name || '',
+        email: owner.email || '',
+        phone: owner.phone || '',
+        address: owner.address || '',
+        logo: null, // Keep null for file input
+        qris_image: null,
+      }
+      previewLogo.value = owner.logo ? `/storage/${owner.logo}` : null
+      previewQris.value = owner.qris_image ? `/storage/${owner.qris_image}` : null
     }
   } catch (error) {
     console.error(error)
-    snackbar.show('Gagal memuat data owner', 'error')
+    snackbar.show('Gagal memuat profil owner', 'error')
   } finally {
     isLoading.value = false
   }
 }
 
-const handleSearch = () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    page.value = 1
-    fetchOwners()
-  }, 400)
-}
-
 onMounted(() => {
-  fetchOwners()
+  fetchOwnerProfile()
 })
 
-const openAddDrawer = () => {
-  selectedOwner.value = null
-  isDrawerOpen.value = true
-}
-
-const editOwner = owner => {
-  selectedOwner.value = owner
-  isDrawerOpen.value = true
-}
-
-const confirmDeleteOwner = id => {
-  ownerToDelete.value = id
-  isConfirmDeleteDialogVisible.value = true
-}
-
-const executeDeleteOwner = async isConfirmed => {
-  if (!isConfirmed) return
-  
-  try {
-    await $api(`/apps/owners/${ownerToDelete.value}`, { method: 'DELETE' })
-    snackbar.show('Owner berhasil dihapus', 'success')
-    fetchOwners()
-  } catch (error) {
-    console.error(error)
-    snackbar.show('Gagal menghapus owner. Pastikan tidak ada cabang terkait.', 'error')
-  } finally {
-    ownerToDelete.value = null
+const handleLogoChange = (file) => {
+  const f = Array.isArray(file) ? file[0] : file
+  if (f instanceof File) {
+    previewLogo.value = URL.createObjectURL(f)
+  } else if (!f) {
+    previewLogo.value = null
   }
 }
 
-const saveOwner = async ownerData => {
+const handleQrisChange = (file) => {
+  const f = Array.isArray(file) ? file[0] : file
+  if (f instanceof File) {
+    previewQris.value = URL.createObjectURL(f)
+  } else if (!f) {
+    previewQris.value = null
+  }
+}
+
+const saveProfile = async () => {
+  isSaving.value = true
   try {
     const formData = new FormData()
-    for (const key in ownerData) {
-      if (key === 'logo' || key === 'qris_image') {
-        if (ownerData[key] instanceof File) {
-          formData.append(key, ownerData[key])
-        }
-      } else if (key === 'parent_id') {
-        if (ownerData[key] && ownerData[key] !== 'null' && ownerData[key] !== '') {
-          formData.append(key, ownerData[key])
-        }
-      } else if (ownerData[key] !== null && ownerData[key] !== undefined && ownerData[key] !== '') {
-        formData.append(key, ownerData[key])
-      }
+    
+    if (ownerForm.value.name) formData.append('name', ownerForm.value.name)
+    if (ownerForm.value.email) formData.append('email', ownerForm.value.email)
+    if (ownerForm.value.phone) formData.append('phone', ownerForm.value.phone)
+    if (ownerForm.value.address) formData.append('address', ownerForm.value.address)
+    formData.append('status', 'Aktif')
+
+    let logoFile = Array.isArray(ownerForm.value.logo) ? ownerForm.value.logo[0] : ownerForm.value.logo
+    if (logoFile instanceof File) {
+      formData.append('logo', logoFile)
     }
 
-    if (ownerData.id) {
+    let qrisFile = Array.isArray(ownerForm.value.qris_image) ? ownerForm.value.qris_image[0] : ownerForm.value.qris_image
+    if (qrisFile instanceof File) {
+      formData.append('qris_image', qrisFile)
+    }
+
+    if (ownerForm.value.id) {
       formData.append('_method', 'PUT')
-      await $api(`/apps/owners/${ownerData.id}`, {
+      await $api(`/apps/owners/${ownerForm.value.id}`, {
         method: 'POST',
         body: formData,
       })
-      snackbar.show('Data owner berhasil diperbarui', 'success')
     } else {
       await $api('/apps/owners', {
         method: 'POST',
         body: formData,
       })
-      snackbar.show('Owner baru berhasil ditambahkan', 'success')
     }
-    fetchOwners()
+    snackbar.show('Profil perusahaan berhasil diperbarui', 'success')
+    fetchOwnerProfile()
   } catch (error) {
     console.error(error)
-    const errMsg = error?.response?._data?.message || error?.data?.message || 'Terjadi kesalahan saat menyimpan data owner'
+    const errMsg = error?.response?._data?.message || error?.data?.message || 'Gagal menyimpan profil'
     snackbar.show(errMsg, 'error')
+  } finally {
+    isSaving.value = false
   }
 }
-
-const tableHeaders = [
-  { title: 'IDENTITAS OWNER / PERUSAHAAN', key: 'name' },
-  { title: 'STRUKTUR HIERARKI', key: 'hierarchy' },
-  { title: 'KONTAK RESMI', key: 'contact', sortable: false },
-  { title: 'TOTAL CABANG', key: 'branches_count', align: 'center', sortable: false },
-  { title: 'STATUS', key: 'status', align: 'center' },
-  { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
-]
-
-const flatTableData = computed(() => {
-  let list = Array.isArray(owners.value) ? owners.value : (owners.value?.data || [])
-  if (selectedType.value === 'main') {
-    list = list.filter(o => !o.parent_id)
-  } else if (selectedType.value === 'sub') {
-    list = list.filter(o => !!o.parent_id)
-  }
-  return Array.isArray(list) ? list.map(item => ({
-    ...item,
-    is_sub: !!item.parent_id,
-    parent_name: item.parent?.name || 'Owner Utama',
-  })) : []
-})
 </script>
 
 <template>
-  <div class="pa-4">
-    <!-- Header -->
-    <div class="d-flex flex-wrap align-center justify-space-between mb-4 gap-4">
-      <div>
-        <h2 class="text-h4 font-weight-bold mb-1">
-          Manajemen Pemilik Bisnis (Owner & Sub-Owner)
-        </h2>
-        <p class="text-body-2 text-medium-emphasis mb-0">
-          Kelola kepemilikan bisnis, entitas PT/CV induk, sub-owner mitra, dan alokasi cabang terkait.
-        </p>
-      </div>
-      
-      <div class="d-flex gap-3">
-        <VBtn
-          color="secondary"
-          variant="tonal"
-          prepend-icon="ri-refresh-line"
-          :loading="isLoading"
-          @click="fetchOwners"
-        >
-          Muat Ulang
-        </VBtn>
-
-        <VBtn
-          color="primary"
-          prepend-icon="ri-add-line"
-          @click="openAddDrawer"
-        >
-          Tambah Owner Baru
-        </VBtn>
-      </div>
+  <div class="pa-4 max-w-1200 mx-auto">
+    <div class="mb-6">
+      <h2 class="text-h4 font-weight-bold mb-1">
+        Profil Perusahaan
+      </h2>
+      <p class="text-body-2 text-medium-emphasis mb-0">
+        Kelola informasi utama dan identitas perusahaan Anda.
+      </p>
     </div>
 
-    <!-- KPI Summary Row -->
-    <VRow class="mb-4">
-      <VCol cols="12" sm="4">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
-          <div class="d-flex align-center justify-space-between">
-            <div>
-              <div class="text-caption text-primary font-weight-bold">TOTAL OWNER TERDATA</div>
-              <div class="text-h4 font-weight-bold text-primary mt-1">{{ stats.total }} <span class="text-caption text-medium-emphasis">Entitas</span></div>
-            </div>
-            <VAvatar color="primary" variant="tonal" rounded size="44">
-              <VIcon icon="ri-user-star-line" size="24" />
-            </VAvatar>
-          </div>
-          <div class="text-caption text-medium-emphasis mt-2">Seluruh pemegang hak usaha</div>
-        </VCard>
-      </VCol>
-
-      <VCol cols="12" sm="4">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success">
-          <div class="d-flex align-center justify-space-between">
-            <div>
-              <div class="text-caption text-success font-weight-bold">OWNER UTAMA (HOLDING)</div>
-              <div class="text-h4 font-weight-bold text-success mt-1">{{ stats.main }} <span class="text-caption text-medium-emphasis">Induk</span></div>
-            </div>
-            <VAvatar color="success" variant="tonal" rounded size="44">
-              <VIcon icon="ri-building-line" size="24" />
-            </VAvatar>
-          </div>
-          <div class="text-caption text-medium-emphasis mt-2">Pemilik modal entitas utama</div>
-        </VCard>
-      </VCol>
-
-      <VCol cols="12" sm="4">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info">
-          <div class="d-flex align-center justify-space-between">
-            <div>
-              <div class="text-caption text-info font-weight-bold">SUB-OWNER / MITRA</div>
-              <div class="text-h4 font-weight-bold text-info mt-1">{{ stats.sub }} <span class="text-caption text-medium-emphasis">Mitra</span></div>
-            </div>
-            <VAvatar color="info" variant="tonal" rounded size="44">
-              <VIcon icon="ri-team-line" size="24" />
-            </VAvatar>
-          </div>
-          <div class="text-caption text-medium-emphasis mt-2">Pemilik unit cabang turunan</div>
-        </VCard>
+    <VRow v-if="isLoading">
+      <VCol cols="12" class="text-center pa-10">
+        <VProgressCircular indeterminate color="primary" size="64" />
       </VCol>
     </VRow>
 
-    <!-- Main Table Card -->
-    <VCard elevation="2">
-      <!-- Card Toolbar -->
-      <VCardItem class="pa-4">
-        <VRow align="center">
-          <VCol cols="12" sm="6" md="4">
-            <VTextField
-              v-model="search"
-              prepend-inner-icon="ri-search-line"
-              placeholder="Cari nama owner, kontak, email..."
-              density="compact"
-              variant="outlined"
-              hide-details
-              clearable
-              @update:model-value="handleSearch"
-            />
-          </VCol>
-
-          <VCol cols="12" sm="6" md="3">
-            <VSelect
-              v-model="selectedType"
-              :items="[
-                { title: 'Semua Tipe Owner', value: 'all' },
-                { title: 'Owner Utama Sahaja', value: 'main' },
-                { title: 'Sub-Owner Sahaja', value: 'sub' }
-              ]"
-              item-title="title"
-              item-value="value"
-              density="compact"
-              variant="outlined"
-              hide-details
-            />
-          </VCol>
-
-          <VCol cols="12" md="5" class="text-right d-none d-md-block">
-            <div class="text-caption text-medium-emphasis">
-              Total Terdaftar: <strong>{{ totalItems }}</strong> Pemilik Usaha
+    <VRow v-else>
+      <VCol cols="12" md="4">
+        <!-- Identity Card -->
+        <VCard elevation="2" class="mb-4 text-center">
+          <VCardText class="pa-6">
+            <div class="d-flex justify-center mb-4">
+              <VAvatar
+                size="120"
+                color="primary"
+                variant="tonal"
+                class="rounded-circle border"
+              >
+                <VImg
+                  v-if="previewLogo"
+                  :src="previewLogo"
+                  cover
+                />
+                <VIcon
+                  v-else
+                  icon="ri-building-line"
+                  size="60"
+                />
+              </VAvatar>
             </div>
-          </VCol>
-        </VRow>
-      </VCardItem>
+            <h3 class="text-h5 font-weight-bold mb-1">
+              {{ ownerForm.name || 'Nama Perusahaan' }}
+            </h3>
+            <p class="text-body-2 text-medium-emphasis mb-4">
+              <VIcon icon="ri-map-pin-2-line" size="16" class="me-1" />
+              {{ ownerForm.address || 'Alamat Belum Diatur' }}
+            </p>
+            <div class="d-flex justify-center gap-4">
+              <VChip color="success" size="small" variant="elevated" class="font-weight-bold">
+                <VIcon icon="ri-checkbox-circle-fill" size="14" class="me-1" />
+                Status Aktif
+              </VChip>
+            </div>
+          </VCardText>
+        </VCard>
 
-      <VDivider />
-
-      <VDataTableServer
-        v-model:items-per-page="itemsPerPage"
-        v-model:page="page"
-        :headers="tableHeaders"
-        :items="flatTableData"
-        :items-length="totalItems"
-        :loading="isLoading"
-        hover
-        class="text-no-wrap"
-        @update:options="fetchOwners"
-      >
-        <!-- Owner Name -->
-        <template #item.name="{ item }">
-          <div class="d-flex align-center py-2">
-            <VAvatar
-              size="40"
-              :color="item.is_sub ? 'info' : 'primary'"
-              variant="tonal"
-              class="me-3 rounded-lg border flex-shrink-0"
+        <!-- QRIS Card -->
+        <VCard elevation="2">
+          <VCardTitle class="pa-4 pb-0 text-subtitle-1 font-weight-bold text-center">
+            QRIS Pembayaran
+          </VCardTitle>
+          <VCardText class="pa-4 text-center">
+            <div
+              class="bg-grey-100 rounded-lg pa-4 d-flex align-center justify-center mx-auto"
+              style="width: 200px; height: 200px; border: 2px dashed #ccc; background: #f8f9fa;"
             >
               <VImg
-                v-if="item.logo"
-                :src="`/storage/${item.logo}`"
-                alt="Logo"
+                v-if="previewQris"
+                :src="previewQris"
                 cover
+                class="rounded"
               />
-              <VIcon
-                v-else
-                :icon="item.is_sub ? 'ri-user-follow-line' : 'ri-user-star-line'"
-                size="22"
-              />
-            </VAvatar>
-            <div>
-              <div class="font-weight-bold text-subtitle-2">{{ item.name }}</div>
-              <div class="text-caption text-disabled">ID Owner: #{{ item.id }}</div>
+              <div v-else class="text-center text-medium-emphasis">
+                <VIcon icon="ri-qr-code-line" size="48" class="mb-2" />
+                <div class="text-caption">Belum ada QRIS</div>
+              </div>
             </div>
-          </div>
-        </template>
+            <p class="text-caption text-medium-emphasis mt-4">
+              Gambar QRIS ini akan ditampilkan pada sistem kasir atau struk pembayaran.
+            </p>
+          </VCardText>
+        </VCard>
+      </VCol>
 
-        <!-- Hierarchy -->
-        <template #item.hierarchy="{ item }">
-          <VChip
-            v-if="!item.is_sub"
-            color="success"
-            size="small"
-            variant="tonal"
-            class="font-weight-bold"
-          >
-            <VIcon icon="ri-shield-star-line" size="14" class="me-1" />
-            Owner Utama (Holding)
-          </VChip>
-          <div v-else class="d-flex align-center gap-1">
-            <VChip
-              color="info"
-              size="small"
-              variant="tonal"
-              class="font-weight-medium"
-            >
-              <VIcon icon="ri-corner-down-right-line" size="14" class="me-1" />
-              Sub: {{ item.parent_name }}
-            </VChip>
-          </div>
-        </template>
+      <VCol cols="12" md="8">
+        <VCard elevation="2">
+          <VCardTitle class="pa-4 font-weight-bold d-flex align-center">
+            <VIcon icon="ri-file-edit-line" class="me-2 text-primary" />
+            Edit Informasi Perusahaan
+          </VCardTitle>
+          <VDivider />
+          <VCardText class="pa-6">
+            <VForm @submit.prevent="saveProfile">
+              <VRow>
+                <VCol cols="12" md="6">
+                  <VTextField
+                    v-model="ownerForm.name"
+                    label="Nama Perusahaan *"
+                    placeholder="Masukkan nama perusahaan"
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="ri-building-line"
+                    :rules="[v => !!v || 'Nama wajib diisi']"
+                  />
+                </VCol>
+                <VCol cols="12" md="6">
+                  <VTextField
+                    v-model="ownerForm.email"
+                    label="Alamat Email *"
+                    type="email"
+                    placeholder="contoh@email.com"
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="ri-mail-line"
+                    :rules="[v => !!v || 'Email wajib diisi']"
+                  />
+                </VCol>
+                <VCol cols="12" md="6">
+                  <VTextField
+                    v-model="ownerForm.phone"
+                    label="Nomor Telepon"
+                    placeholder="0812xxxxxxxx"
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="ri-phone-line"
+                  />
+                </VCol>
+                <VCol cols="12">
+                  <VTextarea
+                    v-model="ownerForm.address"
+                    label="Alamat Lengkap"
+                    placeholder="Masukkan alamat lengkap perusahaan"
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="ri-map-pin-line"
+                    rows="3"
+                  />
+                </VCol>
 
-        <!-- Contact -->
-        <template #item.contact="{ item }">
-          <div class="d-flex flex-column gap-1">
-            <div class="text-caption d-flex align-center">
-              <VIcon size="14" icon="ri-mail-line" class="me-1 text-primary" />
-              <span>{{ item.email || '-' }}</span>
-            </div>
-            <div class="text-caption d-flex align-center">
-              <VIcon size="14" icon="ri-phone-line" class="me-1 text-success" />
-              <span>{{ item.phone || '-' }}</span>
-            </div>
-          </div>
-        </template>
+                <VCol cols="12" md="6">
+                  <VFileInput
+                    v-model="ownerForm.logo"
+                    label="Ubah Logo Perusahaan"
+                    accept="image/png, image/jpeg, image/jpg"
+                    prepend-icon=""
+                    prepend-inner-icon="ri-image-add-line"
+                    variant="outlined"
+                    density="comfortable"
+                    show-size
+                    clearable
+                    hint="Format JPG/PNG. Maksimal 2MB."
+                    persistent-hint
+                    @update:model-value="handleLogoChange"
+                  />
+                </VCol>
+                <VCol cols="12" md="6">
+                  <VFileInput
+                    v-model="ownerForm.qris_image"
+                    label="Ubah Gambar QRIS"
+                    accept="image/png, image/jpeg, image/jpg"
+                    prepend-icon=""
+                    prepend-inner-icon="ri-qr-code-line"
+                    variant="outlined"
+                    density="comfortable"
+                    show-size
+                    clearable
+                    hint="Format JPG/PNG. Maksimal 2MB."
+                    persistent-hint
+                    @update:model-value="handleQrisChange"
+                  />
+                </VCol>
 
-        <!-- Branches Count -->
-        <template #item.branches_count="{ item }">
-          <VChip
-            size="small"
-            variant="tonal"
-            color="primary"
-            class="font-weight-bold"
-          >
-            {{ item.branches_count || (item.branches ? item.branches.length : 0) }} Cabang
-          </VChip>
-        </template>
-
-        <!-- Status -->
-        <template #item.status="{ item }">
-          <VChip
-            :color="item.status === 'Aktif' ? 'success' : 'error'"
-            size="small"
-            variant="elevated"
-            class="font-weight-bold"
-          >
-            <VIcon
-              :icon="item.status === 'Aktif' ? 'ri-checkbox-circle-fill' : 'ri-close-circle-fill'"
-              size="14"
-              class="me-1"
-            />
-            {{ item.status || 'Aktif' }}
-          </VChip>
-        </template>
-
-        <!-- Actions -->
-        <template #item.actions="{ item }">
-          <div class="d-flex align-center justify-center gap-1">
-            <VBtn
-              size="small"
-              variant="text"
-              color="primary"
-              icon="ri-edit-box-line"
-              title="Edit Data Owner"
-              @click="editOwner(item)"
-            />
-            <VBtn
-              size="small"
-              variant="text"
-              color="error"
-              icon="ri-delete-bin-line"
-              title="Hapus Owner"
-              @click="confirmDeleteOwner(item.id)"
-            />
-          </div>
-        </template>
-      </VDataTableServer>
-    </VCard>
-
-    <AddNewOwnerDrawer
-      v-model:is-drawer-open="isDrawerOpen"
-      :selected-owner="selectedOwner"
-      :owners-list="owners"
-      @owner-data="saveOwner"
-    />
-
-    <SimpleConfirmDialog
-      v-model:is-dialog-visible="isConfirmDeleteDialogVisible"
-      title="Hapus Data Owner?"
-      message="Apakah Anda yakin ingin menghapus owner ini? Pastikan tidak ada cabang atau sub-owner yang masih bergantung pada entitas ini."
-      confirm-text="Ya, Hapus"
-      cancel-text="Batal"
-      @confirm="executeDeleteOwner"
-    />
+                <VCol cols="12" class="d-flex justify-end mt-4">
+                  <VBtn
+                    color="primary"
+                    type="submit"
+                    size="large"
+                    :loading="isSaving"
+                    prepend-icon="ri-save-line"
+                  >
+                    Simpan Perubahan
+                  </VBtn>
+                </VCol>
+              </VRow>
+            </VForm>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
   </div>
 </template>
+
+<style scoped>
+.max-w-1200 {
+  max-width: 1200px;
+}
+</style>

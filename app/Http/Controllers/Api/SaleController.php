@@ -145,7 +145,7 @@ class SaleController extends Controller
             'items.*.product_branch_id' => 'required|exists:product_branches,id',
             'items.*.qty' => 'required|integer|min:1',
             'items.*.price' => 'required|numeric|min:0',
-            'payment_method' => 'nullable|in:cash,transfer,qris,tempo',
+            'payment_method' => 'nullable|in:cash,transfer,qris,edc,tempo',
             'bank_account_id' => 'nullable|exists:bank_accounts,id',
             'paid_amount' => 'nullable|numeric|min:0',
             'change_amount' => 'nullable|numeric|min:0',
@@ -158,7 +158,7 @@ class SaleController extends Controller
             'customer_name' => 'nullable|string|max:255',
             'due_date' => 'nullable|date',
             'dp_amount' => 'nullable|numeric|min:0',
-            'dp_payment_method' => 'nullable|in:cash,transfer,qris',
+            'dp_payment_method' => 'nullable|in:cash,transfer,qris,edc',
         ]);
 
         \Illuminate\Support\Facades\DB::beginTransaction();
@@ -230,10 +230,15 @@ class SaleController extends Controller
             if ($request->bank_account_id) {
                 $bankAccount = \App\Models\BankAccount::find($request->bank_account_id);
             }
-            if (!$bankAccount && in_array($paymentMethod, ['transfer', 'bank_transfer', 'qris', 'edc'])) {
-                if ($request->filled('bank_name')) {
-                    $bankAccount = \App\Models\BankAccount::where('bank_name', $request->bank_name)->where('is_active', true)->first();
+            if (!$bankAccount) {
+                if ($paymentMethod === 'cash' || ($paymentMethod === 'tempo' && ($request->dp_payment_method ?? 'cash') === 'cash')) {
+                    $bankAccount = \App\Models\BankAccount::where('type', 'cash')->where('is_active', true)->first();
+                } elseif (in_array($paymentMethod, ['transfer', 'bank_transfer', 'qris', 'edc'])) {
+                    if ($request->filled('bank_name')) {
+                        $bankAccount = \App\Models\BankAccount::where('bank_name', $request->bank_name)->where('is_active', true)->first();
+                    }
                 }
+                
                 if (!$bankAccount) {
                     $bankAccount = \App\Models\BankAccount::where('is_default', true)->where('is_active', true)->first();
                 }

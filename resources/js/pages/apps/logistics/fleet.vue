@@ -149,6 +149,7 @@ watch(activeIndex, () => {
 <template>
   <VLayout class="fleet-app-layout">
     <VNavigationDrawer
+      v-if="isLeftSidebarOpen"
       v-model="isLeftSidebarOpen"
       data-allow-mismatch
       width="320"
@@ -156,7 +157,8 @@ watch(activeIndex, () => {
       touchless
       :border="0"
       location="start"
-    >
+    
+      disable-resize-watcher>
       <VCard
         class="h-100"
         flat

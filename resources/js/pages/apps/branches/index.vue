@@ -555,6 +555,7 @@ const filteredBranches = computed(() => {
     </VCard>
 
     <AddNewBranchDrawer
+      v-if="isDrawerOpen"
       v-model:is-drawer-open="isDrawerOpen"
       :selected-branch="selectedBranch"
       :owners-list="owners"

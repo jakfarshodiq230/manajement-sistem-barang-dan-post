@@ -18,27 +18,29 @@ class BankAccountController extends Controller
     public function index(Request $request)
     {
         $year = (int) $request->query('year', date('Y'));
-        $month = $request->has('month') && $request->month !== '' && $request->month !== null ? (int) $request->month : (int) date('n');
+        $month = $request->has('month') && $request->month !== '' && $request->month !== null && $request->month !== 'null' ? (int) $request->month : (int) date('n');
 
         $query = BankAccount::with('branch:id,name');
 
-        if ($request->has('branch_id') && $request->branch_id !== null && $request->branch_id !== '') {
-            $query->where(function ($q) use ($request) {
-                $q->where('branch_id', $request->branch_id)
+        $branchId = $request->query('branch_id');
+        if ($branchId !== null && $branchId !== '' && $branchId !== 'null') {
+            $query->where(function ($q) use ($branchId) {
+                $q->where('branch_id', $branchId)
                   ->orWhereNull('branch_id'); // Global accounts available to all branches
             });
         }
 
-        if ($request->has('type') && $request->type) {
-            $query->where('type', $request->type);
+        $type = $request->query('type');
+        if ($type !== null && $type !== '' && $type !== 'null') {
+            $query->where('type', $type);
         }
 
-        if ($request->has('is_active')) {
+        if ($request->has('is_active') && $request->is_active !== null && $request->is_active !== '') {
             $query->where('is_active', filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN));
         }
 
-        if ($request->has('search') && $request->search) {
-            $search = $request->search;
+        $search = $request->query('search');
+        if ($search !== null && $search !== '' && $search !== 'null') {
             $query->where(function ($q) use ($search) {
                 $q->where('bank_name', 'like', "%{$search}%")
                   ->orWhere('account_number', 'like', "%{$search}%")
@@ -51,74 +53,114 @@ class BankAccountController extends Controller
             ->orderBy('bank_name', 'asc')
             ->get();
 
+        $startDateMonth = sprintf('%04d-%02d-01', $year, $month);
+        $endDateMonth = date('Y-m-t', strtotime($startDateMonth));
+        $startDateYear = sprintf('%04d-01-01', $year);
+        $endDateYear = sprintf('%04d-12-31', $year);
+
+        $selectedMonthReceived = 0;
+        $selectedMonthTxCount = 0;
+        $selectedYearReceived = 0;
+
         // Calculate Monthly & Yearly Stats for each bank account
         foreach ($accounts as $account) {
             // Selected Month Revenue
-            $account->month_received = (float) DB::table('sales')
+            $salesMonthQuery = DB::table('sales')
                 ->where('bank_account_id', $account->id)
-                ->whereYear('date', $year)
-                ->whereMonth('date', $month)
-                ->where('status', '!=', 'cancelled')
-                ->sum('total_amount');
-
-            $account->month_tx_count = DB::table('sales')
+                ->whereBetween(DB::raw('DATE(COALESCE(date, created_at))'), [$startDateMonth, $endDateMonth])
+                ->where('status', '!=', 'cancelled');
+            
+            if ($branchId !== null && $branchId !== '' && $branchId !== 'null') {
+                $salesMonthQuery->where('branch_id', $branchId);
+            }
+            $salesMonth = $salesMonthQuery->get();
+                
+            $monthReceived = 0;
+            foreach ($salesMonth as $s) {
+                $monthReceived += $s->payment_method === 'tempo' ? (float) $s->dp_amount : (float) $s->total_amount;
+            }
+            
+            // Receivable payments might not have branch_id directly, but if they do, we should filter. 
+            // Assuming receivable_payments is global for the account, or we can just filter by branch if applicable.
+            $recMonthQuery = DB::table('receivable_payments')
                 ->where('bank_account_id', $account->id)
-                ->whereYear('date', $year)
-                ->whereMonth('date', $month)
-                ->where('status', '!=', 'cancelled')
-                ->count();
+                ->whereBetween(DB::raw('DATE(COALESCE(payment_date, created_at))'), [$startDateMonth, $endDateMonth]);
+            // If receivable_payments has branch_id, uncomment below:
+            // if ($branchId !== null && $branchId !== '' && $branchId !== 'null') {
+            //     $recMonthQuery->where('branch_id', $branchId);
+            // }
+            $monthReceivables = (float) $recMonthQuery->sum('amount');
+                
+            $account->month_received = $monthReceived + $monthReceivables;
+            $account->month_tx_count = $salesMonth->count() + $recMonthQuery->count();
 
             // Selected Year Revenue
-            $account->year_received = (float) DB::table('sales')
+            $salesYearQuery = DB::table('sales')
                 ->where('bank_account_id', $account->id)
-                ->whereYear('date', $year)
-                ->where('status', '!=', 'cancelled')
-                ->sum('total_amount');
+                ->whereBetween(DB::raw('DATE(COALESCE(date, created_at))'), [$startDateYear, $endDateYear])
+                ->where('status', '!=', 'cancelled');
+                
+            if ($branchId !== null && $branchId !== '' && $branchId !== 'null') {
+                $salesYearQuery->where('branch_id', $branchId);
+            }
+            $salesYear = $salesYearQuery->get();
+                
+            $yearReceived = 0;
+            foreach ($salesYear as $s) {
+                $yearReceived += $s->payment_method === 'tempo' ? (float) $s->dp_amount : (float) $s->total_amount;
+            }
+            
+            $recYearQuery = DB::table('receivable_payments')
+                ->where('bank_account_id', $account->id)
+                ->whereBetween(DB::raw('DATE(COALESCE(payment_date, created_at))'), [$startDateYear, $endDateYear]);
+            $yearReceivables = (float) $recYearQuery->sum('amount');
+                
+            $account->year_received = $yearReceived + $yearReceivables;
 
-            // 12-Month Trend Array for this bank in selected year
+            // 12-Month Trend Array
             $monthly12 = [];
             for ($m = 1; $m <= 12; $m++) {
-                $monthly12[$m] = (float) DB::table('sales')
+                $sd = sprintf('%04d-%02d-01', $year, $m);
+                $ed = date('Y-m-t', strtotime($sd));
+                
+                $salesMQuery = DB::table('sales')
                     ->where('bank_account_id', $account->id)
-                    ->whereYear('date', $year)
-                    ->whereMonth('date', $m)
-                    ->where('status', '!=', 'cancelled')
-                    ->sum('total_amount');
+                    ->whereBetween(DB::raw('DATE(COALESCE(date, created_at))'), [$sd, $ed])
+                    ->where('status', '!=', 'cancelled');
+                if ($branchId !== null && $branchId !== '' && $branchId !== 'null') {
+                    $salesMQuery->where('branch_id', $branchId);
+                }
+                $salesM = $salesMQuery->get();
+                    
+                $rec = 0;
+                foreach ($salesM as $s) {
+                    $rec += $s->payment_method === 'tempo' ? (float) $s->dp_amount : (float) $s->total_amount;
+                }
+                
+                $rec += (float) DB::table('receivable_payments')
+                    ->where('bank_account_id', $account->id)
+                    ->whereBetween(DB::raw('DATE(COALESCE(payment_date, created_at))'), [$sd, $ed])
+                    ->sum('amount');
+                    
+                $monthly12[$m] = $rec;
             }
             $account->monthly_trend = array_values($monthly12);
+
+            // Accumulate for summary
+            $selectedMonthReceived += $account->month_received;
+            $selectedMonthTxCount += $account->month_tx_count;
+            $selectedYearReceived += $account->year_received;
         }
 
         // Available Years from Sales Data
         $salesYears = DB::table('sales')
-            ->selectRaw('DISTINCT YEAR(date) as yr')
-            ->whereNotNull('date')
+            ->selectRaw('DISTINCT YEAR(COALESCE(date, created_at)) as yr')
             ->pluck('yr')
             ->toArray();
 
         $currentYear = (int) date('Y');
         $yearsList = array_unique(array_merge([$currentYear - 1, $currentYear, $currentYear + 1], array_map('intval', $salesYears)));
         rsort($yearsList);
-
-        // Overall Monthly & Yearly Summary KPI
-        $selectedMonthReceived = (float) DB::table('sales')
-            ->whereYear('date', $year)
-            ->whereMonth('date', $month)
-            ->whereNotNull('bank_account_id')
-            ->where('status', '!=', 'cancelled')
-            ->sum('total_amount');
-
-        $selectedMonthTxCount = DB::table('sales')
-            ->whereYear('date', $year)
-            ->whereMonth('date', $month)
-            ->whereNotNull('bank_account_id')
-            ->where('status', '!=', 'cancelled')
-            ->count();
-
-        $selectedYearReceived = (float) DB::table('sales')
-            ->whereYear('date', $year)
-            ->whereNotNull('bank_account_id')
-            ->where('status', '!=', 'cancelled')
-            ->sum('total_amount');
 
         $totalBalance = (float) $accounts->sum('current_balance');
         $totalInitial = (float) $accounts->sum('initial_balance');

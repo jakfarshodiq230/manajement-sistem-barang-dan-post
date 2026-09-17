@@ -758,6 +758,7 @@ const widgetData = computed(() => [
 
     <!-- 👉 Add New User Drawer -->
     <AddNewUserDrawer
+      v-if="isAddNewUserDrawerVisible"
       v-model:is-drawer-open="isAddNewUserDrawerVisible"
       @user-data="addNewUser"
     />

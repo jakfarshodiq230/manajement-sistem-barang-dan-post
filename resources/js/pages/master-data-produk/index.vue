@@ -619,6 +619,7 @@ const handleFileUpload = async event => {
     </VCard>
 
     <AddNewProductDrawer
+      v-if="isAddNewProductDrawerVisible"
       v-model:is-drawer-open="isAddNewProductDrawerVisible"
       :selected-product="selectedProduct"
       :categories-list="categories"

@@ -466,24 +466,15 @@ const closeDrawer = () => {
     location="end"
     temporary
     width="850"
-    @update:model-value="val => emit('update:isDrawerOpen', val)"
+    @update:model-value="val =
+      disable-resize-watcher> emit('update:isDrawerOpen', val)"
   >
     <div class="d-flex flex-column h-100">
       <!-- Header -->
-      <div class="pa-5 border-b bg-gradient-header d-flex justify-space-between align-center">
-        <div class="d-flex align-center gap-3">
-          <VAvatar color="primary" variant="tonal" size="44" class="rounded-lg">
-            <VIcon icon="ri-calendar-check-line" size="24" />
-          </VAvatar>
-          <div>
-            <h6 class="text-h6 font-weight-bold mb-0">
-              Rekap Tagihan Bulanan & Seleksi Pembayaran Barang
-            </h6>
-            <span class="text-caption text-medium-emphasis">
-              No. Tagihan: <strong>{{ statement?.statement_number || '-' }}</strong>
-            </span>
-          </div>
-        </div>
+      <div class="pa-5 border-b  d-flex justify-space-between align-center">
+      <h6 class="text-h6 font-weight-bold mb-0">
+        Rekap Tagihan Bulanan & Seleksi Pembayaran Barang
+      </h6>
         <div class="d-flex align-center gap-2">
           <VBtn icon="ri-close-line" variant="text" size="small" @click="closeDrawer" />
         </div>

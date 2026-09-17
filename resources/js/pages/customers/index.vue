@@ -424,6 +424,7 @@ const executeDeleteCustomer = async isConfirmed => {
     </VCard>
 
     <AddNewCustomerDrawer
+      v-if="isAddNewDrawerVisible"
       v-model:is-drawer-open="isAddNewDrawerVisible"
       :selected-customer="selectedCustomer"
       @customer-data="saveCustomer"

@@ -669,6 +669,7 @@ onMounted(() => {
 
     <!-- Add / Edit Drawer Component -->
     <AddNewAdjustmentDrawer
+      v-if="isAddDrawerVisible"
       v-model:is-drawer-open="isAddDrawerVisible"
       :adjustment-to-edit="editingAdjustment"
       :branches="branches"

@@ -450,6 +450,7 @@ const deleteUser = async () => {
 
     <!-- Dialogs -->
     <AddNewUserDrawer
+      v-if="isAddUserDrawerOpen"
       v-model:is-drawer-open="isAddUserDrawerOpen"
       @user-data="addNewUser"
     />
