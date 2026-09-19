@@ -12,7 +12,11 @@ export const { themeConfig, layoutConfig } = defineThemeConfig({
     title: window.appConfig?.appName || 'Ms.POS',
 
     // ❗ Logo PNG from public folder or database is used now
-    logo: h('img', { src: window.appConfig?.appLogo || '/logo.png', style: 'height: 30px;' }),
+    logo: h('img', { 
+      src: window.appConfig?.appLogo || '/logo.png', 
+      style: 'height: 30px;',
+      onError: (e) => e.target.src = '/logo.png'
+    }),
     contentWidth: ContentWidth.Boxed,
     contentLayoutNav: AppContentLayoutNav.Vertical,
     overlayNavFromBreakpoint: breakpointsVuetifyV3.lg - 1, // 1 for matching with vuetify breakpoint. Docs: https://next.vuetifyjs.com/en/features/display-and-platform/

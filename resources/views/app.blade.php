@@ -3,9 +3,18 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        
+        @php
+            $owner = \App\Models\Owner::first();
+            $appName = $owner->name ?? config('app.name');
+            $appLogo = $owner && $owner->logo && file_exists(public_path('storage/' . $owner->logo))
+                ? asset('storage/' . $owner->logo)
+                : asset('logo.png');
+            $appEmail = $owner->email ?? 'support@' . request()->getHost();
+        @endphp
 
-        <title inertia>{{ \App\Models\Owner::first()->name ?? config('app.name') }}</title>
-        <link rel="icon" href="{{ \App\Models\Owner::first()->logo ? asset('storage/' . \App\Models\Owner::first()->logo) : asset('logo.png') }}" />
+        <title inertia>{{ $appName }}</title>
+        <link rel="icon" href="{{ $appLogo }}" />
         <!-- Fonts -->
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap">
 
@@ -13,9 +22,9 @@
         
         <script>
             window.appConfig = {
-                appName: "{{ \App\Models\Owner::first()->name ?? config('app.name') }}",
-                appLogo: "{{ \App\Models\Owner::first()->logo ? asset('storage/' . \App\Models\Owner::first()->logo) : asset('logo.png') }}",
-                appEmail: "{{ \App\Models\Owner::first()->email ?? 'support@' . request()->getHost() }}"
+                appName: {!! json_encode($appName) !!},
+                appLogo: {!! json_encode($appLogo) !!},
+                appEmail: {!! json_encode($appEmail) !!}
             };
         </script>
 

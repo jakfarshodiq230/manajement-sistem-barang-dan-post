@@ -12,12 +12,21 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('product_branches', function (Blueprint $table) {
-            $table->decimal('ori_discount_percent', 5, 2)->default(0)->after('status')->comment('Discount percentage for Promo ORI in this branch');
-            $table->decimal('ori_cashback_percent', 5, 2)->default(0)->after('ori_discount_percent')->comment('Cashback percentage for Promo ORI in this branch');
+            if (!Schema::hasColumn('product_branches', 'ori_discount_percent')) {
+                $table->decimal('ori_discount_percent', 5, 2)->default(0)->comment('Discount percentage for Promo ORI in this branch');
+            }
+            if (!Schema::hasColumn('product_branches', 'ori_cashback_percent')) {
+                $table->decimal('ori_cashback_percent', 5, 2)->default(0)->comment('Cashback percentage for Promo ORI in this branch');
+            }
         });
 
         Schema::table('products', function (Blueprint $table) {
-            $table->dropColumn(['ori_discount_percent', 'ori_cashback_percent']);
+            if (Schema::hasColumn('products', 'ori_discount_percent')) {
+                $table->dropColumn('ori_discount_percent');
+            }
+            if (Schema::hasColumn('products', 'ori_cashback_percent')) {
+                $table->dropColumn('ori_cashback_percent');
+            }
         });
     }
 

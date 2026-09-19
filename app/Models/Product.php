@@ -45,6 +45,11 @@ class Product extends Model
         return $this->hasMany(ProductBranch::class);
     }
 
+    public function oriPromos()
+    {
+        return $this->hasMany(ProductOriPromo::class);
+    }
+
     public function getPriceAttribute()
     {
         if ($this->relationLoaded('productBranches')) {

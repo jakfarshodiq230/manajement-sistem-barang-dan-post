@@ -48,8 +48,7 @@ const is_returnable = ref(true)
 const tax_type = ref(null)
 const image = ref(null)
 const previewImage = ref(null)
-const ori_discount_percent = ref(0)
-const ori_cashback_percent = ref(0)
+const ori_promos = ref([])
 
 watch(() => props.selectedProduct, newVal => {
   if (newVal) {
@@ -69,8 +68,7 @@ watch(() => props.selectedProduct, newVal => {
     height.value = newVal.height || null
     is_returnable.value = newVal.is_returnable ?? true
     tax_type.value = newVal.tax_type || null
-    ori_discount_percent.value = newVal.ori_discount_percent || 0
-    ori_cashback_percent.value = newVal.ori_cashback_percent || 0
+    ori_promos.value = newVal.ori_promos ? JSON.parse(JSON.stringify(newVal.ori_promos)) : []
     image.value = null
     previewImage.value = newVal.image ? `/storage/${newVal.image}` : null
   } else {
@@ -90,8 +88,7 @@ watch(() => props.selectedProduct, newVal => {
     height.value = null
     is_returnable.value = true
     tax_type.value = null
-    ori_discount_percent.value = 0
-    ori_cashback_percent.value = 0
+    ori_promos.value = []
     image.value = null
     previewImage.value = null
   }
@@ -135,8 +132,7 @@ const onSubmit = () => {
         height: height.value,
         is_returnable: is_returnable.value ? 1 : 0,
         tax_type: tax_type.value,
-        ori_discount_percent: Number(ori_discount_percent.value) || 0,
-        ori_cashback_percent: Number(ori_cashback_percent.value) || 0,
+        ori_promos: ori_promos.value,
         image: image.value ? image.value[0] : null,
       })
       closeNavigationDrawer()
@@ -434,21 +430,54 @@ const onSubmit = () => {
               </span>
             </div>
 
-            <VRow dense>
-              <VCol cols="12">
-                <VTextField
-                  v-model="ori_discount_percent"
-                  type="number"
-                  label="Diskon Ori"
-                  suffix="%"
-                  placeholder="0"
-                  density="compact"
-                  variant="outlined"
-                  hint="Memotong harga langsung saat kasir mencentang Barang Ori"
-                  persistent-hint
-                />
-              </VCol>
-            </VRow>
+            <div v-for="(promo, index) in ori_promos" :key="index" class="d-flex align-center gap-2 mb-2 p-2 border rounded bg-grey-50">
+              <VTextField
+                v-model="promo.name"
+                label="Nama Promo (Misal: Grosir)"
+                density="compact"
+                variant="outlined"
+                hide-details
+                class="flex-grow-1"
+              />
+              <VSelect
+                v-model="promo.discount_type"
+                :items="[{ title: 'Persen (%)', value: 'percentage' }, { title: 'Nominal (Rp)', value: 'nominal' }]"
+                item-title="title"
+                item-value="value"
+                label="Tipe"
+                density="compact"
+                variant="outlined"
+                hide-details
+                style="max-width: 130px;"
+              />
+              <VTextField
+                v-model="promo.discount_value"
+                type="number"
+                :label="promo.discount_type === 'nominal' ? 'Nominal (Rp)' : 'Nilai (%)'"
+                density="compact"
+                variant="outlined"
+                hide-details
+                style="max-width: 120px;"
+              />
+              <VBtn
+                icon="ri-delete-bin-line"
+                variant="text"
+                color="error"
+                size="small"
+                @click="ori_promos.splice(index, 1)"
+              />
+            </div>
+            
+            <VBtn
+              variant="tonal"
+              color="warning"
+              size="small"
+              prepend-icon="ri-add-line"
+              class="mt-2"
+              @click="ori_promos.push({ name: '', discount_type: 'percentage', discount_value: 0 })"
+            >
+              Tambah Promo ORI
+            </VBtn>
           </div>
 
           <!-- Sticky Action Bar -->

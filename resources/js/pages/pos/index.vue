@@ -962,9 +962,8 @@ const addToCart = (productBranch, batch = null) => {
       price: Math.round(sellingPrice),
       tax_percentage: Number(productBranch.tax_percentage) || 0,
       tax_type: productBranch.product?.tax_type || 'Exclude PPN',
-      ori_discount_percent: Number(productBranch.product?.ori_discount_percent) || 0,
-      ori_cashback_percent: Number(productBranch.product?.ori_cashback_percent) || 0,
-      ori_promo_type: Number(productBranch.product?.ori_discount_percent) > 0 ? 'discount' : (Number(productBranch.product?.ori_cashback_percent) > 0 ? 'cashback' : null),
+      available_ori_promos: productBranch.product?.ori_promos || [],
+      selected_ori_promo: null,
       is_ori: false,
     })
   }
@@ -975,15 +974,12 @@ const removeFromCart = index => {
 }
 
 const getItemOriDiscount = item => {
-  if (item.is_ori && item.ori_promo_type === 'discount' && item.ori_discount_percent > 0) {
-    return (item.price * item.qty) * (item.ori_discount_percent / 100)
-  }
-  return 0
-}
-
-const getItemOriCashback = item => {
-  if (item.is_ori && item.ori_promo_type === 'cashback' && item.ori_cashback_percent > 0) {
-    return (item.price * item.qty) * (item.ori_cashback_percent / 100)
+  if (item.is_ori && item.selected_ori_promo && customerId.value) {
+    if (item.selected_ori_promo.discount_type === 'percentage') {
+      return (item.price * item.qty) * (item.selected_ori_promo.discount_value / 100)
+    } else if (item.selected_ori_promo.discount_type === 'nominal') {
+      return item.selected_ori_promo.discount_value * item.qty
+    }
   }
   return 0
 }
@@ -1254,9 +1250,12 @@ const confirmAndSubmitCheckout = () => {
     if (item.batch_id) {
       formData.append(`items[${index}][batch_id]`, item.batch_id)
     }
-    if (item.is_ori && customerId.value) {
+    if (item.is_ori && customerId.value && item.selected_ori_promo) {
       formData.append(`items[${index}][is_ori]`, 1)
-      formData.append(`items[${index}][ori_promo_type]`, item.ori_promo_type || '')
+      formData.append(`items[${index}][ori_promo_id]`, item.selected_ori_promo.id || '')
+      formData.append(`items[${index}][ori_promo_name]`, item.selected_ori_promo.name || '')
+      formData.append(`items[${index}][ori_promo_discount_type]`, item.selected_ori_promo.discount_type || '')
+      formData.append(`items[${index}][ori_promo_discount_value]`, item.selected_ori_promo.discount_value || 0)
     }
   })
 
@@ -1729,7 +1728,7 @@ const startNewTransaction = () => {
 
                   <!-- Barang Ori Checkbox (Only if applicable) -->
                   <div
-                    v-if="item.ori_discount_percent > 0 || item.ori_cashback_percent > 0"
+                    v-if="item.available_ori_promos && item.available_ori_promos.length > 0"
                     class="mt-2"
                   >
                     <VCheckbox
@@ -1739,24 +1738,21 @@ const startNewTransaction = () => {
                       hide-details
                       class="pos-ori-checkbox"
                       color="primary"
-                      @change="!item.ori_promo_type ? item.ori_promo_type = (item.ori_discount_percent > 0 ? 'discount' : 'cashback') : null"
+                      @change="item.selected_ori_promo = (item.is_ori && item.available_ori_promos?.length > 0) ? item.available_ori_promos[0] : null"
                     />
                     
                     <div v-if="item.is_ori" class="d-flex flex-column gap-1 mt-1 ms-6">
-                      <VRadioGroup v-model="item.ori_promo_type" inline hide-details density="compact">
-                        <VRadio
-                          v-if="item.ori_discount_percent > 0"
-                          :label="`Diskon (${item.ori_discount_percent}%)`"
-                          value="discount"
-                          density="compact"
-                        />
-                        <VRadio
-                          v-if="item.ori_cashback_percent > 0"
-                          :label="`Cashback (${item.ori_cashback_percent}%)`"
-                          value="cashback"
-                          density="compact"
-                        />
-                      </VRadioGroup>
+                      <VSelect
+                        v-model="item.selected_ori_promo"
+                        :items="item.available_ori_promos"
+                        item-title="name"
+                        item-value="id"
+                        return-object
+                        label="Pilih Promo"
+                        density="compact"
+                        variant="outlined"
+                        hide-details
+                      />
                       <div class="text-caption text-error font-weight-medium" style="font-size: 10px;">
                         * Wajib pilih pelanggan di menu Pembayaran.
                       </div>
@@ -1789,9 +1785,7 @@ const startNewTransaction = () => {
                       {{ formatRupiah(item.price * item.qty) }}
                     </div>
                     <span>{{ formatRupiah((item.price * item.qty) - getItemOriDiscount(item)) }}</span>
-                    <div v-if="getItemOriCashback(item) > 0" class="text-warning mt-1" style="font-size: 10px;">
-                      + {{ formatRupiah(getItemOriCashback(item)) }} Poin
-                    </div>
+
                   </div>
                 </div>
               </div>

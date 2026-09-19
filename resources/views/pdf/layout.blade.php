@@ -5,7 +5,7 @@
     <title>@yield('title', 'Dokumen')</title>
     <style>
         @page {
-            margin: 120px 40px 100px 40px; /* Top, Right, Bottom, Left */
+            margin: 150px 40px 100px 40px; /* Top, Right, Bottom, Left */
         }
         body {
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -16,10 +16,10 @@
         }
         header {
             position: fixed;
-            top: -100px;
+            top: -120px;
             left: 0px;
             right: 0px;
-            height: 85px;
+            height: 105px;
             border-bottom: 2px solid #000;
         }
         footer {
@@ -167,9 +167,25 @@
     <header>
         <table class="kop-table">
             <tr>
-                <td class="kop-logo">
-                    @if(isset($branch) && isset($branch->owner) && $branch->owner->logo)
-                        <img src="{{ storage_path('app/public/' . $branch->owner->logo) }}" alt="Logo">
+                <td class="kop-logo" style="width: 110px; text-align: left; vertical-align: middle;">
+                    @php
+                        $ownerLogoPath = null;
+                        if(isset($branch) && isset($branch->owner) && $branch->owner->logo) {
+                            $path = storage_path('app/public/' . $branch->owner->logo);
+                            if(file_exists($path)) {
+                                $ownerLogoPath = $path;
+                            }
+                        }
+                        if(!$ownerLogoPath) {
+                            $fallback = public_path('logo.png');
+                            if(file_exists($fallback)) {
+                                $ownerLogoPath = $fallback;
+                            }
+                        }
+                    @endphp
+
+                    @if($ownerLogoPath)
+                        <img src="{{ $ownerLogoPath }}" alt="Logo" style="max-width: 100px; max-height: 75px; object-fit: contain;">
                     @else
                         <!-- Placeholder jika logo belum diupload -->
                         <div style="width: 70px; height: 70px; line-height: 70px; text-align: center; background: #f0f0f0; border: 1px dashed #999; font-size: 10px; font-weight: bold; color: #666;">LOGO</div>
@@ -238,11 +254,12 @@
 
         <!-- Bagian Tanda Tangan (Tidak Terpotong) -->
         <div class="signature-box clearfix">
-            <div class="qr-section">
+            <div class="qr-section" @if(isset($type) && $type === 'sale') style="margin: 20px auto; float: none;" @endif>
                 <div><img src="data:image/svg+xml;base64,{{ $qrCode ?? '' }}" alt="QR Code"></div>
                 <div class="qr-text">Scan QR Code ini untuk verifikasi keaslian dokumen</div>
             </div>
             
+            @if(!isset($type) || $type !== 'sale')
             <div style="float: right; width: 70%;">
                 @if(isset($type) && $type === 'goods_receipt')
                 <table class="signature-table" style="width: 100%;">
@@ -345,6 +362,7 @@
                 </table>
                 @endif
             </div>
+            @endif
         </div>
     </main>
 </body>

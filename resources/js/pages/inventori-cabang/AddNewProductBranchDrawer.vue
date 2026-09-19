@@ -39,8 +39,6 @@ const price = ref(0)
 const min_nego_price = ref(0)
 const tax_percentage = ref(0)
 const other_fees = ref(0)
-const ori_discount_percent = ref(0)
-const ori_cashback_percent = ref(0)
 
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
@@ -62,8 +60,6 @@ watch(() => props.selectedData, newVal => {
     min_nego_price.value = Math.round(newVal.min_nego_price || 0)
     tax_percentage.value = newVal.tax_percentage || 0
     other_fees.value = Math.round(newVal.other_fees || 0)
-    ori_discount_percent.value = newVal.ori_discount_percent || 0
-    ori_cashback_percent.value = newVal.ori_cashback_percent || 0
   } else {
     id.value = null
     product_id.value = null
@@ -73,8 +69,6 @@ watch(() => props.selectedData, newVal => {
     min_nego_price.value = 0
     tax_percentage.value = 0
     other_fees.value = 0
-    ori_discount_percent.value = 0
-    ori_cashback_percent.value = 0
   }
 }, { immediate: true })
 
@@ -119,8 +113,6 @@ const onSubmit = () => {
         min_nego_price: min_nego_price.value,
         tax_percentage: tax_percentage.value || 0,
         other_fees: other_fees.value || 0,
-        ori_discount_percent: ori_discount_percent.value || 0,
-        ori_cashback_percent: ori_cashback_percent.value || 0,
       })
       closeNavigationDrawer()
     }
@@ -395,47 +387,7 @@ const formatCurrency = value => {
             </VRow>
           </div>
 
-          <VDivider class="my-5" />
 
-          <!-- Section 4: Promo Ori Cabang -->
-          <div class="mb-6">
-            <div class="d-flex align-center gap-2 mb-3">
-              <VIcon icon="ri-percent-line" color="warning" size="18" />
-              <span class="text-subtitle-2 font-weight-bold text-uppercase letter-spacing-1 text-warning">
-                4. Pengaturan Promo Barang Ori (Cabang)
-              </span>
-            </div>
-
-            <VRow dense>
-              <VCol cols="12" md="6">
-                <VTextField
-                  v-model="ori_discount_percent"
-                  type="number"
-                  label="Diskon Ori"
-                  suffix="%"
-                  placeholder="0"
-                  density="compact"
-                  variant="outlined"
-                  hint="Memotong harga langsung saat kasir mencentang Barang Ori"
-                  persistent-hint
-                />
-              </VCol>
-
-              <VCol cols="12" md="6">
-                <VTextField
-                  v-model="ori_cashback_percent"
-                  type="number"
-                  label="Cashback Poin Ori"
-                  suffix="%"
-                  placeholder="0"
-                  density="compact"
-                  variant="outlined"
-                  hint="Masuk ke saldo poin pelanggan saat transaksi selesai"
-                  persistent-hint
-                />
-              </VCol>
-            </VRow>
-          </div>
 
           <!-- Sticky Action Bar -->
           <div class="d-flex align-center gap-3 pt-2">

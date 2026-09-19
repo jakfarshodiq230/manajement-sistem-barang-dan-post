@@ -112,6 +112,7 @@ const tableHeaders = [
   { title: 'PROFIL PELANGGAN', key: 'name' },
   { title: 'INSTANSI / PERUSAHAAN', key: 'company_name' },
   { title: 'KONTAK & WHATSAPP', key: 'phone', sortable: false },
+  { title: 'EMAIL', key: 'email', sortable: false },
   { title: 'PLAFON LIMIT PIUTANG', key: 'credit_limit', align: 'center' },
   { title: 'STATUS', key: 'is_active', align: 'center' },
   { title: 'AKSI', key: 'actions', sortable: false, align: 'center' },
@@ -310,15 +311,17 @@ const executeDeleteCustomer = async isConfirmed => {
 
         <!-- Phone / WA -->
         <template #item.phone="{ item }">
-          <div class="d-flex flex-column gap-1">
-            <div class="text-caption d-flex align-center">
-              <VIcon size="14" icon="ri-phone-line" class="me-1 text-success" />
-              <span>{{ item.phone || '-' }}</span>
-            </div>
-            <div v-if="item.email" class="text-caption d-flex align-center">
-              <VIcon size="14" icon="ri-mail-line" class="me-1 text-primary" />
-              <span>{{ item.email }}</span>
-            </div>
+          <div class="d-flex align-center">
+            <VIcon size="14" icon="ri-phone-line" class="me-1 text-success" />
+            <span>{{ item.phone || '-' }}</span>
+          </div>
+        </template>
+
+        <!-- Email -->
+        <template #item.email="{ item }">
+          <div class="d-flex align-center">
+            <VIcon size="14" icon="ri-mail-line" class="me-1 text-primary" />
+            <span>{{ item.email || '-' }}</span>
           </div>
         </template>
 
@@ -427,7 +430,7 @@ const executeDeleteCustomer = async isConfirmed => {
       v-if="isAddNewDrawerVisible"
       v-model:is-drawer-open="isAddNewDrawerVisible"
       :selected-customer="selectedCustomer"
-      @customer-data="saveCustomer"
+      @save-data="saveCustomer"
     />
 
     <SimpleConfirmDialog

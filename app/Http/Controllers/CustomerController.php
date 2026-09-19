@@ -93,7 +93,8 @@ class CustomerController extends Controller
 
     public function update(Request $request, Customer $customer)
     {
-        if (!request()->user()->can('Data Pelanggan Update') && !request()->user()->can('Data Pelanggan Write')) {
+        $user = request()->user();
+        if ($user && !$user->can('Data Pelanggan Update') && !$user->can('Data Pelanggan Write') && !$user->can('manage all')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -121,7 +122,8 @@ class CustomerController extends Controller
 
     public function destroy(Customer $customer)
     {
-        if (!request()->user()->can('Data Pelanggan Delete')) {
+        $user = request()->user();
+        if ($user && !$user->can('Data Pelanggan Delete') && !$user->can('manage all')) {
             abort(403, 'Unauthorized action.');
         }
 

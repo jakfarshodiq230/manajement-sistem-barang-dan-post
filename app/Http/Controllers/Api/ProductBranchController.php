@@ -10,7 +10,7 @@ class ProductBranchController extends Controller
 {
     public function index(Request $request)
     {
-        $query = ProductBranch::with(['product.category', 'branch', 'productBatches']);
+        $query = ProductBranch::with(['product.category', 'product.oriPromos', 'branch', 'productBatches']);
         
         if ($request->has('branch_id')) {
             $query->where('branch_id', $request->branch_id);
@@ -107,7 +107,7 @@ class ProductBranchController extends Controller
 
     public function show(ProductBranch $productBranch)
     {
-        $productBranch->load(['product', 'branch', 'stockMovements', 'productBatches']);
+        $productBranch->load(['product.category', 'product.oriPromos', 'branch', 'stockMovements', 'productBatches']);
         return response()->json($productBranch);
     }
 

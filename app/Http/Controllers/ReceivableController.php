@@ -90,7 +90,7 @@ class ReceivableController extends Controller
 
     public function show(Receivable $receivable)
     {
-        $receivable->load(['customer', 'sale.branch.owner', 'sale.items.productBranch.product', 'payments.user', 'payments.bankAccount']);
+        $receivable->load(['customer', 'sale.branch.owner', 'sale.items.productBranch.product.oriPromos', 'payments.user', 'payments.bankAccount']);
         return response()->json($receivable);
     }
 
@@ -109,6 +109,9 @@ class ReceivableController extends Controller
             'ori_discounts' => 'nullable|array',
             'ori_discounts.*.sale_item_id' => 'required|exists:sale_items,id',
             'ori_discounts.*.amount' => 'required|numeric|min:0',
+            'ori_discounts.*.promo_name' => 'nullable|string',
+            'ori_discounts.*.discount_type' => 'nullable|string',
+            'ori_discounts.*.discount_value' => 'nullable|numeric',
         ]);
 
         if ($receivable->status === 'paid') {
@@ -194,7 +197,9 @@ class ReceivableController extends Controller
                     if ($discount['amount'] > 0) {
                         \App\Models\SaleItem::where('id', $discount['sale_item_id'])->update([
                             'is_ori' => true,
-                            'ori_promo_type' => 'discount'
+                            'ori_promo_name' => $discount['promo_name'] ?? null,
+                            'ori_promo_discount_type' => $discount['discount_type'] ?? null,
+                            'ori_promo_discount_value' => $discount['discount_value'] ?? null,
                         ]);
                     }
                 }

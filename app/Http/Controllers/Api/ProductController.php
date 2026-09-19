@@ -25,7 +25,7 @@ class ProductController extends Controller
         $itemsPerPage = $request->query('itemsPerPage', 15);
         $page = $request->query('page', 1);
 
-        $query = Product::with(['category', 'productBranches.branch']);
+        $query = Product::with(['category', 'productBranches.branch', 'oriPromos']);
 
         if ($search) {
             $query->where(function($q) use ($search) {
@@ -113,12 +113,24 @@ class ProductController extends Controller
 
         $product = Product::create($data);
 
-        return response()->json(['message' => 'Master Produk berhasil ditambahkan', 'product' => $product->load('category')], 201);
+        if ($request->has('ori_promos') && is_array($request->ori_promos)) {
+            foreach ($request->ori_promos as $promo) {
+                if (!empty($promo['name']) && isset($promo['discount_value'])) {
+                    $product->oriPromos()->create([
+                        'name' => $promo['name'],
+                        'discount_type' => $promo['discount_type'] ?? 'percentage',
+                        'discount_value' => $promo['discount_value'],
+                    ]);
+                }
+            }
+        }
+
+        return response()->json(['message' => 'Master Produk berhasil ditambahkan', 'product' => $product->load(['category', 'oriPromos'])], 201);
     }
 
     public function show(Product $product)
     {
-        $product->load(['category', 'productBranches']);
+        $product->load(['category', 'productBranches', 'oriPromos']);
         return response()->json($product);
     }
 
@@ -166,7 +178,20 @@ class ProductController extends Controller
 
         $product->update($data);
 
-        return response()->json(['message' => 'Master Produk berhasil diperbarui', 'product' => $product->load('category')]);
+        if ($request->has('ori_promos') && is_array($request->ori_promos)) {
+            $product->oriPromos()->delete();
+            foreach ($request->ori_promos as $promo) {
+                if (!empty($promo['name']) && isset($promo['discount_value'])) {
+                    $product->oriPromos()->create([
+                        'name' => $promo['name'],
+                        'discount_type' => $promo['discount_type'] ?? 'percentage',
+                        'discount_value' => $promo['discount_value'],
+                    ]);
+                }
+            }
+        }
+
+        return response()->json(['message' => 'Master Produk berhasil diperbarui', 'product' => $product->load(['category', 'oriPromos'])]);
     }
 
     public function destroy(Product $product)
@@ -184,9 +209,9 @@ class ProductController extends Controller
 
     public function importTemplate(Request $request)
     {
-        $csvContent = "SKU (Wajib),Nama Produk (Wajib),Kategori (Wajib),Barcode,Merek,Satuan,Berat (g),Panjang (cm),Lebar (cm),Tinggi (cm),Metode Stok (fifo/fefo/lifo),Status (Aktif/Nonaktif),Deskripsi,Bisa Retur (Ya/Tidak),Diskon Ori (%),Cashback Ori (%)\n";
+        $csvContent = "SKU (Wajib),Nama Produk (Wajib),Kategori (Wajib),Barcode,Merek,Satuan,Berat (g),Panjang (cm),Lebar (cm),Tinggi (cm),Metode Stok (fifo/fefo/lifo),Status (Aktif/Nonaktif),Deskripsi,Bisa Retur (Ya/Tidak),Diskon Ori Legacy (%),Cashback Ori Legacy (%)\n";
         $csvContent .= "SKU-001,Aki GS Astra Hybrid NS60,Otomotif,8991234567890,GS Astra,Pcs,15000,24,13,20,fifo,Aktif,Aki mobil hybrid,Ya,10,0\n";
-        $csvContent .= "SKU-002,Aqua Botol 600ml,Minuman,8999999999999,Danone,Karton,15000,40,30,25,fefo,Aktif,Air mineral botol 600ml isi 24,Ya,0,5\n";
+        $csvContent .= "SKU-002,Aqua Botol 600ml,Minuman,8999999999999,Danone,Karton,15000,40,30,25,fefo,Aktif,Air mineral botol 600ml isi 24,Ya,0,0\n";
         
         return response($csvContent, 200, [
             'Content-Type' => 'text/csv',
@@ -269,10 +294,20 @@ class ProductController extends Controller
                             'status' => isset($row[11]) && trim($row[11]) !== '' ? ucfirst(strtolower(trim($row[11]))) : 'Aktif',
                             'description' => isset($row[12]) && trim($row[12]) !== '' ? trim($row[12]) : null,
                             'is_returnable' => $isReturnable,
-                            'ori_discount_percent' => isset($row[14]) && is_numeric(trim($row[14])) ? floatval(trim($row[14])) : 0,
-                            'ori_cashback_percent' => isset($row[15]) && is_numeric(trim($row[15])) ? floatval(trim($row[15])) : 0,
                         ]
                     );
+
+                    // Backward compatibility for old CSV files: if Diskon Ori (%) > 0, create a promo
+                    $legacyDiscount = isset($row[14]) && is_numeric(trim($row[14])) ? floatval(trim($row[14])) : 0;
+                    if ($legacyDiscount > 0) {
+                        \App\Models\ProductOriPromo::updateOrCreate(
+                            ['product_id' => $product->id, 'name' => 'Diskon ' . $legacyDiscount . '% (Import)'],
+                            [
+                                'discount_type' => 'percentage',
+                                'discount_value' => $legacyDiscount
+                            ]
+                        );
+                    }
 
                     $count++;
                 }

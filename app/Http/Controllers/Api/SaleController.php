@@ -277,7 +277,6 @@ class SaleController extends Controller
 
             $subtotal = 0;
             $total_tax = 0;
-            $total_cashback_points = 0;
 
             $productBranchIds = collect($request->items)->pluck('product_branch_id')->unique()->toArray();
             $productBranches = \App\Models\ProductBranch::with(['product', 'productBatches' => function($q) {
@@ -307,12 +306,21 @@ class SaleController extends Controller
                 }
 
                 $is_ori = !empty($item['is_ori']) ? (bool)$item['is_ori'] : false;
-                $ori_promo_type = !empty($item['ori_promo_type']) ? $item['ori_promo_type'] : null;
+                $ori_promo_name = !empty($item['ori_promo_name']) ? $item['ori_promo_name'] : null;
+                $ori_promo_discount_type = !empty($item['ori_promo_discount_type']) ? $item['ori_promo_discount_type'] : null;
+                $ori_promo_discount_value = !empty($item['ori_promo_discount_value']) ? (float)$item['ori_promo_discount_value'] : 0;
                 $final_item_price = (float) $item['price'];
 
-                if ($is_ori && $finalCustomerId) {
-                    if ($ori_promo_type === 'discount' && $productBranch->ori_discount_percent > 0) {
-                        $discount_amount = ($final_item_price * (float)$productBranch->ori_discount_percent) / 100;
+                if ($is_ori && $finalCustomerId && $ori_promo_name) {
+                    if ($ori_promo_discount_type === 'percentage' && $ori_promo_discount_value > 0) {
+                        $discount_amount = ($final_item_price * $ori_promo_discount_value) / 100;
+                    } elseif ($ori_promo_discount_type === 'nominal' && $ori_promo_discount_value > 0) {
+                        $discount_amount = $ori_promo_discount_value;
+                    } else {
+                        $discount_amount = 0;
+                    }
+
+                    if ($discount_amount > 0) {
                         $final_item_price -= $discount_amount;
                         $item_subtotal = $item['qty'] * $final_item_price;
                         // Recalculate tax if price drops due to ori discount
@@ -322,8 +330,6 @@ class SaleController extends Controller
                         } else if ($tax_type === 'Include PPN') {
                             $tax_amount = $item_subtotal - ($item_subtotal / (1 + ($tax_percentage / 100)));
                         }
-                    } else if ($ori_promo_type === 'cashback' && $productBranch->ori_cashback_percent > 0) {
-                        $total_cashback_points += ($item_subtotal * (float)$productBranch->ori_cashback_percent) / 100;
                     }
                 }
 
@@ -354,7 +360,9 @@ class SaleController extends Controller
                     'tax_amount' => $tax_amount,
                     'subtotal' => $item_subtotal,
                     'is_ori' => $is_ori,
-                    'ori_promo_type' => $is_ori ? $ori_promo_type : null,
+                    'ori_promo_name' => $is_ori ? $ori_promo_name : null,
+                    'ori_promo_discount_type' => $is_ori ? $ori_promo_discount_type : null,
+                    'ori_promo_discount_value' => $is_ori ? $ori_promo_discount_value : null,
                 ]);
 
                 // Create Stock Movement (Out)
@@ -508,19 +516,7 @@ class SaleController extends Controller
                     ]);
                 }
             }
-            if ($total_cashback_points > 0 && $finalCustomerId) {
-                $customer = \App\Models\Customer::find($finalCustomerId);
-                if ($customer) {
-                    $customer->increment('points', $total_cashback_points);
-                    \App\Models\CustomerPointHistory::create([
-                        'customer_id' => $finalCustomerId,
-                        'sale_id' => $sale->id,
-                        'type' => 'earned',
-                        'points' => $total_cashback_points,
-                        'description' => 'Cashback Barang Ori dari transaksi ' . $invoice_number,
-                    ]);
-                }
-            }
+            // Cashback logic has been removed as per requirements
 
             \Illuminate\Support\Facades\DB::commit();
 

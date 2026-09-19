@@ -32,19 +32,25 @@ class SendReceivableDueReminders extends Command
         $this->info("Memulai pengecekan piutang jatuh tempo...");
 
         $today = Carbon::today();
-        $threeDaysLater = Carbon::today()->addDays(3);
 
-        // Find receivables due on or before 3 days from now, and unpaid/partial
+        // Find unpaid/partial receivables with due date
         $receivables = Receivable::with(['customer', 'sale.branch'])
             ->whereIn('status', ['unpaid', 'partial'])
             ->whereNotNull('due_date')
-            ->whereDate('due_date', '<=', $threeDaysLater)
             ->get();
+
+        $receivablesToRemind = $receivables->filter(function($receivable) use ($today) {
+            $dueDate = Carbon::parse($receivable->due_date)->startOfDay();
+            $diffInDays = $today->diffInDays($dueDate, false); // false = negative if today > dueDate
+            
+            // Hari H (0), H-2 (2), H-7 (7)
+            return in_array($diffInDays, [0, 2, 7], true);
+        });
 
         $sentCount = 0;
         $failedCount = 0;
 
-        foreach ($receivables as $receivable) {
+        foreach ($receivablesToRemind as $receivable) {
             $customer = $receivable->customer;
             if (!$customer || !$customer->email) {
                 continue;

@@ -232,9 +232,11 @@ const totalOriDiscount = computed(() => {
   if (isPromoOriEnabled.value && receivable.value?.sale?.items) {
     receivable.value.sale.items.forEach(item => {
       if (selectedOriItems.value[item.id] && !item.is_ori) {
-        const discountPercent = item.product_branch?.ori_discount_percent || 0
-        if (discountPercent > 0) {
-          discount += (item.price * item.qty) * (discountPercent / 100)
+        const promo = selectedOriItems.value[item.id]
+        if (promo && promo.discount_type === 'percentage') {
+          discount += (item.price * item.qty) * (promo.discount_value / 100)
+        } else if (promo && promo.discount_type === 'nominal') {
+          discount += promo.discount_value * item.qty
         }
       }
     })
@@ -266,12 +268,23 @@ const submitPayment = async () => {
       let discountIndex = 0
       receivable.value.sale.items.forEach(item => {
         if (selectedOriItems.value[item.id] && !item.is_ori) {
-          const discountPercent = item.product_branch?.ori_discount_percent || 0
-          if (discountPercent > 0) {
-            const discountAmount = (item.price * item.qty) * (discountPercent / 100)
-            formData.append(`ori_discounts[${discountIndex}][sale_item_id]`, item.id)
-            formData.append(`ori_discounts[${discountIndex}][amount]`, discountAmount)
-            discountIndex++
+          const promo = selectedOriItems.value[item.id]
+          if (promo) {
+            let discountAmount = 0
+            if (promo.discount_type === 'percentage') {
+              discountAmount = (item.price * item.qty) * (promo.discount_value / 100)
+            } else if (promo.discount_type === 'nominal') {
+              discountAmount = promo.discount_value * item.qty
+            }
+            
+            if (discountAmount > 0) {
+              formData.append(`ori_discounts[${discountIndex}][sale_item_id]`, item.id)
+              formData.append(`ori_discounts[${discountIndex}][amount]`, discountAmount)
+              formData.append(`ori_discounts[${discountIndex}][promo_name]`, promo.name)
+              formData.append(`ori_discounts[${discountIndex}][discount_type]`, promo.discount_type)
+              formData.append(`ori_discounts[${discountIndex}][discount_value]`, promo.discount_value)
+              discountIndex++
+            }
           }
         }
       })
@@ -640,17 +653,32 @@ onMounted(() => {
                             <template v-if="item.is_ori">
                               <VChip size="x-small" color="success">Sudah Diklaim</VChip>
                             </template>
-                            <template v-else-if="item.product_branch?.ori_discount_percent > 0">
-                              <VSwitch
+                            <template v-else-if="item.product_branch?.product?.ori_promos?.length > 0">
+                              <VSelect
                                 v-model="selectedOriItems[item.id]"
+                                :items="item.product_branch.product.ori_promos"
+                                item-title="name"
+                                return-object
                                 density="compact"
-                                color="success"
+                                variant="outlined"
                                 hide-details
-                                class="d-inline-flex justify-center"
-                              />
+                                placeholder="Pilih Promo"
+                                clearable
+                                style="min-width: 120px;"
+                              >
+                                <template #selection="{ item: pItem }">
+                                  <span class="text-caption">
+                                    {{ pItem.raw.name }}
+                                  </span>
+                                </template>
+                                <template #item="{ props, item: pItem }">
+                                  <VListItem v-bind="props" :title="pItem.raw.name" :subtitle="pItem.raw.discount_type === 'nominal' ? `Rp ${formatCurrency(pItem.raw.discount_value).replace('Rp ', '')}` : `${pItem.raw.discount_value}%`" />
+                                </template>
+                              </VSelect>
+                              
                               <div class="text-caption text-success mt-1" v-if="selectedOriItems[item.id]">
-                                -{{ formatCurrency((item.price * item.qty) * (item.product_branch.ori_discount_percent / 100)) }}
-                                ({{ item.product_branch.ori_discount_percent }}%)
+                                -{{ formatCurrency(selectedOriItems[item.id].discount_type === 'percentage' ? (item.price * item.qty) * (selectedOriItems[item.id].discount_value / 100) : selectedOriItems[item.id].discount_value * item.qty) }}
+                                ({{ selectedOriItems[item.id].discount_type === 'nominal' ? 'Rp' : '' }}{{ selectedOriItems[item.id].discount_value }}{{ selectedOriItems[item.id].discount_type === 'percentage' ? '%' : '' }})
                               </div>
                             </template>
                             <span v-else class="text-caption text-medium-emphasis">-</span>

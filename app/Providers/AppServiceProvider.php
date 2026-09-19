@@ -23,6 +23,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        //
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('owners')) {
+                $owner = \App\Models\Owner::first();
+                if ($owner && $owner->name) {
+                    config(['mail.from.name' => $owner->name]);
+                }
+            }
+        } catch (\Exception $e) {
+            // Do nothing if database connection fails during initial boot/migrations
+        }
     }
 }

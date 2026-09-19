@@ -94,7 +94,13 @@ const addNewProduct = async productData => {
     const formData = new FormData()
     
     for (const key in productData) {
-      if (productData[key] !== null && productData[key] !== undefined) {
+      if (key === 'ori_promos' && Array.isArray(productData[key])) {
+        productData[key].forEach((promo, idx) => {
+          formData.append(`ori_promos[${idx}][name]`, promo.name || '')
+          formData.append(`ori_promos[${idx}][discount_type]`, promo.discount_type || 'percentage')
+          formData.append(`ori_promos[${idx}][discount_value]`, promo.discount_value || 0)
+        })
+      } else if (productData[key] !== null && productData[key] !== undefined) {
         formData.append(key, productData[key])
       }
     }
@@ -139,6 +145,50 @@ const tableHeaders = [
 const editProduct = product => {
   selectedProduct.value = product
   isAddNewProductDrawerVisible.value = true
+}
+
+const isPromoDialogVisible = ref(false)
+const selectedPromoProduct = ref(null)
+const tempPromos = ref([])
+
+const openPromoDialog = product => {
+  selectedPromoProduct.value = product
+  tempPromos.value = product.ori_promos ? JSON.parse(JSON.stringify(product.ori_promos)) : []
+  isPromoDialogVisible.value = true
+}
+
+const addPromo = () => {
+  tempPromos.value.push({ name: '', discount_type: 'percentage', discount_value: 0 })
+}
+
+const removePromo = index => {
+  tempPromos.value.splice(index, 1)
+}
+
+const savePromos = async () => {
+  const p = selectedPromoProduct.value
+  const productData = {
+    id: p.id,
+    name: p.name,
+    sku: p.sku,
+    category_id: p.category_id,
+    description: p.description,
+    status: p.status,
+    stock_method: p.stock_method,
+    brand: p.brand,
+    barcode: p.barcode,
+    unit: p.unit,
+    weight: p.weight,
+    length: p.length,
+    width: p.width,
+    height: p.height,
+    is_returnable: p.is_returnable,
+    tax_type: p.tax_type,
+    ori_promos: tempPromos.value
+  }
+  
+  await addNewProduct(productData)
+  isPromoDialogVisible.value = false
 }
 
 const openDeleteDialog = id => {
@@ -194,10 +244,13 @@ const exportExcel = () => {
     snackbar.show('Tidak ada data untuk diekspor', 'warning')
     return
   }
-  const headers = ['Nama Produk', 'SKU', 'Kategori', 'Deskripsi', 'Merek', 'Barcode', 'Satuan', 'Status']
+  const headers = ['Nama Produk', 'SKU', 'Kategori', 'Deskripsi', 'Merek', 'Barcode', 'Satuan', 'Status', 'Promo ORI']
   const csvRows = [headers.join(',')]
   
   products.value.forEach(prod => {
+    // Format promo ori as a single string
+    const promoStr = prod.ori_promos?.map(p => `${p.name}: ${p.discount_type === 'nominal' ? 'Rp' : ''}${p.discount_value}${p.discount_type === 'percentage' ? '%' : ''}`).join(' | ') || '-'
+
     const row = [
       `"${prod.name || ''}"`,
       `"${prod.sku || ''}"`,
@@ -207,6 +260,7 @@ const exportExcel = () => {
       `"${prod.barcode || ''}"`,
       `"${prod.unit || ''}"`,
       `"${prod.status || ''}"`,
+      `"${promoStr}"`
     ]
 
     csvRows.push(row.join(','))
@@ -497,22 +551,20 @@ const handleFileUpload = async event => {
 
         <!-- Promo Ori -->
         <template #item.promo_ori="{ item }">
-          <div v-if="item.product_branches && item.product_branches.length > 0" class="d-flex flex-column gap-1">
-            <template v-for="pb in item.product_branches" :key="pb.id">
-              <div v-if="Number(pb.ori_discount_percent) > 0 || Number(pb.ori_cashback_percent) > 0" class="d-flex align-center gap-1">
-                <span class="text-caption font-weight-medium me-1" style="font-size: 10px !important;">{{ pb.branch?.name }}:</span>
-                <VChip v-if="Number(pb.ori_discount_percent) > 0" size="x-small" color="error" variant="flat">
-                  Disc {{ pb.ori_discount_percent }}%
-                </VChip>
-                <VChip v-if="Number(pb.ori_cashback_percent) > 0" size="x-small" color="warning" variant="flat">
-                  CB {{ pb.ori_cashback_percent }}%
-                </VChip>
-              </div>
-            </template>
-            <!-- Check if there's any active promo across all branches -->
-            <span v-if="!item.product_branches.some(pb => Number(pb.ori_discount_percent) > 0 || Number(pb.ori_cashback_percent) > 0)" class="text-caption text-disabled text-center">-</span>
+          <div class="d-flex align-center justify-center">
+            <VBtn
+              icon
+              size="small"
+              variant="tonal"
+              :color="(item.ori_promos && item.ori_promos.length > 0) ? 'error' : 'secondary'"
+              @click="openPromoDialog(item)"
+            >
+              <VIcon icon="ri-eye-line" />
+              <VTooltip activator="parent" location="top">
+                {{ (item.ori_promos && item.ori_promos.length > 0) ? 'Kelola Promo ORI (' + item.ori_promos.length + ' Aktif)' : 'Kelola Promo ORI' }}
+              </VTooltip>
+            </VBtn>
           </div>
-          <span v-else class="text-caption text-disabled text-center">-</span>
         </template>
 
         <!-- Stock Method -->
@@ -631,6 +683,71 @@ const handleFileUpload = async event => {
       cancel-text="Batal"
       @confirm="executeDeleteProduct"
     />
+
+    <!-- Dialog Promo ORI -->
+    <VDialog v-model="isPromoDialogVisible" max-width="600">
+      <VCard title="Kelola Promo ORI">
+        <VCardText>
+          <div class="mb-4 text-body-2">
+            Atur diskon promo barang ori secara global untuk produk <strong>{{ selectedPromoProduct?.name }}</strong>.
+          </div>
+          
+          <div v-for="(promo, index) in tempPromos" :key="index" class="d-flex align-center gap-2 mb-2 p-2 border rounded bg-grey-50">
+            <VTextField
+              v-model="promo.name"
+              label="Nama Promo"
+              density="compact"
+              variant="outlined"
+              hide-details
+              class="flex-grow-1"
+            />
+            <VSelect
+              v-model="promo.discount_type"
+              :items="[{ title: 'Persen (%)', value: 'percentage' }, { title: 'Nominal (Rp)', value: 'nominal' }]"
+              item-title="title"
+              item-value="value"
+              label="Tipe"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="max-width: 130px;"
+            />
+            <VTextField
+              v-model="promo.discount_value"
+              label="Nilai"
+              type="number"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="max-width: 120px;"
+            />
+            <VBtn
+              icon="ri-close-line"
+              color="error"
+              variant="text"
+              size="small"
+              @click="removePromo(index)"
+            />
+          </div>
+          
+          <VBtn
+            variant="tonal"
+            color="primary"
+            prepend-icon="ri-add-line"
+            size="small"
+            class="mt-2"
+            @click="addPromo"
+          >
+            Tambah Promo
+          </VBtn>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn color="secondary" variant="text" @click="isPromoDialogVisible = false">Batal</VBtn>
+          <VBtn color="primary" variant="elevated" @click="savePromos">Simpan Promo</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
 
     <VDialog
       v-model="isImportDialogVisible"
