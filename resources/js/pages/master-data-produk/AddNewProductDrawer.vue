@@ -188,7 +188,7 @@ const onSubmit = () => {
 
             <VRow dense>
               <VCol cols="12" class="mb-2">
-                <div class="d-flex align-center gap-4 pa-3 border rounded-xl bg-var-theme-surface">
+                <div class="d-flex align-center gap-4 pa-3 border rounded bg-var-theme-surface">
                   <VAvatar
                     v-if="previewImage"
                     size="64"
@@ -217,7 +217,7 @@ const onSubmit = () => {
                     prepend-icon=""
                     prepend-inner-icon="ri-image-add-line"
                     show-size
-                    density="comfortable"
+                    density="compact"
                     variant="outlined"
                     clearable
                     hint="Format JPG/PNG. Maks. 2MB."
@@ -233,7 +233,7 @@ const onSubmit = () => {
                   :rules="[v => !!v || 'Nama Produk wajib diisi']"
                   label="Nama Master Produk"
                   placeholder="Misal: Aki GS Astra Hybrid NS60"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-box-3-line"
                 />
@@ -247,7 +247,7 @@ const onSubmit = () => {
                   item-value="id"
                   label="Kategori"
                   placeholder="Pilih Kategori"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   clearable
                 />
@@ -259,7 +259,7 @@ const onSubmit = () => {
                   :rules="[v => !!v || 'Kode SKU wajib diisi']"
                   label="Kode SKU (Internal)"
                   placeholder="Misal: AKI-GS-NS60"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-qr-code-line"
                 />
@@ -270,7 +270,7 @@ const onSubmit = () => {
                   v-model="barcode"
                   label="Barcode Pabrik (EAN/UPC)"
                   placeholder="Misal: 8991234567890"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-barcode-line"
                 />
@@ -281,7 +281,7 @@ const onSubmit = () => {
                   v-model="brand"
                   label="Merek / Brand"
                   placeholder="Misal: GS Astra"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-building-line"
                 />
@@ -293,7 +293,7 @@ const onSubmit = () => {
                   :items="['Pcs', 'Unit', 'Lembar', 'Kg', 'Gram', 'Liter', 'Ml', 'Karton', 'Box', 'Pak', 'Set', 'Lusin', 'Kodi']"
                   label="Satuan Dasar"
                   placeholder="Pilih atau ketik satuan"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   clearable
                 />
@@ -320,7 +320,7 @@ const onSubmit = () => {
                   label="Berat"
                   suffix="g"
                   placeholder="0"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                 />
               </VCol>
@@ -331,7 +331,7 @@ const onSubmit = () => {
                   label="Panjang"
                   suffix="cm"
                   placeholder="0"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                 />
               </VCol>
@@ -342,7 +342,7 @@ const onSubmit = () => {
                   label="Lebar"
                   suffix="cm"
                   placeholder="0"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                 />
               </VCol>
@@ -353,7 +353,7 @@ const onSubmit = () => {
                   label="Tinggi"
                   suffix="cm"
                   placeholder="0"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                 />
               </VCol>
@@ -383,7 +383,7 @@ const onSubmit = () => {
                   item-title="title"
                   item-value="value"
                   label="Metode Pemotongan Stok"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   hint="Urutan batch yang akan otomatis terpotong saat transaksi POS"
                   persistent-hint
@@ -395,7 +395,7 @@ const onSubmit = () => {
                   v-model="status"
                   :items="['Aktif', 'Nonaktif']"
                   label="Status Publikasi"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                 />
               </VCol>
@@ -406,7 +406,7 @@ const onSubmit = () => {
                   label="Deskripsi & Spesifikasi Produk"
                   placeholder="Tuliskan keterangan detail mengenai produk ini..."
                   rows="3"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                 />
               </VCol>
@@ -435,30 +435,16 @@ const onSubmit = () => {
             </div>
 
             <VRow dense>
-              <VCol cols="12" md="6">
+              <VCol cols="12">
                 <VTextField
                   v-model="ori_discount_percent"
                   type="number"
                   label="Diskon Ori"
                   suffix="%"
                   placeholder="0"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   hint="Memotong harga langsung saat kasir mencentang Barang Ori"
-                  persistent-hint
-                />
-              </VCol>
-
-              <VCol cols="12" md="6">
-                <VTextField
-                  v-model="ori_cashback_percent"
-                  type="number"
-                  label="Cashback Poin Ori"
-                  suffix="%"
-                  placeholder="0"
-                  density="comfortable"
-                  variant="outlined"
-                  hint="Masuk ke saldo poin pelanggan saat transaksi selesai"
                   persistent-hint
                 />
               </VCol>

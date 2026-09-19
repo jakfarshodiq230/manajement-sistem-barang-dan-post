@@ -194,7 +194,7 @@ const panelStatus = ref(0)
           <VExpansionPanel
             v-for="(section, index) in courseDetails?.content"
             :key="index"
-            elevation="0"
+            
             collapse-icon="ri-arrow-down-s-line"
             :expand-icon="$vuetify.locale.isRtl ? 'ri-arrow-left-s-line' : 'ri-arrow-right-s-line'"
             :value="index"

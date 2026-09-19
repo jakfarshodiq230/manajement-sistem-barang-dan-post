@@ -24,6 +24,8 @@ const receivable = ref(null)
 const isLoading = ref(false)
 const lastPayment = ref(null)
 const isSuccessDialogVisible = ref(false)
+const selectedOriItems = ref({})
+const isPromoOriEnabled = ref(false)
 
 // Printer & Settings from Database
 const receiptPrinterRef = ref(null)
@@ -175,12 +177,16 @@ const fetchReceivable = async id => {
 
 watch(() => props.receivableId, newId => {
   if (newId) {
+    selectedOriItems.value = {}
+    isPromoOriEnabled.value = false
     fetchReceivable(newId)
     fetchBankAccounts()
     fetchReceiptSettings()
   } else {
     receivable.value = null
     emailLogs.value = []
+    selectedOriItems.value = {}
+    isPromoOriEnabled.value = false
   }
 }, { immediate: true })
 
@@ -221,13 +227,30 @@ const formatDateTime = dateString => {
   })
 }
 
+const totalOriDiscount = computed(() => {
+  let discount = 0
+  if (isPromoOriEnabled.value && receivable.value?.sale?.items) {
+    receivable.value.sale.items.forEach(item => {
+      if (selectedOriItems.value[item.id] && !item.is_ori) {
+        const discountPercent = item.product_branch?.ori_discount_percent || 0
+        if (discountPercent > 0) {
+          discount += (item.price * item.qty) * (discountPercent / 100)
+        }
+      }
+    })
+  }
+  return discount
+})
+
 const submitPayment = async () => {
-  if (paymentForm.value.amount <= 0) {
-    snackbar.show('Nominal pembayaran tidak valid', 'error')
+  const totalPayment = paymentForm.value.amount + totalOriDiscount.value
+  
+  if (totalPayment <= 0) {
+    snackbar.show('Harus ada nominal pembayaran atau diskon', 'error')
     return
   }
-  if (paymentForm.value.amount > remainingBalance.value) {
-    snackbar.show('Nominal pembayaran melebihi sisa hutang', 'error')
+  if (totalPayment > (remainingBalance.value + 0.01)) {
+    snackbar.show('Total nominal (Bayar + Diskon) melebihi sisa hutang', 'error')
     return
   }
 
@@ -237,6 +260,22 @@ const submitPayment = async () => {
     formData.append('amount', paymentForm.value.amount)
     formData.append('payment_date', paymentForm.value.payment_date)
     formData.append('payment_method', paymentForm.value.payment_method)
+    
+    // Append discounts
+    if (isPromoOriEnabled.value && receivable.value?.sale?.items) {
+      let discountIndex = 0
+      receivable.value.sale.items.forEach(item => {
+        if (selectedOriItems.value[item.id] && !item.is_ori) {
+          const discountPercent = item.product_branch?.ori_discount_percent || 0
+          if (discountPercent > 0) {
+            const discountAmount = (item.price * item.qty) * (discountPercent / 100)
+            formData.append(`ori_discounts[${discountIndex}][sale_item_id]`, item.id)
+            formData.append(`ori_discounts[${discountIndex}][amount]`, discountAmount)
+            discountIndex++
+          }
+        }
+      })
+    }
     
     if (paymentForm.value.payment_method !== 'cash') {
       if (paymentForm.value.bank_account_id) formData.append('bank_account_id', paymentForm.value.bank_account_id)
@@ -362,7 +401,7 @@ onMounted(() => {
         <!-- Customer & Sale Info -->
         <VCard
           variant="tonal"
-          class="mb-4 pa-4 rounded-xl"
+          class="mb-4 pa-4 rounded"
         >
           <div class="d-flex justify-space-between align-start mb-2">
             <div>
@@ -402,7 +441,7 @@ onMounted(() => {
           <VCol cols="4">
             <VCard
               variant="outlined"
-              class="pa-3 text-center rounded-xl"
+              class="pa-3 text-center rounded"
             >
               <div class="text-caption text-medium-emphasis">Total Piutang</div>
               <div class="text-body-1 font-weight-bold">
@@ -413,7 +452,7 @@ onMounted(() => {
           <VCol cols="4">
             <VCard
               variant="outlined"
-              class="pa-3 text-center rounded-xl"
+              class="pa-3 text-center rounded"
             >
               <div class="text-caption text-success">Sudah Dibayar</div>
               <div class="text-body-1 font-weight-bold text-success">
@@ -424,7 +463,7 @@ onMounted(() => {
           <VCol cols="4">
             <VCard
               variant="outlined"
-              class="pa-3 text-center rounded-xl"
+              class="pa-3 text-center rounded"
               :class="remainingBalance > 0 ? 'border-error' : ''"
             >
               <div class="text-caption text-error">Sisa Piutang</div>
@@ -453,7 +492,7 @@ onMounted(() => {
         <VCard
           v-if="remainingBalance > 0"
           variant="outlined"
-          class="mb-6 rounded-xl border-primary"
+          class="mb-6 rounded border-primary"
         >
           <VCardItem class="bg-primary bg-opacity-10 py-3">
             <VCardTitle class="text-subtitle-1 font-weight-bold text-primary d-flex align-center gap-2">
@@ -556,6 +595,78 @@ onMounted(() => {
                     prepend-icon="ri-image-add-line" 
                   />
                 </VCol>
+                
+                <!-- Promo ORI selection -->
+                <VCol cols="12" v-if="receivable?.sale?.items && receivable.sale.items.length > 0">
+                  <VCard variant="outlined" color="warning" class="mb-2 bg-warning bg-opacity-10">
+                    <div class="d-flex align-center justify-space-between pa-3">
+                      <div>
+                        <div class="font-weight-bold text-warning d-flex align-center gap-2">
+                          <VIcon icon="ri-star-smile-line" />
+                          Beri Diskon Promo ORI?
+                        </div>
+                        <div class="text-caption text-medium-emphasis">Aktifkan ini hanya jika pelanggan berhak mendapatkan diskon khusus.</div>
+                      </div>
+                      <VSwitch
+                        v-model="isPromoOriEnabled"
+                        color="warning"
+                        hide-details
+                      />
+                    </div>
+                  </VCard>
+
+                  <div class="text-caption font-weight-bold mb-2 mt-4">📦 Daftar Barang di Nota Ini:</div>
+                  <VCard variant="outlined" class="rounded-lg overflow-hidden border-warning">
+                    <VTable density="compact">
+                      <thead>
+                        <tr>
+                          <th>Barang</th>
+                          <th class="text-right">Subtotal</th>
+                          <th class="text-center" v-if="isPromoOriEnabled">Promo ORI</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="item in receivable.sale.items" :key="item.id">
+                          <td>
+                            <div class="text-truncate font-weight-medium" style="max-width: 180px">
+                              {{ item.product_branch?.product?.name || 'Produk' }}
+                            </div>
+                            <div class="text-caption text-medium-emphasis">Qty: {{ item.qty }}</div>
+                          </td>
+                          <td class="text-right">
+                            {{ formatCurrency(item.price * item.qty) }}
+                          </td>
+                          <td class="text-center" style="min-width: 110px" v-if="isPromoOriEnabled">
+                            <template v-if="item.is_ori">
+                              <VChip size="x-small" color="success">Sudah Diklaim</VChip>
+                            </template>
+                            <template v-else-if="item.product_branch?.ori_discount_percent > 0">
+                              <VSwitch
+                                v-model="selectedOriItems[item.id]"
+                                density="compact"
+                                color="success"
+                                hide-details
+                                class="d-inline-flex justify-center"
+                              />
+                              <div class="text-caption text-success mt-1" v-if="selectedOriItems[item.id]">
+                                -{{ formatCurrency((item.price * item.qty) * (item.product_branch.ori_discount_percent / 100)) }}
+                                ({{ item.product_branch.ori_discount_percent }}%)
+                              </div>
+                            </template>
+                            <span v-else class="text-caption text-medium-emphasis">-</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </VTable>
+                  </VCard>
+                  
+                  <VExpandTransition>
+                    <div v-if="isPromoOriEnabled && totalOriDiscount > 0" class="d-flex justify-space-between align-center mt-2 pa-2 bg-success bg-opacity-10 rounded">
+                      <span class="text-caption font-weight-bold text-success">Total Diskon Promo ORI:</span>
+                      <span class="font-weight-bold text-success">-{{ formatCurrency(totalOriDiscount) }}</span>
+                    </div>
+                  </VExpandTransition>
+                </VCol>
 
                 <VCol cols="12" class="mt-2">
                   <VBtn
@@ -584,7 +695,7 @@ onMounted(() => {
 
         <VTable
           density="compact"
-          class="border rounded-xl mb-6"
+          class="border rounded mb-6"
         >
           <thead>
             <tr>
@@ -646,7 +757,7 @@ onMounted(() => {
           />
         </div>
 
-        <VCard class="border rounded-xl" variant="flat" :loading="isLoadingEmailLogs">
+        <VCard class="border rounded" variant="flat" :loading="isLoadingEmailLogs">
           <VProgressLinear v-if="isLoadingEmailLogs" indeterminate color="primary" height="2" />
           <VTable density="compact">
             <thead>
@@ -710,7 +821,7 @@ onMounted(() => {
     v-model="isSendEmailDialogVisible"
     max-width="480"
   >
-    <VCard class="rounded-xl">
+    <VCard class="rounded">
       <VCardTitle class="pa-5 pb-3 font-weight-bold text-h6 d-flex align-center gap-2">
         <VIcon icon="ri-mail-send-line" color="primary" />
         Kirim Surat Tagihan Piutang
@@ -760,7 +871,7 @@ onMounted(() => {
     max-width="400"
     persistent
   >
-    <VCard class="text-center pa-6 rounded-xl">
+    <VCard class="text-center pa-6 rounded">
       <VIcon
         icon="ri-checkbox-circle-fill"
         color="success"

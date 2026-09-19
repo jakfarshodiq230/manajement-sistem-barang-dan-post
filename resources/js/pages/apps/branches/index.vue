@@ -219,7 +219,7 @@ const filteredBranches = computed(() => {
     <!-- KPI Summary Row -->
     <VRow class="mb-4">
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+        <VCard  class="pa-4 border-s-lg border-primary">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-primary font-weight-bold">TOTAL JARINGAN</div>
@@ -234,7 +234,7 @@ const filteredBranches = computed(() => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+        <VCard  class="pa-4 border-s-lg border-info">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-info font-weight-bold">CABANG TOKO (STORE)</div>
@@ -249,7 +249,7 @@ const filteredBranches = computed(() => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-warning">
+        <VCard  class="pa-4 border-s-lg border-warning">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-warning font-weight-bold">GUDANG (WAREHOUSE)</div>
@@ -264,7 +264,7 @@ const filteredBranches = computed(() => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+        <VCard  class="pa-4 border-s-lg border-success">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-success font-weight-bold">STATUS AKTIF</div>
@@ -280,7 +280,7 @@ const filteredBranches = computed(() => {
     </VRow>
 
     <!-- Main Table Card -->
-    <VCard elevation="2">
+    <VCard >
       <!-- Toolbar & Filters -->
       <VCardItem class="pa-4">
         <VRow align="center">
@@ -533,7 +533,7 @@ const filteredBranches = computed(() => {
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -542,7 +542,7 @@ const filteredBranches = computed(() => {
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalItems / itemsPerPage)"

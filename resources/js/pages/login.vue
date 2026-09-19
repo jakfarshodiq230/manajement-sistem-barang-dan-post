@@ -134,10 +134,10 @@ onMounted(() => {
 <template>
   <div class="login-page-wrapper d-flex align-center justify-center">
     <div class="login-card-container w-100 max-w-420 px-4">
-      <VCard class="login-card pa-6 pa-sm-8 rounded-xl border elevation-2">
+      <VCard class="login-card pa-6 pa-sm-8 rounded border elevation-2">
         <!-- Logo & Header -->
         <div class="text-center mb-6">
-          <div class="d-inline-flex align-center justify-center bg-primary-lighten-5 pa-3 rounded-xl mb-3">
+          <div class="d-inline-flex align-center justify-center bg-primary-lighten-5 pa-3 rounded mb-3">
             <VNodeRenderer :nodes="themeConfig.app.logo" />
           </div>
           <h1 class="text-h5 font-weight-extrabold text-high-emphasis mb-1">

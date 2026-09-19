@@ -494,7 +494,7 @@ onMounted(() => {
     <VRow class="mb-4">
       <!-- 1. Total Saldo Bank (Berjalan) -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+        <VCard class="pa-4 border-s-lg border-primary">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-primary font-weight-bold">TOTAL SALDO BANK</div>
@@ -512,7 +512,7 @@ onMounted(() => {
 
       <!-- 2. Penerimaan Bulan Ini -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+        <VCard class="pa-4 border-s-lg border-success">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-success font-weight-bold">PENERIMAAN {{ currentMonthName.toUpperCase() }}</div>
@@ -530,7 +530,7 @@ onMounted(() => {
 
       <!-- 3. Omzet Tahun Berjalan -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+        <VCard class="pa-4 border-s-lg border-info">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-info font-weight-bold">TOTAL OMZET TAHUN {{ selectedYear }}</div>
@@ -548,7 +548,7 @@ onMounted(() => {
 
       <!-- 4. Rata-rata Nominal per Transaksi -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-warning">
+        <VCard class="pa-4 border-s-lg border-warning">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-warning font-weight-bold">RATA-RATA / BON</div>
@@ -566,7 +566,7 @@ onMounted(() => {
     </VRow>
 
     <!-- Clean Single-Row Filter Card -->
-    <VCard elevation="2" class="mb-4">
+    <VCard class="mb-4">
       <VCardText class="pa-4">
         <VRow dense align="center">
           <VCol cols="12" sm="6" md="2">
@@ -660,7 +660,7 @@ onMounted(() => {
           sm="6"
           lg="4"
         >
-          <VCard elevation="2" class="h-100 d-flex flex-column rounded-xl border">
+          <VCard class="h-100 d-flex flex-column rounded border">
             <!-- Card Header -->
             <VCardItem class="pb-3">
               <template #prepend>
@@ -804,7 +804,7 @@ onMounted(() => {
       </VRow>
 
       <!-- Empty State -->
-      <VCard v-else-if="!isLoading" class="pa-12 text-center rounded-xl border">
+      <VCard v-else-if="!isLoading" class="pa-12 text-center rounded border">
         <VIcon icon="ri-bank-card-line" size="48" class="text-disabled mb-2" />
         <h5 class="text-h5 font-weight-bold">Belum Ada Rekening Bank</h5>
         <p class="text-body-2 text-medium-emphasis mb-4">
@@ -817,7 +817,7 @@ onMounted(() => {
     </div>
 
     <!-- TAB 2: Table Summary View per Month -->
-    <VCard v-else-if="activeTab === 'table'" class="rounded-xl border shadow-xs overflow-hidden">
+    <VCard v-else-if="activeTab === 'table'" class="rounded border shadow-xs overflow-hidden">
       <div class="pa-4 bg-gradient-header border-b d-flex justify-space-between align-center flex-wrap gap-2">
         <div class="d-flex align-center gap-2">
           <VIcon icon="ri-file-list-3-line" color="primary" size="22" />
@@ -1138,7 +1138,7 @@ onMounted(() => {
       :fullscreen="$vuetify.display.xs"
       max-width="400"
     >
-      <VCard class="pa-4 text-center rounded-xl">
+      <VCard class="pa-4 text-center rounded">
         <VCardTitle class="font-weight-bold text-h6 pb-1">
           QRIS {{ selectedQrisBankName }}
         </VCardTitle>
@@ -1166,8 +1166,9 @@ onMounted(() => {
       v-model="isRecentSalesModalOpen"
       :fullscreen="$vuetify.display.xs"
       max-width="850"
+      scrollable
     >
-      <VCard v-if="selectedBankForSales" class="rounded-xl overflow-hidden shadow-lg">
+      <VCard v-if="selectedBankForSales" class="rounded overflow-hidden shadow-lg">
         <VCardTitle class="pa-5 bg-gradient-header d-flex justify-space-between align-center">
           <div class="d-flex align-center gap-3">
             <VAvatar :color="selectedBankForSales.color || 'primary'" variant="tonal" size="44" class="rounded-lg">
@@ -1194,10 +1195,10 @@ onMounted(() => {
           <div v-if="isLoadingRecentSales" class="d-flex justify-center py-8">
             <VProgressCircular indeterminate color="primary" />
           </div>
-          <div v-else-if="recentSalesList.length > 0" class="border rounded-xl overflow-hidden shadow-xs">
+          <div v-else-if="recentSalesList.length > 0" class="border rounded shadow-xs" style="max-height: 60vh; overflow-y: auto;">
             <table class="w-100" style="border-collapse: collapse; font-size: 12.5px;">
-              <thead>
-                <tr class="bg-grey-100 text-left border-b font-weight-bold text-uppercase" style="font-size: 11px;">
+              <thead style="position: sticky; top: 0; z-index: 10;" class="bg-grey-100">
+                <tr class="text-left border-b font-weight-bold text-uppercase" style="font-size: 11px;">
                   <th class="pa-3">NO. BON</th>
                   <th class="pa-3">TANGGAL</th>
                   <th class="pa-3">CABANG</th>
@@ -1230,7 +1231,7 @@ onMounted(() => {
               </tbody>
             </table>
           </div>
-          <div v-else class="pa-10 text-center text-medium-emphasis border rounded-xl bg-grey-50">
+          <div v-else class="pa-10 text-center text-medium-emphasis border rounded bg-grey-50">
             <VIcon icon="ri-inbox-line" size="40" class="mb-2 text-disabled" />
             <div class="text-subtitle-2 font-weight-bold">Belum Ada Riwayat Transaksi</div>
             <div class="text-caption">Belum ada transaksi penjualan yang dicatat masuk ke rekening bank ini.</div>
@@ -1245,7 +1246,7 @@ onMounted(() => {
       scrollable
       transition="dialog-bottom-transition"
     >
-      <VCard class="rounded-xl overflow-hidden border">
+      <VCard class="rounded overflow-hidden border">
         <!-- Dialog Header -->
         <VCardItem class="pa-5 bg-surface border-b">
           <template #prepend>
@@ -1398,7 +1399,7 @@ onMounted(() => {
           <VRow dense>
             <!-- 1. Saldo Awal -->
             <VCol cols="12" sm="6" md="3">
-              <VCard elevation="1" class="pa-3 border-s-lg border-primary h-100">
+              <VCard  class="pa-3 border-s-lg border-primary h-100">
                 <div class="text-caption text-primary font-weight-bold">SALDO AWAL PERIODE</div>
                 <div class="text-h6 font-weight-bold font-mono text-primary mt-1">
                   {{ formatCurrency(statementData.summary?.opening_balance || 0) }}
@@ -1411,7 +1412,7 @@ onMounted(() => {
 
             <!-- 2. Total Masuk (Kredit +) -->
             <VCol cols="12" sm="6" md="3">
-              <VCard elevation="1" class="pa-3 border-s-lg border-success h-100">
+              <VCard  class="pa-3 border-s-lg border-success h-100">
                 <div class="text-caption text-success font-weight-bold">TOTAL MASUK (KREDIT +)</div>
                 <div class="text-h6 font-weight-bold font-mono text-success mt-1">
                   +{{ formatCurrency(statementData.summary?.total_credit || 0) }}
@@ -1424,7 +1425,7 @@ onMounted(() => {
 
             <!-- 3. Total Keluar (Debet -) -->
             <VCol cols="12" sm="6" md="3">
-              <VCard elevation="1" class="pa-3 border-s-lg border-error h-100">
+              <VCard  class="pa-3 border-s-lg border-error h-100">
                 <div class="text-caption text-error font-weight-bold">TOTAL KELUAR (DEBET -)</div>
                 <div class="text-h6 font-weight-bold font-mono text-error mt-1">
                   -{{ formatCurrency(statementData.summary?.total_debit || 0) }}
@@ -1437,7 +1438,7 @@ onMounted(() => {
 
             <!-- 4. Saldo Akhir Berjalan -->
             <VCol cols="12" sm="6" md="3">
-              <VCard elevation="1" class="pa-3 border-s-lg border-info h-100">
+              <VCard  class="pa-3 border-s-lg border-info h-100">
                 <div class="text-caption text-info font-weight-bold">SALDO AKHIR PERIODE</div>
                 <div class="text-h6 font-weight-bold font-mono text-info mt-1">
                   {{ formatCurrency(statementData.summary?.closing_balance || 0) }}

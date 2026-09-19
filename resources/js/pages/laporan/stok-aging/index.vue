@@ -190,7 +190,7 @@ const exportExcel = async () => {
     <!-- Summary KPI Cards -->
     <VRow class="mb-4">
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+        <VCard  class="pa-4 border-s-lg border-primary">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">TOTAL BATCH AKTIF</div>
@@ -205,7 +205,7 @@ const exportExcel = async () => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+        <VCard  class="pa-4 border-s-lg border-info">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">TOTAL UNIT TERSEDIA</div>
@@ -220,7 +220,7 @@ const exportExcel = async () => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+        <VCard  class="pa-4 border-s-lg border-success">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">NILAI ASET PERSEDIAAN</div>
@@ -235,7 +235,7 @@ const exportExcel = async () => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-error">
+        <VCard  class="pa-4 border-s-lg border-error">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-error font-weight-bold">PERLU PERHATIAN (FEFO)</div>
@@ -251,7 +251,7 @@ const exportExcel = async () => {
     </VRow>
 
     <!-- Card with Tabs -->
-    <VCard elevation="2">
+    <VCard >
       <!-- Tabs Navigation -->
       <VTabs
         v-model="activeTab"
@@ -452,7 +452,7 @@ const exportExcel = async () => {
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -461,7 +461,7 @@ const exportExcel = async () => {
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalItems / itemsPerPage)"

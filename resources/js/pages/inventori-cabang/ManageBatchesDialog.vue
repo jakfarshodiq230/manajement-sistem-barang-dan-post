@@ -174,7 +174,7 @@ const closeDialog = () => {
     scrollable
     @update:model-value="(val) => emit('update:isDialogVisible', val)"
   >
-    <VCard class="rounded-xl overflow-hidden shadow-lg d-flex flex-column" style="max-height: 90vh;" :loading="isLoading">
+    <VCard class="rounded overflow-hidden shadow-lg d-flex flex-column" style="max-height: 90vh;" :loading="isLoading">
       <!-- Header -->
       <div class="px-6 py-5 border-b bg-gradient-header d-flex justify-space-between align-center flex-shrink-0">
         <div class="d-flex align-center gap-3">
@@ -200,7 +200,7 @@ const closeDialog = () => {
       </div>
 
       <VCardText class="pa-6 overflow-y-auto" style="max-height: calc(90vh - 130px);">
-        <div class="mb-4 pa-4 rounded-xl border bg-var-theme-surface shadow-xs">
+        <div class="mb-4 pa-4 rounded border bg-var-theme-surface shadow-xs">
           <VRow dense align="center">
             <VCol cols="12" sm="4">
               <div class="text-caption text-medium-emphasis">Total Stok Gabungan:</div>
@@ -242,7 +242,7 @@ const closeDialog = () => {
         
         <div
           v-else-if="batches.length > 0"
-          class="border rounded-xl overflow-x-auto shadow-xs"
+          class="border rounded overflow-x-auto shadow-xs"
         >
           <table class="w-100 table-receipt" style="min-width: 780px;">
             <thead>
@@ -369,7 +369,7 @@ const closeDialog = () => {
 
         <div
           v-else
-          class="pa-8 text-center border rounded-xl bg-grey-50 text-medium-emphasis"
+          class="pa-8 text-center border rounded bg-grey-50 text-medium-emphasis"
         >
           <VIcon icon="ri-inbox-archive-line" size="36" class="mb-2 text-disabled" />
           <div class="font-weight-medium">Belum ada data batch fisik untuk produk ini.</div>

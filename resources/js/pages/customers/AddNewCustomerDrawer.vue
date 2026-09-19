@@ -137,7 +137,7 @@ const onSubmit = () => {
                 :rules="[v => !!v || 'Nama pelanggan wajib diisi']"
                 label="Nama Lengkap Pelanggan"
                 placeholder="Misal: Bapak Hendra Wijaya"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
                 prepend-inner-icon="ri-user-3-line"
               />
@@ -148,7 +148,7 @@ const onSubmit = () => {
                 v-model="formData.phone"
                 label="No. Telepon / WhatsApp"
                 placeholder="Misal: 081234567890"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
                 prepend-inner-icon="ri-phone-line"
               />
@@ -159,7 +159,7 @@ const onSubmit = () => {
                 v-model="formData.nik"
                 label="NIK / No. KTP"
                 placeholder="16 Digit NIK"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
                 prepend-inner-icon="ri-id-card-line"
               />
@@ -171,7 +171,7 @@ const onSubmit = () => {
                 label="Alamat Email"
                 type="email"
                 placeholder="pelanggan@email.com"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
                 prepend-inner-icon="ri-mail-line"
               />
@@ -182,7 +182,7 @@ const onSubmit = () => {
                 v-model="formData.company_name"
                 label="Nama Perusahaan / Toko"
                 placeholder="Misal: PT / Toko Bangun Jaya"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
                 prepend-inner-icon="ri-building-line"
               />
@@ -209,7 +209,7 @@ const onSubmit = () => {
                 type="text" 
                 prefix="Rp"
                 placeholder="0"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
                 prepend-inner-icon="ri-wallet-3-line"
                 hint="Maksimal nominal tagihan piutang bon yang diperbolehkan di kasir POS"
@@ -237,7 +237,7 @@ const onSubmit = () => {
                 label="Alamat Tempat Tinggal / Toko"
                 placeholder="Tuliskan jalan, nomor, RT/RW..."
                 rows="2"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
               />
             </VCol>
@@ -247,7 +247,7 @@ const onSubmit = () => {
                 v-model="formData.city"
                 label="Kota / Kabupaten"
                 placeholder="Misal: Dumai"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
               />
             </VCol>
@@ -257,7 +257,7 @@ const onSubmit = () => {
                 v-model="formData.province"
                 label="Provinsi"
                 placeholder="Misal: Riau"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
               />
             </VCol>
@@ -268,7 +268,7 @@ const onSubmit = () => {
                 label="Catatan Khusus Pelanggan"
                 placeholder="Keterangan preferensi order, diskon khusus, dll..."
                 rows="2"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
               />
             </VCol>

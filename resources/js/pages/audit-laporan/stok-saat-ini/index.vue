@@ -159,7 +159,7 @@ const headers = [
     <!-- Summary KPI Cards -->
     <VRow class="mb-4">
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+        <VCard  class="pa-4 border-s-lg border-primary">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">TOTAL SKU AKTIF</div>
@@ -174,7 +174,7 @@ const headers = [
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+        <VCard  class="pa-4 border-s-lg border-info">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">TOTAL FISIK BARANG</div>
@@ -189,7 +189,7 @@ const headers = [
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+        <VCard  class="pa-4 border-s-lg border-success">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">TOTAL VALUASI ASET</div>
@@ -204,7 +204,7 @@ const headers = [
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-warning">
+        <VCard  class="pa-4 border-s-lg border-warning">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-warning font-weight-bold">STOK MENIPIS (&le; 5)</div>
@@ -220,7 +220,7 @@ const headers = [
     </VRow>
 
     <!-- Table Card -->
-    <VCard elevation="2">
+    <VCard >
       <VCardText class="d-flex flex-wrap gap-4 align-center py-4">
         <VAutocomplete
           v-model="selectedBranch"

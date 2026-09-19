@@ -39,6 +39,8 @@ const price = ref(0)
 const min_nego_price = ref(0)
 const tax_percentage = ref(0)
 const other_fees = ref(0)
+const ori_discount_percent = ref(0)
+const ori_cashback_percent = ref(0)
 
 const closeNavigationDrawer = () => {
   emit('update:isDrawerOpen', false)
@@ -60,6 +62,8 @@ watch(() => props.selectedData, newVal => {
     min_nego_price.value = Math.round(newVal.min_nego_price || 0)
     tax_percentage.value = newVal.tax_percentage || 0
     other_fees.value = Math.round(newVal.other_fees || 0)
+    ori_discount_percent.value = newVal.ori_discount_percent || 0
+    ori_cashback_percent.value = newVal.ori_cashback_percent || 0
   } else {
     id.value = null
     product_id.value = null
@@ -69,6 +73,8 @@ watch(() => props.selectedData, newVal => {
     min_nego_price.value = 0
     tax_percentage.value = 0
     other_fees.value = 0
+    ori_discount_percent.value = 0
+    ori_cashback_percent.value = 0
   }
 }, { immediate: true })
 
@@ -111,8 +117,10 @@ const onSubmit = () => {
         cost_price: cost_price.value,
         price: price.value,
         min_nego_price: min_nego_price.value,
-        tax_percentage: tax_percentage.value,
-        other_fees: other_fees.value,
+        tax_percentage: tax_percentage.value || 0,
+        other_fees: other_fees.value || 0,
+        ori_discount_percent: ori_discount_percent.value || 0,
+        ori_cashback_percent: ori_cashback_percent.value || 0,
       })
       closeNavigationDrawer()
     }
@@ -208,7 +216,7 @@ const formatCurrency = value => {
                   item-value="id"
                   label="Pilih Master Produk"
                   placeholder="Ketik nama atau cari SKU"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-box-3-line"
                   :disabled="!!props.selectedData"
@@ -224,7 +232,7 @@ const formatCurrency = value => {
                   item-value="id"
                   label="Pilih Cabang Penempatan"
                   placeholder="Pilih cabang outlet"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-store-line"
                   :disabled="!!props.selectedData"
@@ -263,7 +271,7 @@ const formatCurrency = value => {
                   label="Harga Modal (HPP Real) (Rp)"
                   type="text"
                   placeholder="0"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-archive-line"
                   prefix="Rp"
@@ -281,7 +289,7 @@ const formatCurrency = value => {
                   label="Harga Jual Normal (Pricelist POS) (Rp)"
                   type="text"
                   placeholder="0"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-shopping-bag-3-line"
                   prefix="Rp"
@@ -300,7 +308,7 @@ const formatCurrency = value => {
 
               <!-- Live ERP Profit Insight Card -->
               <VCol cols="12" v-if="cost_price > 0 && price > 0" class="my-2">
-                <div class="pa-3 rounded-xl border" :class="calculatedProfit >= 0 ? 'bg-success-lighten-5 border-success-subtle' : 'bg-error-lighten-5 border-error-subtle'">
+                <div class="pa-3 rounded border" :class="calculatedProfit >= 0 ? 'bg-success-lighten-5 border-success-subtle' : 'bg-error-lighten-5 border-error-subtle'">
                   <div class="d-flex align-center justify-space-between">
                     <div>
                       <div class="text-caption text-medium-emphasis" style="font-size: 11px;">Estimasi Keuntungan Retail:</div>
@@ -325,7 +333,7 @@ const formatCurrency = value => {
                   label="Harga Nego Minimum (Batas Kasir) (Rp)"
                   type="text"
                   placeholder="0"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-hand-coin-line"
                   prefix="Rp"
@@ -362,7 +370,7 @@ const formatCurrency = value => {
                   label="PPN Kasir (%)"
                   type="number"
                   placeholder="0"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   suffix="%"
                   hint="PPN keluaran di struk POS"
@@ -376,12 +384,54 @@ const formatCurrency = value => {
                   label="Biaya Tambahan (Rp)"
                   type="text"
                   placeholder="0"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prefix="Rp"
                   hint="Biaya admin / pasang di struk"
                   persistent-hint
                   @update:model-value="val => other_fees = parseInputRupiah(val)"
+                />
+              </VCol>
+            </VRow>
+          </div>
+
+          <VDivider class="my-5" />
+
+          <!-- Section 4: Promo Ori Cabang -->
+          <div class="mb-6">
+            <div class="d-flex align-center gap-2 mb-3">
+              <VIcon icon="ri-percent-line" color="warning" size="18" />
+              <span class="text-subtitle-2 font-weight-bold text-uppercase letter-spacing-1 text-warning">
+                4. Pengaturan Promo Barang Ori (Cabang)
+              </span>
+            </div>
+
+            <VRow dense>
+              <VCol cols="12" md="6">
+                <VTextField
+                  v-model="ori_discount_percent"
+                  type="number"
+                  label="Diskon Ori"
+                  suffix="%"
+                  placeholder="0"
+                  density="compact"
+                  variant="outlined"
+                  hint="Memotong harga langsung saat kasir mencentang Barang Ori"
+                  persistent-hint
+                />
+              </VCol>
+
+              <VCol cols="12" md="6">
+                <VTextField
+                  v-model="ori_cashback_percent"
+                  type="number"
+                  label="Cashback Poin Ori"
+                  suffix="%"
+                  placeholder="0"
+                  density="compact"
+                  variant="outlined"
+                  hint="Masuk ke saldo poin pelanggan saat transaksi selesai"
+                  persistent-hint
                 />
               </VCol>
             </VRow>

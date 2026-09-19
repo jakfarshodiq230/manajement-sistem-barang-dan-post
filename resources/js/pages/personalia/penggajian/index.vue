@@ -237,7 +237,7 @@ const openDetail = (item) => {
     <!-- Tab 1: Proses Gaji -->
     <VWindow v-model="activeTab">
       <VWindowItem value="generate">
-        <VCard elevation="1" class="border rounded-lg mb-4 pa-4">
+        <VCard  class="border rounded-lg mb-4 pa-4">
           <div class="d-flex flex-wrap gap-4 align-center justify-space-between">
             <div class="d-flex flex-wrap gap-4 align-center">
               <VSelect
@@ -271,7 +271,7 @@ const openDetail = (item) => {
           </div>
         </VCard>
 
-        <VCard elevation="1" class="border rounded-lg mb-6 pa-4">
+        <VCard  class="border rounded-lg mb-6 pa-4">
           <VDataTable
             :headers="tableHeaders"
             :items="employeesData"
@@ -333,7 +333,7 @@ const openDetail = (item) => {
 
       <!-- Tab 2: Riwayat -->
       <VWindowItem value="history">
-        <VCard elevation="1" class="border rounded-lg">
+        <VCard  class="border rounded-lg">
           <VDataTable
             :headers="historyHeaders"
             :items="historyData"

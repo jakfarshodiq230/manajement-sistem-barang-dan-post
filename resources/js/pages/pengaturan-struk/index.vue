@@ -237,7 +237,7 @@ const filteredItems = computed(() => {
     </div>
 
     <!-- Alert Info Card -->
-    <VCard class="pa-4 rounded-xl border elevation-1 mb-6 bg-primary-lighten-5">
+    <VCard class="pa-4 rounded border elevation-1 mb-6 bg-primary-lighten-5">
       <div class="d-flex align-center gap-3">
         <VAvatar color="primary" variant="tonal" size="44" rounded="lg">
           <VIcon icon="ri-information-line" size="24" />
@@ -254,7 +254,7 @@ const filteredItems = computed(() => {
     </VCard>
 
     <!-- Main Table Card -->
-    <VCard class="rounded-xl border elevation-1">
+    <VCard class="rounded border elevation-1">
       <VCardText class="pa-5 d-flex justify-space-between align-center flex-wrap gap-4">
         <VTextField
           v-model="search"
@@ -406,7 +406,7 @@ const filteredItems = computed(() => {
                 v-model="editedItem.name"
                 placeholder="Contoh: Thermal Kasir 58mm"
                 variant="outlined"
-                density="comfortable"
+                density="compact"
                 rounded="lg"
                 hide-details
               />
@@ -418,7 +418,7 @@ const filteredItems = computed(() => {
                 v-model="editedItem.width"
                 placeholder="Contoh: 58mm atau 80mm"
                 variant="outlined"
-                density="comfortable"
+                density="compact"
                 rounded="lg"
                 hide-details
               />

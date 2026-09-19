@@ -208,7 +208,7 @@ onMounted(async () => {
     </div>
 
     <!-- Filter Bar -->
-    <VCard elevation="1" class="border rounded-lg mb-6 d-print-none">
+    <VCard  class="border rounded-lg mb-6 d-print-none">
       <VCardText class="pa-4">
         <VRow align="center">
           <VCol cols="12" md="4">
@@ -287,7 +287,7 @@ onMounted(async () => {
     <div v-show="activeTab === 'balance-sheet'">
       <!-- Status Balance Box -->
       <VCard
-        elevation="1"
+        
         class="mb-6 pa-4 border rounded-lg"
         :color="balanceSheet.is_balanced ? 'success-lighten-5' : 'error-lighten-5'"
       >
@@ -315,7 +315,7 @@ onMounted(async () => {
       <VRow>
         <!-- Kolom Kiri: ASET / AKTIVA -->
         <VCol cols="12" md="6">
-          <VCard elevation="1" class="border rounded-lg h-100">
+          <VCard  class="border rounded-lg h-100">
             <VCardItem class="pa-4 bg-primary-lighten-5 border-b">
               <VCardTitle class="text-h6 font-weight-bold text-primary">
                 ASET / AKTIVA (ASSETS)
@@ -349,7 +349,7 @@ onMounted(async () => {
 
         <!-- Kolom Kanan: KEWAJIBAN & EKUITAS (PASIVA) -->
         <VCol cols="12" md="6">
-          <VCard elevation="1" class="border rounded-lg h-100">
+          <VCard  class="border rounded-lg h-100">
             <VCardItem class="pa-4 bg-warning-lighten-5 border-b">
               <VCardTitle class="text-h6 font-weight-bold text-warning">
                 KEWAJIBAN & EKUITAS (PASIVA)
@@ -422,7 +422,7 @@ onMounted(async () => {
 
     <!-- TAB 2: NERACA SALDO (TRIAL BALANCE) -->
     <div v-show="activeTab === 'trial-balance'">
-      <VCard elevation="1" class="border rounded-lg">
+      <VCard  class="border rounded-lg">
         <VCardItem class="pa-4 pb-2">
           <VCardTitle class="font-weight-bold text-h6">
             Neraca Saldo (Trial Balance) Per {{ asOfDate }}
@@ -470,7 +470,7 @@ onMounted(async () => {
 
     <!-- TAB 3: LAPORAN LABA RUGI (INCOME STATEMENT) -->
     <div v-show="activeTab === 'income-statement'">
-      <VCard elevation="1" class="border rounded-lg">
+      <VCard  class="border rounded-lg">
         <VCardItem class="pa-4 pb-2">
           <VCardTitle class="font-weight-bold text-h6">
             Laporan Laba Rugi (Income Statement)

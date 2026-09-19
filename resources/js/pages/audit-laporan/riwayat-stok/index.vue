@@ -189,7 +189,7 @@ const formatDate = dateString => {
     </div>
 
     <!-- Filter Card -->
-    <VCard elevation="2" :loading="isLoading">
+    <VCard  :loading="isLoading">
       <VCardText class="d-flex flex-wrap gap-4 align-center py-4">
         <VSelect
           v-model="selectedMonth"

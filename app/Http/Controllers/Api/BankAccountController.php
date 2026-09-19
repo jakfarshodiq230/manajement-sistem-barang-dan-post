@@ -73,12 +73,8 @@ class BankAccountController extends Controller
             if ($branchId !== null && $branchId !== '' && $branchId !== 'null') {
                 $salesMonthQuery->where('branch_id', $branchId);
             }
-            $salesMonth = $salesMonthQuery->get();
-                
-            $monthReceived = 0;
-            foreach ($salesMonth as $s) {
-                $monthReceived += $s->payment_method === 'tempo' ? (float) $s->dp_amount : (float) $s->total_amount;
-            }
+            $salesMonthCount = clone $salesMonthQuery;
+            $monthReceived = (float) $salesMonthQuery->sum(DB::raw("CASE WHEN payment_method = 'tempo' THEN COALESCE(paid_amount, 0) ELSE COALESCE(total_amount, 0) END"));
             
             // Receivable payments might not have branch_id directly, but if they do, we should filter. 
             // Assuming receivable_payments is global for the account, or we can just filter by branch if applicable.
@@ -92,7 +88,7 @@ class BankAccountController extends Controller
             $monthReceivables = (float) $recMonthQuery->sum('amount');
                 
             $account->month_received = $monthReceived + $monthReceivables;
-            $account->month_tx_count = $salesMonth->count() + $recMonthQuery->count();
+            $account->month_tx_count = $salesMonthCount->count() + $recMonthQuery->count();
 
             // Selected Year Revenue
             $salesYearQuery = DB::table('sales')
@@ -103,12 +99,7 @@ class BankAccountController extends Controller
             if ($branchId !== null && $branchId !== '' && $branchId !== 'null') {
                 $salesYearQuery->where('branch_id', $branchId);
             }
-            $salesYear = $salesYearQuery->get();
-                
-            $yearReceived = 0;
-            foreach ($salesYear as $s) {
-                $yearReceived += $s->payment_method === 'tempo' ? (float) $s->dp_amount : (float) $s->total_amount;
-            }
+            $yearReceived = (float) $salesYearQuery->sum(DB::raw("CASE WHEN payment_method = 'tempo' THEN COALESCE(paid_amount, 0) ELSE COALESCE(total_amount, 0) END"));
             
             $recYearQuery = DB::table('receivable_payments')
                 ->where('bank_account_id', $account->id)
@@ -130,12 +121,8 @@ class BankAccountController extends Controller
                 if ($branchId !== null && $branchId !== '' && $branchId !== 'null') {
                     $salesMQuery->where('branch_id', $branchId);
                 }
-                $salesM = $salesMQuery->get();
-                    
-                $rec = 0;
-                foreach ($salesM as $s) {
-                    $rec += $s->payment_method === 'tempo' ? (float) $s->dp_amount : (float) $s->total_amount;
-                }
+                
+                $rec = (float) $salesMQuery->sum(DB::raw("CASE WHEN payment_method = 'tempo' THEN COALESCE(paid_amount, 0) ELSE COALESCE(total_amount, 0) END"));
                 
                 $rec += (float) DB::table('receivable_payments')
                     ->where('bank_account_id', $account->id)

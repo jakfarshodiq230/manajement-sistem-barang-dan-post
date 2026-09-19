@@ -211,7 +211,7 @@ const deleteUser = async () => {
     <!-- KPI Summary Cards -->
     <VRow class="mb-6">
       <VCol cols="12" sm="4">
-        <VCard class="pa-5 rounded-xl border elevation-1">
+        <VCard class="pa-5 rounded border elevation-1">
           <div class="d-flex align-center gap-4">
             <VAvatar color="primary" variant="tonal" size="52" rounded="lg">
               <VIcon icon="ri-group-line" size="28" />
@@ -225,7 +225,7 @@ const deleteUser = async () => {
       </VCol>
 
       <VCol cols="12" sm="4">
-        <VCard class="pa-5 rounded-xl border elevation-1">
+        <VCard class="pa-5 rounded border elevation-1">
           <div class="d-flex align-center gap-4">
             <VAvatar color="warning" variant="tonal" size="52" rounded="lg">
               <VIcon icon="ri-key-2-line" size="28" />
@@ -239,7 +239,7 @@ const deleteUser = async () => {
       </VCol>
 
       <VCol cols="12" sm="4">
-        <VCard class="pa-5 rounded-xl border elevation-1">
+        <VCard class="pa-5 rounded border elevation-1">
           <div class="d-flex align-center gap-4">
             <VAvatar color="info" variant="tonal" size="52" rounded="lg">
               <VIcon icon="ri-store-2-line" size="28" />
@@ -254,7 +254,7 @@ const deleteUser = async () => {
     </VRow>
 
     <!-- Main Table Card -->
-    <VCard class="rounded-xl border elevation-1">
+    <VCard class="rounded border elevation-1">
       <!-- Toolbar -->
       <VCardText class="pa-5">
         <VRow>

@@ -133,7 +133,7 @@ const handleDrawerModelValueUpdate = val => {
                   :rules="[v => !!v || 'Nama supplier wajib diisi']"
                   label="Nama Perusahaan / Supplier"
                   placeholder="Misal: PT. Sparepart Auto Nusantara"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-building-line"
                 />
@@ -144,7 +144,7 @@ const handleDrawerModelValueUpdate = val => {
                   v-model="contact_person"
                   label="Nama Kontak PIC"
                   placeholder="Misal: Bpk. Gunawan (Sales Manager)"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-user-line"
                 />
@@ -169,7 +169,7 @@ const handleDrawerModelValueUpdate = val => {
                   v-model="phone"
                   label="No. Telepon / WhatsApp"
                   placeholder="Misal: 081234567890"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-phone-line"
                 />
@@ -181,7 +181,7 @@ const handleDrawerModelValueUpdate = val => {
                   label="Alamat Email"
                   type="email"
                   placeholder="vendor@supplier.com"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-mail-line"
                 />
@@ -193,7 +193,7 @@ const handleDrawerModelValueUpdate = val => {
                   label="Alamat Kantor / Gudang Supplier"
                   placeholder="Tuliskan alamat lengkap pengiriman/faktur..."
                   rows="3"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-map-pin-line"
                 />

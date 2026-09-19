@@ -122,7 +122,7 @@ function resetForm() {
                 :rules="[v => !!v || 'Nama kategori wajib diisi']"
                 label="Nama Kategori Produk"
                 placeholder="Misal: Aki Basah / Aki Kering / Oli"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
                 prepend-inner-icon="ri-folder-3-line"
               />
@@ -134,7 +134,7 @@ function resetForm() {
                 label="Deskripsi & Keterangan Kategori"
                 placeholder="Tuliskan catatan klasifikasi barang..."
                 rows="3"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
                 prepend-inner-icon="ri-file-text-line"
               />

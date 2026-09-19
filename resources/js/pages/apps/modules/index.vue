@@ -281,7 +281,7 @@ const updateSubItemsState = async ({ parentId, items }) => {
     <!-- Stats Cards -->
     <VRow class="mb-6">
       <VCol cols="12" sm="6" md="3">
-        <VCard class="pa-5 rounded-xl border elevation-1">
+        <VCard class="pa-5 rounded border elevation-1">
           <div class="d-flex align-center gap-4">
             <VAvatar color="primary" variant="tonal" size="52" rounded="lg">
               <VIcon icon="ri-apps-2-line" size="28" />
@@ -295,7 +295,7 @@ const updateSubItemsState = async ({ parentId, items }) => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard class="pa-5 rounded-xl border elevation-1">
+        <VCard class="pa-5 rounded border elevation-1">
           <div class="d-flex align-center gap-4">
             <VAvatar color="success" variant="tonal" size="52" rounded="lg">
               <VIcon icon="ri-checkbox-circle-line" size="28" />
@@ -309,7 +309,7 @@ const updateSubItemsState = async ({ parentId, items }) => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard class="pa-5 rounded-xl border elevation-1">
+        <VCard class="pa-5 rounded border elevation-1">
           <div class="d-flex align-center gap-4">
             <VAvatar color="warning" variant="tonal" size="52" rounded="lg">
               <VIcon icon="ri-shield-user-line" size="28" />
@@ -323,7 +323,7 @@ const updateSubItemsState = async ({ parentId, items }) => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard class="pa-5 rounded-xl border elevation-1">
+        <VCard class="pa-5 rounded border elevation-1">
           <div class="d-flex align-center gap-4">
             <VAvatar color="info" variant="tonal" size="52" rounded="lg">
               <VIcon icon="ri-folder-2-line" size="28" />
@@ -338,7 +338,7 @@ const updateSubItemsState = async ({ parentId, items }) => {
     </VRow>
 
     <!-- Main Tree Card -->
-    <VCard class="rounded-xl border elevation-1">
+    <VCard class="rounded border elevation-1">
       <VCardText class="pa-6">
         <div class="d-flex justify-space-between align-center flex-wrap gap-4 mb-6">
           <div>

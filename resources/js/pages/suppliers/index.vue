@@ -169,7 +169,7 @@ const executeDeleteSupplier = async isConfirmed => {
     <!-- KPI Summary Row -->
     <VRow class="mb-4">
       <VCol cols="12" sm="4">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+        <VCard  class="pa-4 border-s-lg border-primary">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-primary font-weight-bold">TOTAL VENDOR MITRA</div>
@@ -184,7 +184,7 @@ const executeDeleteSupplier = async isConfirmed => {
       </VCol>
 
       <VCol cols="12" sm="4">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+        <VCard  class="pa-4 border-s-lg border-success">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-success font-weight-bold">SUPPLIER AKTIF</div>
@@ -199,7 +199,7 @@ const executeDeleteSupplier = async isConfirmed => {
       </VCol>
 
       <VCol cols="12" sm="4">
-        <VCard elevation="2" class="pa-4 border-s-lg border-secondary">
+        <VCard  class="pa-4 border-s-lg border-secondary">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-secondary font-weight-bold">SUPPLIER NONAKTIF</div>
@@ -215,7 +215,7 @@ const executeDeleteSupplier = async isConfirmed => {
     </VRow>
 
     <!-- Main Table Card -->
-    <VCard elevation="2">
+    <VCard >
       <!-- Card Toolbar -->
       <VCardItem class="pa-4">
         <VRow align="center">
@@ -386,7 +386,7 @@ const executeDeleteSupplier = async isConfirmed => {
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -395,7 +395,7 @@ const executeDeleteSupplier = async isConfirmed => {
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalItems / itemsPerPage)"

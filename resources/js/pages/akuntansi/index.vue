@@ -193,7 +193,7 @@ const downloadFinancialPdf = () => {
     <VRow class="mb-6 match-height">
       <!-- 1. Total Aset (Aktiva) -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="1" class="h-100 pa-4 border rounded-lg">
+        <VCard  class="h-100 pa-4 border rounded-lg">
           <div class="d-flex align-center justify-space-between mb-2">
             <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Total Aset (Aktiva)</span>
             <VAvatar color="primary" variant="tonal" size="36" rounded>
@@ -211,7 +211,7 @@ const downloadFinancialPdf = () => {
 
       <!-- 2. Total Kewajiban (Hutang) -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="1" class="h-100 pa-4 border rounded-lg">
+        <VCard  class="h-100 pa-4 border rounded-lg">
           <div class="d-flex align-center justify-space-between mb-2">
             <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Total Kewajiban (Hutang)</span>
             <VAvatar color="error" variant="tonal" size="36" rounded>
@@ -229,7 +229,7 @@ const downloadFinancialPdf = () => {
 
       <!-- 3. Total Ekuitas & Laba -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="1" class="h-100 pa-4 border rounded-lg">
+        <VCard  class="h-100 pa-4 border rounded-lg">
           <div class="d-flex align-center justify-space-between mb-2">
             <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Ekuitas & Modal</span>
             <VAvatar color="warning" variant="tonal" size="36" rounded>
@@ -247,7 +247,7 @@ const downloadFinancialPdf = () => {
 
       <!-- 4. Laba Bersih Akuntansi -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="1" class="h-100 pa-4 border rounded-lg">
+        <VCard  class="h-100 pa-4 border rounded-lg">
           <div class="d-flex align-center justify-space-between mb-2">
             <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Laba Bersih Akuntansi</span>
             <VAvatar :color="stats.net_profit >= 0 ? 'success' : 'error'" variant="tonal" size="36" rounded>
@@ -265,7 +265,7 @@ const downloadFinancialPdf = () => {
     </VRow>
 
     <!-- Status Validasi Neraca (Balance Indicator) -->
-    <VCard elevation="1" class="mb-6 border rounded-lg pa-4" :color="stats.is_balance_sheet_balanced ? 'success-lighten-5' : 'error-lighten-5'">
+    <VCard  class="mb-6 border rounded-lg pa-4" :color="stats.is_balance_sheet_balanced ? 'success-lighten-5' : 'error-lighten-5'">
       <div class="d-flex flex-wrap align-center justify-space-between gap-4">
         <div class="d-flex align-center gap-3">
           <VAvatar :color="stats.is_balance_sheet_balanced ? 'success' : 'error'" variant="tonal" size="40" rounded>
@@ -314,7 +314,7 @@ const downloadFinancialPdf = () => {
       >
         <VCard
           class="h-100 d-flex flex-column border rounded-lg module-card"
-          elevation="1"
+          
           :to="mod.to"
         >
           <VCardText class="pa-5 flex-grow-1">

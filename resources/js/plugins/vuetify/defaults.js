@@ -1,4 +1,14 @@
 export default {
+  VCard: {
+    elevation: 0,
+    variant: 'flat',
+  },
+  VDataTable: {
+    density: 'compact',
+  },
+  VDataTableServer: {
+    density: 'compact',
+  },
   IconBtn: {
     icon: true,
     color: 'default',
@@ -21,6 +31,7 @@ export default {
   VBtn: {
     // set v-btn default color to primary
     color: 'primary',
+    variant: 'flat',
   },
   VMenu: {
     offset: '2px',

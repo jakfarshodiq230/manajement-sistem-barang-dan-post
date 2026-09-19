@@ -368,7 +368,7 @@ const deleteOrder = async id => {
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -377,7 +377,7 @@ const deleteOrder = async id => {
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalOrder / itemsPerPage)"

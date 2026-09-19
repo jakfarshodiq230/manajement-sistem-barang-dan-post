@@ -153,7 +153,7 @@ const handleCancel = () => {
           placeholder="Cari nama supervisor"
           class="mb-4"
           variant="outlined"
-          density="comfortable"
+          density="compact"
           no-data-text="Tidak ada supervisor untuk cabang ini"
         />
 
@@ -165,7 +165,7 @@ const handleCancel = () => {
           :error-messages="errorMsg"
           autocomplete="off"
           variant="outlined"
-          density="comfortable"
+          density="compact"
           maxlength="6"
           @keyup.enter="submitApproval"
         />

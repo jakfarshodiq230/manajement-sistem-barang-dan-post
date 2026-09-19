@@ -230,7 +230,7 @@ const editAdjustment = () => {
 
         <template v-else-if="adjustment">
           <!-- Metadata Card -->
-          <VCard elevation="0" class="border rounded-lg pa-4 mb-4 bg-var-theme-surface">
+          <VCard  class="border rounded-lg pa-4 mb-4 bg-var-theme-surface">
             <VRow dense>
               <VCol cols="12" md="4">
                 <div class="text-caption text-medium-emphasis">Tanggal Berlaku Efektif</div>
@@ -282,28 +282,28 @@ const editAdjustment = () => {
           <!-- KPI Summary Cards -->
           <VRow class="mb-4" dense>
             <VCol cols="12" sm="3">
-              <VCard elevation="0" class="border rounded-lg pa-3 text-center">
+              <VCard  class="border rounded-lg pa-3 text-center">
                 <div class="text-caption text-medium-emphasis font-weight-bold text-uppercase">Total Produk</div>
                 <div class="text-h6 font-weight-bold">{{ totalItems }} SKU</div>
               </VCard>
             </VCol>
 
             <VCol cols="12" sm="3">
-              <VCard elevation="0" class="border rounded-lg pa-3 text-center">
+              <VCard  class="border rounded-lg pa-3 text-center">
                 <div class="text-caption text-success font-weight-bold text-uppercase">Produk Naik</div>
                 <div class="text-h6 font-weight-bold text-success">+{{ increasedCount }} Item</div>
               </VCard>
             </VCol>
 
             <VCol cols="12" sm="3">
-              <VCard elevation="0" class="border rounded-lg pa-3 text-center">
+              <VCard  class="border rounded-lg pa-3 text-center">
                 <div class="text-caption text-medium-emphasis font-weight-bold text-uppercase">Produk Turun / Tetap</div>
                 <div class="text-h6 font-weight-bold">{{ decreasedCount }} Item</div>
               </VCard>
             </VCol>
 
             <VCol cols="12" sm="3">
-              <VCard elevation="0" class="border rounded-lg pa-3 text-center">
+              <VCard  class="border rounded-lg pa-3 text-center">
                 <div class="text-caption text-primary font-weight-bold text-uppercase">Total Selisih Nilai</div>
                 <div
                   class="text-h6 font-weight-bold font-mono"
@@ -316,7 +316,7 @@ const editAdjustment = () => {
           </VRow>
 
           <!-- Item Table -->
-          <VCard elevation="0" class="border rounded-lg">
+          <VCard  class="border rounded-lg">
             <VTable density="compact" class="text-no-wrap" hover>
               <thead>
                 <tr>

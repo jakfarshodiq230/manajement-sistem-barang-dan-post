@@ -157,7 +157,7 @@ const chartSeries = computed(() => {
 
       <!-- Side Daily & Monthly Income Cards -->
       <VCol cols="12" md="4" class="d-flex flex-column gap-4">
-        <VCard elevation="2" class="border-s-lg border-primary flex-grow-1">
+        <VCard class="border-s-lg border-primary flex-grow-1">
           <VCardText class="d-flex align-center justify-space-between py-4">
             <div>
               <div class="text-caption text-primary font-weight-bold">
@@ -174,7 +174,7 @@ const chartSeries = computed(() => {
           </VCardText>
         </VCard>
 
-        <VCard elevation="2" class="border-s-lg border-success flex-grow-1">
+        <VCard class="border-s-lg border-success flex-grow-1">
           <VCardText class="d-flex align-center justify-space-between py-4">
             <div>
               <div class="text-caption text-success font-weight-bold">
@@ -197,7 +197,7 @@ const chartSeries = computed(() => {
     <VRow class="mb-4">
       <!-- 1. Pendapatan Tahun Ini -->
       <VCol cols="12" sm="6" md="4" lg="2">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info h-100">
+        <VCard class="pa-4 border-s-lg border-info h-100">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-info font-weight-bold">OMZET TAHUN INI</div>
@@ -213,7 +213,7 @@ const chartSeries = computed(() => {
 
       <!-- 2. Pengadaan PO Bulan Ini -->
       <VCol cols="12" sm="6" md="4" lg="2">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary h-100" to="/purchase-orders">
+        <VCard class="pa-4 border-s-lg border-primary h-100" to="/purchase-orders">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-primary font-weight-bold">PENGADAAN (PO)</div>
@@ -234,7 +234,7 @@ const chartSeries = computed(() => {
 
       <!-- 3. Total Diskon Kasir -->
       <VCol cols="12" sm="6" md="4" lg="2">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success h-100">
+        <VCard class="pa-4 border-s-lg border-success h-100">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-success font-weight-bold">DISKON KASIR</div>
@@ -250,7 +250,7 @@ const chartSeries = computed(() => {
 
       <!-- 4. Total Piutang Aktif -->
       <VCol cols="12" sm="6" md="4" lg="2">
-        <VCard elevation="2" class="pa-4 border-s-lg border-warning h-100" to="/receivables">
+        <VCard class="pa-4 border-s-lg border-warning h-100" to="/receivables">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-warning font-weight-bold">PIUTANG AKTIF</div>
@@ -266,7 +266,7 @@ const chartSeries = computed(() => {
 
       <!-- 5. Retur Bulan Ini -->
       <VCol cols="12" sm="6" md="4" lg="2">
-        <VCard elevation="2" class="pa-4 border-s-lg border-error h-100" to="/retur">
+        <VCard class="pa-4 border-s-lg border-error h-100" to="/retur">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-error font-weight-bold">RETUR BULAN INI</div>
@@ -282,7 +282,7 @@ const chartSeries = computed(() => {
 
       <!-- 6. Selisih Opname Terakhir -->
       <VCol cols="12" sm="6" md="4" lg="2">
-        <VCard elevation="2" class="pa-4 border-s-lg border-secondary h-100" to="/audit/stock-opname">
+        <VCard class="pa-4 border-s-lg border-secondary h-100" to="/audit/stock-opname">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-secondary font-weight-bold">SELISIH OPNAME</div>
@@ -300,7 +300,7 @@ const chartSeries = computed(() => {
     </VRow>
 
     <!-- Quick Shortcuts Navigation -->
-    <VCard elevation="2" class="mb-4 pa-4 rounded-xl bg-var-theme-background border">
+    <VCard class="mb-4 pa-4 bg-var-theme-background">
       <div class="d-flex align-center justify-space-between flex-wrap gap-3">
         <div class="d-flex align-center gap-2">
           <VIcon icon="ri-flashlight-line" color="primary" size="22" />
@@ -330,7 +330,7 @@ const chartSeries = computed(() => {
     </VCard>
 
     <!-- 12-Month Sales Income Trend Chart -->
-    <VCard elevation="2" class="mb-4">
+    <VCard class="mb-4">
       <VCardItem class="pb-0">
         <div class="d-flex align-center justify-space-between flex-wrap gap-2">
           <div>
@@ -356,7 +356,7 @@ const chartSeries = computed(() => {
     <VRow class="mb-4">
       <!-- Low Stock Table -->
       <VCol cols="12" md="6">
-        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
+        <VCard class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="warning" variant="tonal" size="36" class="me-2">
@@ -369,7 +369,7 @@ const chartSeries = computed(() => {
           <VDivider />
           <VProgressLinear v-if="isLoading" indeterminate color="warning" height="2" />
 
-          <VTable class="text-no-wrap" hover density="comfortable">
+          <VTable class="text-no-wrap" hover density="compact">
             <thead>
               <tr class="bg-grey-50">
                 <th class="text-left font-weight-bold">PRODUK</th>
@@ -419,7 +419,7 @@ const chartSeries = computed(() => {
 
       <!-- Expiring Batches (FEFO) Table -->
       <VCol cols="12" md="6">
-        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
+        <VCard class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="error" variant="tonal" size="36" class="me-2">
@@ -432,7 +432,7 @@ const chartSeries = computed(() => {
           <VDivider />
           <VProgressLinear v-if="isLoading" indeterminate color="error" height="2" />
 
-          <VTable class="text-no-wrap" hover density="comfortable">
+          <VTable class="text-no-wrap" hover density="compact">
             <thead>
               <tr class="bg-grey-50">
                 <th class="text-left font-weight-bold">PRODUK</th>
@@ -487,7 +487,7 @@ const chartSeries = computed(() => {
     <VRow>
       <!-- Dead Stock Table (FIFO) -->
       <VCol cols="12" md="6">
-        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
+        <VCard class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="warning" variant="tonal" size="36" class="me-2">
@@ -500,7 +500,7 @@ const chartSeries = computed(() => {
           <VDivider />
           <VProgressLinear v-if="isLoading" indeterminate color="warning" height="2" />
 
-          <VTable class="text-no-wrap" hover density="comfortable">
+          <VTable class="text-no-wrap" hover density="compact">
             <thead>
               <tr class="bg-grey-50">
                 <th class="text-left font-weight-bold">PRODUK</th>
@@ -550,7 +550,7 @@ const chartSeries = computed(() => {
 
       <!-- New Stock Table (LIFO) -->
       <VCol cols="12" md="6">
-        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
+        <VCard class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="info" variant="tonal" size="36" class="me-2">
@@ -563,7 +563,7 @@ const chartSeries = computed(() => {
           <VDivider />
           <VProgressLinear v-if="isLoading" indeterminate color="info" height="2" />
 
-          <VTable class="text-no-wrap" hover density="comfortable">
+          <VTable class="text-no-wrap" hover density="compact">
             <thead>
               <tr class="bg-grey-50">
                 <th class="text-left font-weight-bold">PRODUK</th>

@@ -680,7 +680,7 @@ const executeDeletePO = async () => {
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -689,7 +689,7 @@ const executeDeletePO = async () => {
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalItems / itemsPerPage)"
@@ -781,7 +781,7 @@ const executeDeletePO = async () => {
           </VAlert>
 
           <!-- Section 1: Data Faktur dari Petugas Gudang (Jika Barang Sudah Divalidasi Gudang) -->
-          <div v-if="trackingPO.goods_receipt" class="pa-4 bg-var-theme-surface rounded-xl border mb-5 shadow-xs">
+          <div v-if="trackingPO.goods_receipt" class="pa-4 bg-var-theme-surface rounded border mb-5 shadow-xs">
             <div class="d-flex align-center justify-space-between mb-3">
               <h6 class="text-subtitle-2 font-weight-bold text-uppercase letter-spacing-1 text-primary d-flex align-center gap-2 mb-0">
                 <VIcon icon="ri-file-paper-2-line" size="18" />
@@ -840,7 +840,7 @@ const executeDeletePO = async () => {
           <!-- Section: Status & Rincian Pembayaran Hutang Supplier (Hutang / Lunas) -->
           <div
             v-if="trackingPO.status === 'completed' || trackingPO.goods_receipt?.approval_status === 'approved' || trackingPO.payable || trackingPO.goods_receipt?.payable"
-            class="pa-4 rounded-xl border mb-5 shadow-xs"
+            class="pa-4 rounded border mb-5 shadow-xs"
             :class="(trackingPO.payable?.status === 'paid' || trackingPO.goods_receipt?.payable?.status === 'paid' || (trackingPO.payable?.remaining_amount !== undefined && Number(trackingPO.payable?.remaining_amount) <= 0) || (trackingPO.goods_receipt?.payable?.remaining_amount !== undefined && Number(trackingPO.goods_receipt?.payable?.remaining_amount) <= 0)) ? 'bg-success-lighten-5 border-success' : 'bg-var-theme-surface border-warning'"
           >
             <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-3">
@@ -1108,7 +1108,7 @@ const executeDeletePO = async () => {
       v-model="isApproveDialogVisible"
       max-width="520"
     >
-      <VCard class="rounded-xl overflow-hidden shadow-lg">
+      <VCard class="rounded overflow-hidden shadow-lg">
         <VCardTitle class="pa-5 pb-3 font-weight-bold text-h6 text-success d-flex align-center gap-2 bg-success-subtle border-b">
           <VIcon icon="ri-checkbox-circle-fill" color="success" size="24" />
           Konfirmasi Persetujuan Penerimaan Barang
@@ -1153,7 +1153,7 @@ const executeDeletePO = async () => {
       v-model="isDeletePoDialogVisible"
       max-width="480"
     >
-      <VCard class="rounded-xl overflow-hidden shadow-lg">
+      <VCard class="rounded overflow-hidden shadow-lg">
         <VCardTitle class="pa-5 pb-3 font-weight-bold text-h6 text-error d-flex align-center gap-2 bg-error-subtle border-b">
           <VIcon icon="ri-delete-bin-line" color="error" size="24" />
           Konfirmasi Hapus Purchase Order

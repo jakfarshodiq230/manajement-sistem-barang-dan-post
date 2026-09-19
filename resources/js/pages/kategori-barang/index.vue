@@ -269,7 +269,7 @@ const handleFileUpload = async event => {
     <!-- KPI Summary Row -->
     <VRow class="mb-4">
       <VCol cols="12" sm="4">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+        <VCard  class="pa-4 border-s-lg border-primary">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-primary font-weight-bold">TOTAL KATEGORI</div>
@@ -284,7 +284,7 @@ const handleFileUpload = async event => {
       </VCol>
 
       <VCol cols="12" sm="4">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+        <VCard  class="pa-4 border-s-lg border-info">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-info font-weight-bold">CYCLE COUNTING AUDIT</div>
@@ -299,7 +299,7 @@ const handleFileUpload = async event => {
       </VCol>
 
       <VCol cols="12" sm="4">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+        <VCard  class="pa-4 border-s-lg border-success">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-success font-weight-bold">STATUS DATABASE</div>
@@ -315,7 +315,7 @@ const handleFileUpload = async event => {
     </VRow>
 
     <!-- Main Table Card -->
-    <VCard elevation="2">
+    <VCard >
       <!-- Card Toolbar -->
       <VCardItem class="pa-4">
         <div class="d-flex flex-wrap align-center justify-space-between gap-4">
@@ -427,7 +427,7 @@ const handleFileUpload = async event => {
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -436,7 +436,7 @@ const handleFileUpload = async event => {
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalItems / itemsPerPage)"

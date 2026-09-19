@@ -51,7 +51,7 @@ definePage({
 <template>
   <div class="login-page-wrapper d-flex align-center justify-center pa-4">
     <div class="w-100 login-card-container">
-      <VCard class="login-card rounded-xl border px-sm-8 px-4 py-8" elevation="0">
+      <VCard class="login-card rounded border px-sm-8 px-4 py-8" >
         <!-- Logo & Header -->
         <div class="d-flex flex-column align-center text-center mb-8">
           <div class="bg-primary-lighten-5 pa-4 rounded-circle mb-4">

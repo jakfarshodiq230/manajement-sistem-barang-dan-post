@@ -437,7 +437,7 @@ onMounted(async () => {
               </p>
 
               <!-- Live Preview Calculation Breakdown -->
-              <VCard variant="tonal" color="primary" class="mb-5 pa-4 rounded-xl border bg-var-theme-surface shadow-xs" :loading="isBreakdownLoading">
+              <VCard variant="tonal" color="primary" class="mb-5 pa-4 rounded border bg-var-theme-surface shadow-xs" :loading="isBreakdownLoading">
                 <div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-3">
                   <div class="d-flex align-center gap-2 font-weight-bold text-subtitle-1 text-primary">
                     <VIcon icon="ri-calculator-line" size="20" />

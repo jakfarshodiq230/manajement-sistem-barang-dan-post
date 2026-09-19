@@ -184,13 +184,13 @@ const copyCatalogLink = () => {
         </p>
 
         <!-- Search Bar Card -->
-        <VCard elevation="3" class="max-w-700 mx-auto rounded-xl pa-2 border">
+        <VCard  class="max-w-700 mx-auto rounded pa-2 border">
           <VTextField
             v-model="searchQuery"
             prepend-inner-icon="ri-search-line"
             placeholder="Ketik nama barang, kode SKU, atau merk produk..."
             variant="plain"
-            density="comfortable"
+            density="compact"
             hide-details
             clearable
             class="px-2"
@@ -257,7 +257,7 @@ const copyCatalogLink = () => {
       <!-- Empty State -->
       <div
         v-else-if="products.length === 0"
-        class="text-center py-16 bg-surface rounded-xl border pa-8 max-w-600 mx-auto"
+        class="text-center py-16 bg-surface rounded border pa-8 max-w-600 mx-auto"
       >
         <VAvatar
           size="80"
@@ -301,8 +301,8 @@ const copyCatalogLink = () => {
             lg="3"
           >
             <VCard
-              class="h-100 product-card rounded-xl overflow-hidden d-flex flex-column transition-all"
-              elevation="1"
+              class="h-100 product-card rounded overflow-hidden d-flex flex-column transition-all"
+              
               hover
               @click="openProductDetail(item)"
             >
@@ -407,7 +407,7 @@ const copyCatalogLink = () => {
       v-model="isDetailModalOpen"
       max-width="560"
     >
-      <VCard v-if="selectedProduct" class="rounded-xl overflow-hidden">
+      <VCard v-if="selectedProduct" class="rounded overflow-hidden">
         <!-- Modal Image -->
         <div class="position-relative bg-grey-lighten-4" style="height: 260px;">
           <VImg
@@ -491,7 +491,7 @@ const copyCatalogLink = () => {
       v-model="isQrModalOpen"
       max-width="400"
     >
-      <VCard class="rounded-xl pa-6 text-center">
+      <VCard class="rounded pa-6 text-center">
         <h4 class="text-h5 font-weight-bold mb-1">QR Katalog Online</h4>
         <p class="text-caption text-medium-emphasis mb-4">
           Pindai kode QR untuk membuka katalog cabang ini di smartphone Anda.

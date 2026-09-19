@@ -78,20 +78,23 @@ class PayableController extends Controller
         // Calculate summary KPIs across filtered set
         $summaryQuery = clone $query;
         $summaryQuery->reorder();
-        $allStatements = $summaryQuery->get();
+        $totalPayable = (float) (clone $summaryQuery)->sum('total_amount');
+        $totalPaid = (float) (clone $summaryQuery)->sum('paid_amount');
+        $totalRemaining = (float) (clone $summaryQuery)->sum('remaining_amount');
 
-        $totalPayable = (float) $allStatements->sum('total_amount');
-        $totalPaid = (float) $allStatements->sum('paid_amount');
-        $totalRemaining = (float) $allStatements->sum('remaining_amount');
+        $totalOverdue = (float) (clone $summaryQuery)
+            ->where('status', '!=', 'paid')
+            ->whereNotNull('due_date')
+            ->where('due_date', '<', $today)
+            ->sum('remaining_amount');
 
-        $totalOverdue = (float) $allStatements->filter(function ($s) use ($today) {
-            return $s->status !== 'paid' && $s->due_date && $s->due_date < $today;
-        })->sum('remaining_amount');
-
-        $dueSoon = (float) $allStatements->filter(function ($s) use ($today) {
-            $next7Days = now()->addDays(7)->toDateString();
-            return $s->status !== 'paid' && $s->due_date && $s->due_date >= $today && $s->due_date <= $next7Days;
-        })->sum('remaining_amount');
+        $next7Days = now()->addDays(7)->toDateString();
+        $dueSoon = (float) (clone $summaryQuery)
+            ->where('status', '!=', 'paid')
+            ->whereNotNull('due_date')
+            ->where('due_date', '>=', $today)
+            ->where('due_date', '<=', $next7Days)
+            ->sum('remaining_amount');
 
         $summary = [
             'total_payable' => $totalPayable,

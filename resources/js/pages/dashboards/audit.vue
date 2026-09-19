@@ -150,7 +150,7 @@ const formatDescription = desc => {
     <!-- KPI Summary Row -->
     <VRow class="mb-4">
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+        <VCard  class="pa-4 border-s-lg border-primary">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">TOTAL LOG TERCATAT</div>
@@ -165,7 +165,7 @@ const formatDescription = desc => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+        <VCard  class="pa-4 border-s-lg border-success">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-success font-weight-bold">DATA BARU DIBUAT</div>
@@ -180,7 +180,7 @@ const formatDescription = desc => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+        <VCard  class="pa-4 border-s-lg border-info">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-info font-weight-bold">DATA DIPERBARUI</div>
@@ -195,7 +195,7 @@ const formatDescription = desc => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-error">
+        <VCard  class="pa-4 border-s-lg border-error">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-error font-weight-bold">DATA DIHAPUS</div>
@@ -211,7 +211,7 @@ const formatDescription = desc => {
     </VRow>
 
     <!-- Audit Logs Table Card -->
-    <VCard elevation="2">
+    <VCard >
       <VCardText class="d-flex flex-wrap gap-4 align-center py-4">
         <VSelect
           v-model="selectedEvent"

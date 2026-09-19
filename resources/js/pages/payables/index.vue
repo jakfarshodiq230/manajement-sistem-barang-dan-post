@@ -307,7 +307,7 @@ const openDetailDrawer = statementId => {
                 {{ summary.count_total }} Tagihan Bulanan Aktif
               </span>
             </div>
-            <VAvatar color="primary" variant="tonal" size="48" class="rounded-xl">
+            <VAvatar color="primary" variant="tonal" size="48" class="rounded">
               <VIcon icon="ri-file-list-3-line" size="24" />
             </VAvatar>
           </VCardText>
@@ -327,7 +327,7 @@ const openDetailDrawer = statementId => {
                 {{ summary.count_paid }} Tagihan Lunas
               </span>
             </div>
-            <VAvatar color="success" variant="tonal" size="48" class="rounded-xl">
+            <VAvatar color="success" variant="tonal" size="48" class="rounded">
               <VIcon icon="ri-checkbox-circle-line" size="24" />
             </VAvatar>
           </VCardText>
@@ -347,7 +347,7 @@ const openDetailDrawer = statementId => {
                 {{ summary.count_unpaid + summary.count_partial }} Tagihan Belum Lunas
               </span>
             </div>
-            <VAvatar color="error" variant="tonal" size="48" class="rounded-xl">
+            <VAvatar color="error" variant="tonal" size="48" class="rounded">
               <VIcon icon="ri-wallet-3-line" size="24" />
             </VAvatar>
           </VCardText>
@@ -367,7 +367,7 @@ const openDetailDrawer = statementId => {
                 {{ summary.count_overdue }} Tagihan Menunggak
               </span>
             </div>
-            <VAvatar color="error" variant="flat" size="48" class="rounded-xl">
+            <VAvatar color="error" variant="flat" size="48" class="rounded">
               <VIcon icon="ri-alarm-warning-line" color="white" size="24" />
             </VAvatar>
           </VCardText>
@@ -376,7 +376,7 @@ const openDetailDrawer = statementId => {
     </VRow>
 
     <!-- Main Card with Tabs -->
-    <VCard class="rounded-xl overflow-hidden shadow-xs border">
+    <VCard class="rounded overflow-hidden shadow-xs border">
       <!-- Tabs Header -->
       <div class="border-b bg-var-theme-surface">
         <VTabs v-model="activeTab" color="primary">
@@ -662,7 +662,7 @@ const openDetailDrawer = statementId => {
                   class="flip-in-rtl"
                   icon="ri-arrow-left-s-line"
                   variant="text"
-                  density="comfortable"
+                  density="compact"
                   color="high-emphasis"
                   :disabled="page <= 1"
                   @click="page <= 1 ? page = 1 : page--"
@@ -671,7 +671,7 @@ const openDetailDrawer = statementId => {
                 <VBtn
                   class="flip-in-rtl"
                   icon="ri-arrow-right-s-line"
-                  density="comfortable"
+                  density="compact"
                   variant="text"
                   color="high-emphasis"
                   :disabled="page >= Math.ceil(totalStatements / itemsPerPage)"
@@ -825,7 +825,7 @@ const openDetailDrawer = statementId => {
                   class="flip-in-rtl"
                   icon="ri-arrow-left-s-line"
                   variant="text"
-                  density="comfortable"
+                  density="compact"
                   color="high-emphasis"
                   :disabled="invoicePage <= 1"
                   @click="invoicePage <= 1 ? invoicePage = 1 : invoicePage--"
@@ -834,7 +834,7 @@ const openDetailDrawer = statementId => {
                 <VBtn
                   class="flip-in-rtl"
                   icon="ri-arrow-right-s-line"
-                  density="comfortable"
+                  density="compact"
                   variant="text"
                   color="high-emphasis"
                   :disabled="invoicePage >= Math.ceil(totalInvoices / invoiceItemsPerPage)"

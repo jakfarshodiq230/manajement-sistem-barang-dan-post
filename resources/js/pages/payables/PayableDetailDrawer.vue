@@ -488,7 +488,7 @@ const closeDrawer = () => {
       <!-- Content -->
       <div v-else-if="statement" class="pa-6 flex-grow-1 overflow-y-auto print-area">
         <!-- Status & Progress Banner -->
-        <div class="mb-5 pa-4 rounded-xl border bg-var-theme-surface shadow-xs">
+        <div class="mb-5 pa-4 rounded border bg-var-theme-surface shadow-xs">
           <div class="d-flex justify-space-between align-center flex-wrap gap-3 mb-3">
             <div>
               <span class="text-caption text-medium-emphasis">Supplier / Vendor:</span>
@@ -616,7 +616,7 @@ const closeDrawer = () => {
           </div>
 
           <!-- Table of Checklist Items -->
-          <div class="border rounded-xl overflow-hidden shadow-xs">
+          <div class="border rounded overflow-hidden shadow-xs">
             <table class="w-100 table-items">
               <thead>
                 <tr class="bg-grey-100 text-left">
@@ -753,7 +753,7 @@ const closeDrawer = () => {
           </div>
 
           <VExpandTransition>
-            <div v-show="isPaymentFormVisible" class="pa-5 rounded-xl border bg-var-theme-surface shadow-sm mb-5">
+            <div v-show="isPaymentFormVisible" class="pa-5 rounded border bg-var-theme-surface shadow-sm mb-5">
               <!-- Form Header -->
               <div class="d-flex align-center justify-space-between pb-3 mb-4 border-b">
                 <div class="d-flex align-center gap-2">
@@ -821,7 +821,7 @@ const closeDrawer = () => {
                   <div class="d-grid grid-cols-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                     <!-- Option 1: Transfer Bank -->
                     <div
-                      class="payable-payment-card pa-3 rounded-xl border cursor-pointer d-flex align-center gap-3"
+                      class="payable-payment-card pa-3 rounded border cursor-pointer d-flex align-center gap-3"
                       :class="paymentMethod === 'bank_transfer' ? 'selected-bank-card' : 'unselected-card'"
                       @click="paymentMethod = 'bank_transfer'"
                     >
@@ -851,7 +851,7 @@ const closeDrawer = () => {
 
                     <!-- Option 2: Kas Tunai Toko -->
                     <div
-                      class="payable-payment-card pa-3 rounded-xl border cursor-pointer d-flex align-center gap-3"
+                      class="payable-payment-card pa-3 rounded border cursor-pointer d-flex align-center gap-3"
                       :class="paymentMethod === 'cash' ? 'selected-cash-card' : 'unselected-card'"
                       @click="paymentMethod = 'cash'"
                     >
@@ -883,7 +883,7 @@ const closeDrawer = () => {
 
                 <!-- Bank Account Selection for Bank Transfer -->
                 <VCol v-if="paymentMethod === 'bank_transfer'" cols="12" class="mt-2">
-                  <div class="pa-4 rounded-xl border border-info" style="background-color: rgba(var(--v-theme-info), 0.04);">
+                  <div class="pa-4 rounded border border-info" style="background-color: rgba(var(--v-theme-info), 0.04);">
                     <div class="d-flex align-center justify-space-between mb-2">
                       <span class="text-caption font-weight-bold text-info d-flex align-center gap-1">
                         <VIcon icon="ri-bank-line" size="16" />
@@ -945,7 +945,7 @@ const closeDrawer = () => {
 
                 <!-- Cash explanation banner -->
                 <VCol v-if="paymentMethod === 'cash'" cols="12" class="mt-2">
-                  <div class="pa-3 rounded-xl border bg-var-theme-surface text-caption text-medium-emphasis d-flex align-center gap-2">
+                  <div class="pa-3 rounded border bg-var-theme-surface text-caption text-medium-emphasis d-flex align-center gap-2">
                     <VIcon icon="ri-information-line" size="20" color="warning" />
                     <div>Pembayaran kas tunai memotong tagihan tanpa memotong saldo rekening bank.</div>
                   </div>
@@ -1020,7 +1020,7 @@ const closeDrawer = () => {
             Riwayat Cicilan & Pelunasan Periode Ini ({{ statement.payments?.length || 0 }})
           </h6>
 
-          <div v-if="statement.payments && statement.payments.length > 0" class="border rounded-xl overflow-hidden shadow-xs">
+          <div v-if="statement.payments && statement.payments.length > 0" class="border rounded overflow-hidden shadow-xs">
             <table class="w-100 table-payments">
               <thead>
                 <tr class="bg-grey-100 text-left">
@@ -1095,7 +1095,7 @@ const closeDrawer = () => {
             </table>
           </div>
 
-          <div v-else class="pa-6 text-center border rounded-xl bg-grey-50 text-medium-emphasis">
+          <div v-else class="pa-6 text-center border rounded bg-grey-50 text-medium-emphasis">
             <VIcon icon="ri-inbox-line" size="32" class="mb-1 text-disabled" />
             <div class="text-caption">Belum ada catatan cicilan atau pembayaran untuk tagihan bulanan ini.</div>
           </div>

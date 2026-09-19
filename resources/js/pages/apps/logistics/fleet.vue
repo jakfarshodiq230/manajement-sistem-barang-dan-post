@@ -243,7 +243,6 @@ watch(activeIndex, () => {
                         icon-color="success"
                         fill-dot
                         size="20"
-                        :elevation="0"
                       >
                         <div class="text-caption text-uppercase text-success">
                           TRACKING NUMBER CREATED
@@ -261,7 +260,6 @@ watch(activeIndex, () => {
                         icon-color="success"
                         fill-dot
                         size="20"
-                        :elevation="0"
                       >
                         <div class="text-caption text-uppercase text-success">
                           OUT FOR DELIVERY
@@ -279,7 +277,6 @@ watch(activeIndex, () => {
                         icon-color="primary"
                         fill-dot
                         size="20"
-                        :elevation="0"
                       >
                         <div class="text-caption text-uppercase text-primary">
                           ARRIVED

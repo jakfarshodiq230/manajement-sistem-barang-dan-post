@@ -22,19 +22,7 @@ Route::get('/auth/verify-email/{id}/{hash}', [AuthController::class, 'verifyEmai
 Route::post('/auth/email/verification-notification', [AuthController::class, 'sendVerificationEmail'])->name('verification.send');
 Route::get('/katalog/{branch_id}', [\App\Http\Controllers\Api\KatalogController::class, 'getKatalog']);
 
-Route::get('/fix-permissions', function () {
-    app()->make(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
-    
-    // Ensure dev role has Kasir (POS) Create permission
-    $dev = \Spatie\Permission\Models\Role::where('name', 'Developer')->orWhere('name', 'dev')->first();
-    if ($dev) {
-        $permission = \Spatie\Permission\Models\Permission::firstOrCreate(['name' => 'Kasir (POS) Create']);
-        if (!$dev->hasPermissionTo('Kasir (POS) Create')) {
-            $dev->givePermissionTo($permission);
-        }
-    }
-    return response()->json(['message' => 'Cache cleared and permissions synced for dev role!']);
-});
+
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/apps/update-pin', [\App\Http\Controllers\Api\AuthController::class, 'updatePin']);
@@ -415,126 +403,11 @@ use App\Models\Module;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
-Route::get('/init-dashboard', function () {
-    $parent = Module::firstOrCreate(['name' => 'Dashboard', 'slug' => 'dashboard'], ['sequence' => 1]);
-    
-    $modules = [
-        ['name' => 'Dashboard Analytics', 'slug' => 'dashboards/analytics'],
-        ['name' => 'Dashboard Penjualan', 'slug' => 'dashboards/penjualan'],
-        ['name' => 'Dashboard Barang', 'slug' => 'dashboards/barang'],
-        ['name' => 'Dashboard Keuntungan', 'slug' => 'dashboards/keuntungan'],
-        ['name' => 'Dashboard Audit', 'slug' => 'dashboards/audit'],
-    ];
 
-    $dev = Role::where('name', 'Developer')->first();
-    $owner = Role::where('name', 'Owner')->first();
 
-    foreach ($modules as $mod) {
-        $child = Module::where('name', $mod['name'])->orWhere('slug', $mod['slug'])->first();
-        if ($child) {
-            $child->update(['name' => $mod['name'], 'slug' => $mod['slug'], 'parent_id' => $parent->id]);
-        } else {
-            $child = Module::create(['name' => $mod['name'], 'slug' => $mod['slug'], 'parent_id' => $parent->id, 'sequence' => 1]);
-        }
 
-        $permName = $mod['name'] . ' Read';
-        $permission = Permission::where('name', $permName)->first();
-        if (!$permission) {
-            $permission = Permission::create(['name' => $permName, 'module_id' => $child->id]);
-        } else {
-            $permission->update(['module_id' => $child->id]);
-        }
 
-        if ($dev) $dev->givePermissionTo($permission);
-        if ($owner) $owner->givePermissionTo($permission);
-    }
 
-    return response()->json(['message' => '5 Dashboard sub-modules and permissions initialized successfully.']);
-});
-
-Route::get('/debug-modules', function() {
-    \Illuminate\Support\Facades\DB::table('modules')->where('slug', 'dashboard-penjualan')->delete();
-    return response()->json(\App\Models\Module::where('name', 'like', 'Dashboard%')->get(['id', 'name', 'slug']));
-});
-
-Route::get('/init-rekap', function () {
-    $parent = Module::firstOrCreate(
-        ['name' => 'Audit & Laporan', 'slug' => 'audit'],
-        ['sequence' => 2]
-    );
-
-    $modules = [
-        ['name' => 'Closing Harian', 'slug' => 'audit/closing-harian'],
-        ['name' => 'Stock Opname',   'slug' => 'audit/stock-opname'],
-        ['name' => 'Rekap Tahunan',  'slug' => 'audit/rekap'],
-        ['name' => 'Analisis Stok',  'slug' => 'laporan/stok-aging'],
-    ];
-
-    $dev   = Role::where('name', 'Developer')->first();
-    $owner = Role::where('name', 'Owner')->first();
-
-    foreach ($modules as $mod) {
-        $child = Module::where('slug', $mod['slug'])->first();
-        if ($child) {
-            $child->update(['name' => $mod['name'], 'parent_id' => $parent->id]);
-        } else {
-            $child = Module::create(['name' => $mod['name'], 'slug' => $mod['slug'], 'parent_id' => $parent->id, 'sequence' => 1]);
-        }
-
-        $permName   = $mod['name'] . ' Read';
-        $permission = Permission::firstOrCreate(['name' => $permName], ['module_id' => $child->id]);
-        $permission->update(['module_id' => $child->id]);
-
-        if ($dev)   $dev->givePermissionTo($permission);
-        if ($owner) $owner->givePermissionTo($permission);
-    }
-
-    return response()->json(['message' => 'Audit modules & Rekap Tahunan registered successfully.']);
-});
-
-Route::get('/init-piutang', function () {
-    $dev   = Role::where('name', 'Developer')->first();
-    $owner = Role::where('name', 'Owner')->first();
-    
-    // Register Master Data -> Pelanggan
-    $masterData = Module::firstOrCreate(
-        ['name' => 'Master Data', 'slug' => 'master-data'],
-        ['sequence' => 3]
-    );
-
-    $customerModule = Module::where('slug', 'customers')->first();
-    if ($customerModule) {
-        $customerModule->update(['name' => 'Data Pelanggan', 'parent_id' => $masterData->id]);
-    } else {
-        $customerModule = Module::create(['name' => 'Data Pelanggan', 'slug' => 'customers', 'parent_id' => $masterData->id, 'sequence' => 5]);
-    }
-
-    $customerPerms = ['Data Pelanggan Create', 'Data Pelanggan Read', 'Data Pelanggan Update', 'Data Pelanggan Delete'];
-    foreach ($customerPerms as $perm) {
-        $permission = Permission::firstOrCreate(['name' => $perm], ['module_id' => $customerModule->id]);
-        $permission->update(['module_id' => $customerModule->id]);
-        if ($dev) $dev->givePermissionTo($permission);
-        if ($owner) $owner->givePermissionTo($permission);
-    }
-
-    // Register Modul Piutang
-    $receivableModule = Module::where('slug', 'receivables')->first();
-    if ($receivableModule) {
-        $receivableModule->update(['name' => 'Data Piutang', 'parent_id' => null]);
-    } else {
-        $receivableModule = Module::create(['name' => 'Data Piutang', 'slug' => 'receivables', 'parent_id' => null, 'sequence' => 4]);
-    }
-
-    $receivablePerms = ['Data Piutang Read', 'Data Piutang Pay'];
-    foreach ($receivablePerms as $perm) {
-        $permission = Permission::firstOrCreate(['name' => $perm], ['module_id' => $receivableModule->id]);
-        $permission->update(['module_id' => $receivableModule->id]);
-        if ($dev) $dev->givePermissionTo($permission);
-        if ($owner) $owner->givePermissionTo($permission);
-    }
-
-    return response()->json(['message' => 'Piutang & Customer modules registered and permissions assigned successfully.']);
-});
 
 // Document Validation & PDF Routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -559,30 +432,4 @@ Route::middleware('auth:sanctum')->group(function () {
 // Public verification
 Route::get('/verify-document/{uuid}', [\App\Http\Controllers\Api\DocumentVerificationController::class, 'verify']);
 
-Route::get('/init-mutasi', function () {
-    $dev   = \Spatie\Permission\Models\Role::where('name', 'Developer')->first();
-    $owner = \Spatie\Permission\Models\Role::where('name', 'Owner')->first();
-    
-    // Register Modul Mutasi Stok di bawah Operasional
-    $operasional = \App\Models\Module::firstOrCreate(
-        ['name' => 'Operasional', 'slug' => 'operasional'],
-        ['sequence' => 3]
-    );
 
-    $mutasiModule = \App\Models\Module::where('slug', 'stock-transfers')->first();
-    if ($mutasiModule) {
-        $mutasiModule->update(['name' => 'Mutasi Stok', 'parent_id' => $operasional->id]);
-    } else {
-        $mutasiModule = \App\Models\Module::create(['name' => 'Mutasi Stok', 'slug' => 'stock-transfers', 'parent_id' => $operasional->id, 'sequence' => 3]);
-    }
-
-    $mutasiPerms = ['Mutasi Stok Create', 'Mutasi Stok Read', 'Mutasi Stok Approve'];
-    foreach ($mutasiPerms as $perm) {
-        $permission = \Spatie\Permission\Models\Permission::firstOrCreate(['name' => $perm], ['module_id' => $mutasiModule->id]);
-        $permission->update(['module_id' => $mutasiModule->id]);
-        if ($dev) $dev->givePermissionTo($permission);
-        if ($owner) $owner->givePermissionTo($permission);
-    }
-
-    return response()->json(['message' => 'Mutasi Stok module registered and permissions assigned successfully.']);
-});

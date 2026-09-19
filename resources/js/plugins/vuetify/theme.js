@@ -63,11 +63,11 @@ export const themes = {
 
       // 👉 shadows
       'shadow-key-umbra-color': '#262B43',
-      'shadow-xs-opacity': '0.14',
-      'shadow-sm-opacity': '0.16',
-      'shadow-md-opacity': '0.16',
-      'shadow-lg-opacity': '0.18',
-      'shadow-xl-opacity': '0.18',
+      'shadow-xs-opacity': '0.01',
+      'shadow-sm-opacity': '0.02',
+      'shadow-md-opacity': '0.03',
+      'shadow-lg-opacity': '0.04',
+      'shadow-xl-opacity': '0.05',
     },
   },
   dark: {
@@ -132,11 +132,11 @@ export const themes = {
 
       // 👉 Shadows
       'shadow-key-umbra-color': '#101121',
-      'shadow-xs-opacity': '0.20',
-      'shadow-sm-opacity': '0.24',
-      'shadow-md-opacity': '0.26',
-      'shadow-lg-opacity': '0.28',
-      'shadow-xl-opacity': '0.30',
+      'shadow-xs-opacity': '0.02',
+      'shadow-sm-opacity': '0.04',
+      'shadow-md-opacity': '0.06',
+      'shadow-lg-opacity': '0.08',
+      'shadow-xl-opacity': '0.10',
     },
   },
 }

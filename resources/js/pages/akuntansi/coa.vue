@@ -371,7 +371,7 @@ onMounted(() => {
     </div>
 
     <!-- Filter & Table Card -->
-    <VCard elevation="1" class="border rounded-lg">
+    <VCard  class="border rounded-lg">
       <VCardText class="pa-4">
         <VRow class="mb-2">
           <VCol cols="12" md="4">
@@ -518,7 +518,7 @@ onMounted(() => {
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -527,7 +527,7 @@ onMounted(() => {
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(accounts.length / itemsPerPage)"

@@ -311,8 +311,8 @@ class SaleController extends Controller
                 $final_item_price = (float) $item['price'];
 
                 if ($is_ori && $finalCustomerId) {
-                    if ($ori_promo_type === 'discount' && $productBranch->product->ori_discount_percent > 0) {
-                        $discount_amount = ($final_item_price * (float)$productBranch->product->ori_discount_percent) / 100;
+                    if ($ori_promo_type === 'discount' && $productBranch->ori_discount_percent > 0) {
+                        $discount_amount = ($final_item_price * (float)$productBranch->ori_discount_percent) / 100;
                         $final_item_price -= $discount_amount;
                         $item_subtotal = $item['qty'] * $final_item_price;
                         // Recalculate tax if price drops due to ori discount
@@ -322,8 +322,8 @@ class SaleController extends Controller
                         } else if ($tax_type === 'Include PPN') {
                             $tax_amount = $item_subtotal - ($item_subtotal / (1 + ($tax_percentage / 100)));
                         }
-                    } else if ($ori_promo_type === 'cashback' && $productBranch->product->ori_cashback_percent > 0) {
-                        $total_cashback_points += ($item_subtotal * (float)$productBranch->product->ori_cashback_percent) / 100;
+                    } else if ($ori_promo_type === 'cashback' && $productBranch->ori_cashback_percent > 0) {
+                        $total_cashback_points += ($item_subtotal * (float)$productBranch->ori_cashback_percent) / 100;
                     }
                 }
 

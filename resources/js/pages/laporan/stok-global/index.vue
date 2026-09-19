@@ -154,7 +154,7 @@ const tableHeaders = [
     <!-- Summary KPI Cards -->
     <VRow class="mb-4">
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+        <VCard  class="pa-4 border-s-lg border-primary">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">TOTAL SKU AKTIF</div>
@@ -169,7 +169,7 @@ const tableHeaders = [
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-warning">
+        <VCard  class="pa-4 border-s-lg border-warning">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">STOK DI GUDANG</div>
@@ -184,7 +184,7 @@ const tableHeaders = [
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+        <VCard  class="pa-4 border-s-lg border-info">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">STOK DI TOKO</div>
@@ -199,7 +199,7 @@ const tableHeaders = [
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+        <VCard  class="pa-4 border-s-lg border-success">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">TOTAL KESELURUHAN</div>
@@ -215,7 +215,7 @@ const tableHeaders = [
     </VRow>
 
     <!-- Table Card -->
-    <VCard elevation="2">
+    <VCard >
       <VCardText class="d-flex flex-wrap py-4 gap-4 align-center">
         <VAutocomplete
           v-model="selectedCategory"
@@ -390,7 +390,7 @@ const tableHeaders = [
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -399,7 +399,7 @@ const tableHeaders = [
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalItems / itemsPerPage)"

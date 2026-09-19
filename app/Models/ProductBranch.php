@@ -18,6 +18,8 @@ class ProductBranch extends Model
         'other_fees',
         'min_nego_price',
         'stock',
+        'ori_discount_percent',
+        'ori_cashback_percent',
     ];
 
     protected $appends = ['active_batch'];

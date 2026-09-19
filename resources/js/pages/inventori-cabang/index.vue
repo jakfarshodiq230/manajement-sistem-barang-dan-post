@@ -417,7 +417,7 @@ const confirmDelete = async id => {
     <!-- Stat Summary Cards -->
     <VRow class="mb-4" dense>
       <VCol cols="12" sm="6" md="3">
-        <VCard class="pa-4 rounded-xl border shadow-xs">
+        <VCard class="pa-4 rounded border shadow-xs">
           <div class="d-flex align-center gap-3">
             <VAvatar color="primary" variant="tonal" size="44" rounded="lg">
               <VIcon icon="ri-box-3-line" size="24" />
@@ -433,7 +433,7 @@ const confirmDelete = async id => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard class="pa-4 rounded-xl border shadow-xs">
+        <VCard class="pa-4 rounded border shadow-xs">
           <div class="d-flex align-center gap-3">
             <VAvatar color="success" variant="tonal" size="44" rounded="lg">
               <VIcon icon="ri-archive-line" size="24" />
@@ -449,7 +449,7 @@ const confirmDelete = async id => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard class="pa-4 rounded-xl border shadow-xs">
+        <VCard class="pa-4 rounded border shadow-xs">
           <div class="d-flex align-center gap-3">
             <VAvatar color="info" variant="tonal" size="44" rounded="lg">
               <VIcon icon="ri-money-dollar-circle-line" size="24" />
@@ -465,7 +465,7 @@ const confirmDelete = async id => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard class="pa-4 rounded-xl border shadow-xs">
+        <VCard class="pa-4 rounded border shadow-xs">
           <div class="d-flex align-center gap-3">
             <VAvatar color="warning" variant="tonal" size="44" rounded="lg">
               <VIcon icon="ri-alert-line" size="24" />
@@ -482,7 +482,7 @@ const confirmDelete = async id => {
     </VRow>
 
     <!-- Price Structure & Tax Policy Guide Banner (Collapsible) -->
-    <VCard class="mb-5 border border-primary-subtle bg-primary-lighten-5 rounded-xl">
+    <VCard class="mb-5 border border-primary-subtle bg-primary-lighten-5 rounded">
       <VCardItem class="pa-4">
         <div class="d-flex align-center justify-space-between flex-wrap gap-2">
           <div class="d-flex align-center gap-3">
@@ -623,7 +623,7 @@ const confirmDelete = async id => {
       </VCardItem>
     </VCard>
 
-    <VCard class="rounded-xl shadow-xs">
+    <VCard class="rounded shadow-xs">
       <VCardItem class="pa-4 pb-2">
         <div class="d-flex flex-column flex-sm-row align-start align-sm-center justify-space-between gap-3 w-100">
           <VCardTitle class="px-0 text-h6 font-weight-bold">
@@ -922,7 +922,7 @@ const confirmDelete = async id => {
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -931,7 +931,7 @@ const confirmDelete = async id => {
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalItems / itemsPerPage)"

@@ -247,7 +247,7 @@ const formatPaymentLabel = method => {
 <template>
   <div class="pa-4">
     <!-- Header Banner -->
-    <VCard elevation="2" class="mb-4 pa-4 rounded-xl border bg-var-theme-surface">
+    <VCard  class="mb-4 pa-4 rounded border bg-var-theme-surface">
       <div class="d-flex flex-wrap align-center justify-space-between gap-4">
         <!-- Title & Subtitle -->
         <div class="d-flex align-center gap-3">
@@ -319,7 +319,7 @@ const formatPaymentLabel = method => {
     <VRow class="mb-4 match-height">
       <!-- 1. Total Omzet (Revenue) -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary h-100 d-flex flex-column justify-space-between" :loading="isLoading">
+        <VCard  class="pa-4 border-s-lg border-primary h-100 d-flex flex-column justify-space-between" :loading="isLoading">
           <div>
             <div class="d-flex align-center justify-space-between">
               <span class="text-caption text-primary font-weight-bold text-uppercase">Total Omzet (Penjualan)</span>
@@ -349,7 +349,7 @@ const formatPaymentLabel = method => {
       <!-- 2. Laba Bersih (Net Profit) -->
       <VCol cols="12" sm="6" md="3">
         <VCard
-          elevation="2"
+          
           :class="['pa-4 border-s-lg h-100 d-flex flex-column justify-space-between', analyticsData.summary.profit.value >= 0 ? 'border-success' : 'border-error']"
           :loading="isLoading"
         >
@@ -388,7 +388,7 @@ const formatPaymentLabel = method => {
 
       <!-- 3. Volume Transaksi -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info h-100 d-flex flex-column justify-space-between" :loading="isLoading">
+        <VCard  class="pa-4 border-s-lg border-info h-100 d-flex flex-column justify-space-between" :loading="isLoading">
           <div>
             <div class="d-flex align-center justify-space-between">
               <span class="text-caption text-info font-weight-bold text-uppercase">Volume Transaksi</span>
@@ -417,7 +417,7 @@ const formatPaymentLabel = method => {
 
       <!-- 4. Average Ticket Size (AOV) -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-warning h-100 d-flex flex-column justify-space-between" :loading="isLoading">
+        <VCard  class="pa-4 border-s-lg border-warning h-100 d-flex flex-column justify-space-between" :loading="isLoading">
           <div>
             <div class="d-flex align-center justify-space-between">
               <span class="text-caption text-warning font-weight-bold text-uppercase">Rata-rata / Struk (AOV)</span>
@@ -441,7 +441,7 @@ const formatPaymentLabel = method => {
     <VRow class="mb-4">
       <!-- Area Chart: Omzet vs Profit -->
       <VCol cols="12" lg="8">
-        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
+        <VCard  class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-0">
             <template #prepend>
               <VAvatar color="primary" variant="tonal" size="36" class="me-2">
@@ -466,7 +466,7 @@ const formatPaymentLabel = method => {
 
       <!-- Donut Chart: Payment Methods Distribution -->
       <VCol cols="12" lg="4">
-        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
+        <VCard  class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-0">
             <template #prepend>
               <VAvatar color="success" variant="tonal" size="36" class="me-2">
@@ -494,7 +494,7 @@ const formatPaymentLabel = method => {
     <VRow>
       <!-- Top 5 Best Sellers -->
       <VCol cols="12" lg="6">
-        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
+        <VCard  class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="warning" variant="tonal" size="36" class="me-2">
@@ -507,7 +507,7 @@ const formatPaymentLabel = method => {
           <VDivider />
           <VProgressLinear v-if="isLoading" indeterminate color="warning" height="2" />
 
-          <VTable class="text-no-wrap" hover density="comfortable">
+          <VTable class="text-no-wrap" hover density="compact">
             <thead>
               <tr class="bg-grey-50">
                 <th class="text-left font-weight-bold">PRODUK</th>
@@ -565,7 +565,7 @@ const formatPaymentLabel = method => {
 
       <!-- Recent 5 Sales Transactions -->
       <VCol cols="12" lg="6">
-        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
+        <VCard  class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="info" variant="tonal" size="36" class="me-2">
@@ -578,7 +578,7 @@ const formatPaymentLabel = method => {
           <VDivider />
           <VProgressLinear v-if="isLoading" indeterminate color="info" height="2" />
 
-          <VTable class="text-no-wrap" hover density="comfortable">
+          <VTable class="text-no-wrap" hover density="compact">
             <thead>
               <tr class="bg-grey-50">
                 <th class="text-left font-weight-bold">NO. INVOICE</th>

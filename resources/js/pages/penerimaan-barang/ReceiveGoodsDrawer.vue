@@ -762,7 +762,7 @@ const handleDrawerModelValueUpdate = val => {
             v-if="props.selectedGr && props.selectedGr.approval_status === 'rejected'"
             type="error"
             variant="tonal"
-            class="mb-5 pa-4 rounded-xl border-dashed"
+            class="mb-5 pa-4 rounded border-dashed"
             icon="ri-error-warning-fill"
           >
             <div class="font-weight-bold text-subtitle-2 mb-1">
@@ -778,7 +778,7 @@ const handleDrawerModelValueUpdate = val => {
           <!-- ============================================================== -->
           <div v-show="currentTab === 'faktur'" class="tab-pane-content">
             <!-- Header Group 1: Supplier & PO Info Summary -->
-            <div class="pa-4 mb-4 rounded-xl border bg-var-theme-surface d-flex align-center justify-space-between flex-wrap gap-3">
+            <div class="pa-4 mb-4 rounded border bg-var-theme-surface d-flex align-center justify-space-between flex-wrap gap-3">
               <div class="d-flex align-center gap-3">
                 <VAvatar color="primary" variant="tonal" size="42" class="rounded-lg">
                   <VIcon icon="ri-store-2-line" size="22" />
@@ -808,7 +808,7 @@ const handleDrawerModelValueUpdate = val => {
             </div>
 
             <!-- Card: Form Input Faktur & Checker -->
-            <VCard class="border rounded-xl pa-5 mb-4 shadow-xs">
+            <VCard class="border rounded pa-5 mb-4 shadow-xs">
               <div class="d-flex align-center gap-2 mb-4 pb-2 border-b">
                 <VIcon icon="ri-shield-user-line" color="primary" size="20" />
                 <h6 class="text-subtitle-1 font-weight-bold mb-0">
@@ -824,7 +824,7 @@ const handleDrawerModelValueUpdate = val => {
                     label="No. Faktur / Kuitansi Supplier *"
                     placeholder="Contoh: FK.202608.01875"
                     prepend-inner-icon="ri-bill-line"
-                    density="comfortable"
+                    density="compact"
                     variant="outlined"
                     :rules="[v => !!v || 'Nomor faktur supplier wajib diisi']"
                   />
@@ -837,7 +837,7 @@ const handleDrawerModelValueUpdate = val => {
                     label="Nama Sales Supplier"
                     placeholder="Contoh: Bpk. Hendra / Capella"
                     prepend-inner-icon="ri-user-star-line"
-                    density="comfortable"
+                    density="compact"
                     variant="outlined"
                   />
                 </VCol>
@@ -852,7 +852,7 @@ const handleDrawerModelValueUpdate = val => {
                     label="Karyawan Checker (Pengecek Fisik) *"
                     placeholder="Pilih karyawan atau ketik nama..."
                     prepend-inner-icon="ri-user-search-line"
-                    density="comfortable"
+                    density="compact"
                     variant="outlined"
                     clearable
                     :rules="[v => !!v || 'Karyawan checker wajib diisi']"
@@ -879,7 +879,7 @@ const handleDrawerModelValueUpdate = val => {
                     :rules="[v => !!v || 'Tanggal barang sampai wajib diisi']"
                     label="Tanggal Barang Sampai *"
                     prepend-inner-icon="ri-calendar-check-line"
-                    density="comfortable"
+                    density="compact"
                     variant="outlined"
                   />
                 </VCol>
@@ -891,7 +891,7 @@ const handleDrawerModelValueUpdate = val => {
                     type="date"
                     label="Tanggal Jatuh Tempo Faktur"
                     prepend-inner-icon="ri-calendar-event-line"
-                    density="comfortable"
+                    density="compact"
                     variant="outlined"
                     persistent-hint
                     hint="Termin kredit supplier (masuk Buku Hutang)"
@@ -917,7 +917,7 @@ const handleDrawerModelValueUpdate = val => {
                     item-title="title"
                     item-value="value"
                     label="Perlakuan Pajak PPN Faktur"
-                    density="comfortable"
+                    density="compact"
                     variant="outlined"
                     prepend-inner-icon="ri-percent-line"
                     @update:model-value="onTaxTypeChange"
@@ -931,7 +931,7 @@ const handleDrawerModelValueUpdate = val => {
                     type="number"
                     label="Tarif PPN (%)"
                     suffix="%"
-                    density="comfortable"
+                    density="compact"
                     variant="outlined"
                     @update:model-value="() => items.forEach(i => autoCalculatePrices(i))"
                   />
@@ -944,7 +944,7 @@ const handleDrawerModelValueUpdate = val => {
                     label="Diskon Tambahan / Ekstra Faktur (Rp)"
                     placeholder="0"
                     prefix="Rp"
-                    density="comfortable"
+                    density="compact"
                     variant="outlined"
                     @update:model-value="onExtraDiscountInput"
                   />
@@ -961,7 +961,7 @@ const handleDrawerModelValueUpdate = val => {
                     label="Foto Faktur / Surat Jalan Fisik"
                     prepend-icon=""
                     prepend-inner-icon="ri-camera-lens-line"
-                    density="comfortable"
+                    density="compact"
                     variant="outlined"
                   />
                 </VCol>
@@ -973,7 +973,7 @@ const handleDrawerModelValueUpdate = val => {
                     label="Catatan Penerimaan Gudang (Opsional)"
                     placeholder="Misal: Barang diterima lengkap oleh staf checker dan faktur asli terlampir..."
                     prepend-inner-icon="ri-edit-line"
-                    density="comfortable"
+                    density="compact"
                     variant="outlined"
                   />
                 </VCol>
@@ -1027,7 +1027,7 @@ const handleDrawerModelValueUpdate = val => {
           <!-- ============================================================== -->
           <div v-show="currentTab === 'physical'" class="tab-pane-content">
             <!-- Toolbar Ceklis Fisik -->
-            <div class="pa-4 mb-4 rounded-xl border bg-var-theme-surface d-flex align-center justify-space-between flex-wrap gap-3">
+            <div class="pa-4 mb-4 rounded border bg-var-theme-surface d-flex align-center justify-space-between flex-wrap gap-3">
               <div>
                 <h6 class="text-subtitle-1 font-weight-bold mb-0 d-flex align-center gap-2">
                   <VIcon icon="ri-checkbox-multiple-line" color="primary" size="20" />
@@ -1074,7 +1074,7 @@ const handleDrawerModelValueUpdate = val => {
               <VCard
                 v-for="(item, index) in items"
                 :key="index"
-                class="border rounded-xl pa-4 transition-all shadow-xs"
+                class="border rounded pa-4 transition-all shadow-xs"
                 :class="item.is_received ? 'bg-var-theme-surface border-success' : 'bg-red-50 border-error'"
                 style="border-width: 1.5px;"
               >
@@ -1254,7 +1254,7 @@ const handleDrawerModelValueUpdate = val => {
               <VCard
                 v-for="(item, index) in items"
                 :key="index"
-                class="border rounded-xl pa-4 shadow-xs"
+                class="border rounded pa-4 shadow-xs"
               >
                 <!-- Item Title & Cost Header -->
                 <div class="d-flex justify-space-between align-center mb-3 pb-2 border-b flex-wrap gap-2">
@@ -1362,7 +1362,7 @@ const handleDrawerModelValueUpdate = val => {
           <!-- ============================================================== -->
           <div v-show="currentTab === 'summary'" class="tab-pane-content">
             <!-- Header Ringkasan Info Dokumen -->
-            <div class="pa-4 mb-4 rounded-xl border bg-var-theme-surface shadow-xs">
+            <div class="pa-4 mb-4 rounded border bg-var-theme-surface shadow-xs">
               <div class="d-flex justify-space-between align-center mb-3 pb-3 border-b flex-wrap gap-2">
                 <div>
                   <h6 class="text-subtitle-1 font-weight-bold text-primary mb-0">
@@ -1403,7 +1403,7 @@ const handleDrawerModelValueUpdate = val => {
             </div>
 
             <!-- Ringkasan Item Table -->
-            <div class="border rounded-xl overflow-hidden mb-4">
+            <div class="border rounded overflow-hidden mb-4">
               <table class="w-100 table-receipt">
                 <thead>
                   <tr class="bg-grey-100 text-left">
@@ -1452,7 +1452,7 @@ const handleDrawerModelValueUpdate = val => {
             </div>
 
             <!-- Grand Financial Summary Card -->
-            <div class="pa-5 bg-var-theme-surface border rounded-xl shadow-xs mb-6">
+            <div class="pa-5 bg-var-theme-surface border rounded shadow-xs mb-6">
               <VRow align="center" justify="space-between">
                 <VCol cols="12" md="6">
                   <div class="text-caption text-medium-emphasis mb-2 font-weight-bold">

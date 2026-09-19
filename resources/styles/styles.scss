@@ -1,2 +1,60 @@
 // Write your overrides
 @import "../css/responsive.scss";
+
+// UI/UX Enterprise Refinement Overrides
+$border-radius-root: 6px;
+
+.v-card {
+  border-radius: $border-radius-root !important;
+}
+
+.v-btn {
+  border-radius: $border-radius-root !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  font-weight: 500 !important;
+}
+
+.v-dialog > .v-overlay__content > .v-card {
+  border-radius: 8px !important; 
+}
+
+.v-table {
+  .v-data-table__th {
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    letter-spacing: 0.5px;
+  }
+  .v-data-table__td {
+    font-size: 0.875rem !important;
+    padding: 0 12px !important;
+    height: 44px !important; // Compact table row
+  }
+}
+
+.v-text-field .v-field, .v-select .v-field, .v-autocomplete .v-field, .v-textarea .v-field {
+  border-radius: $border-radius-root !important;
+}
+
+// Remove glassmorphism on sticky navs
+.layout-navbar-sticky .layout-navbar {
+  backdrop-filter: none !important;
+  background-color: white !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: none !important;
+}
+.v-theme--dark .layout-navbar-sticky .layout-navbar {
+  background-color: #30334E !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+// Active Sidebar Item Indicator (Point 12)
+.layout-vertical-nav .nav-item .v-list-item--active {
+  border-left: 4px solid rgb(var(--v-theme-primary)) !important;
+  background: rgba(var(--v-theme-primary), 0.08) !important;
+  font-weight: 700 !important;
+  border-radius: 0 6px 6px 0 !important;
+}
+.layout-vertical-nav .nav-item .v-list-item--active .v-list-item-title {
+  font-weight: 700 !important;
+}

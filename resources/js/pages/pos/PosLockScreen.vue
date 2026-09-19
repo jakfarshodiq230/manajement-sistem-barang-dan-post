@@ -311,7 +311,7 @@ onUnmounted(() => {
 
   <!-- Logout Confirmation Dialog -->
   <VDialog v-model="isConfirmLogoutVisible" max-width="360" persistent>
-    <VCard class="pa-4 rounded-xl text-center">
+    <VCard class="pa-4 rounded text-center">
       <VAvatar color="error" variant="tonal" size="44" class="mb-2 mx-auto">
         <VIcon icon="ri-logout-box-r-line" size="24" />
       </VAvatar>

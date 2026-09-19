@@ -278,45 +278,39 @@ onMounted(() => {
 <template>
   <div>
     <!-- Page Header & Banner -->
-    <VCard elevation="0" class="border rounded-lg mb-6 bg-var-theme-surface">
-      <VCardText class="pa-6">
-        <div class="d-flex flex-wrap align-center justify-space-between gap-4">
-          <div class="d-flex align-center gap-4">
-            <VAvatar color="primary" variant="tonal" rounded="lg" size="52">
-              <VIcon icon="ri-price-tag-3-line" size="30" />
-            </VAvatar>
-            <div>
-              <h4 class="text-h5 font-weight-bold text-high-emphasis">
-                Penyesuaian Harga Periode & Riwayat Perubahan
-              </h4>
-              <p class="text-body-2 text-medium-emphasis mb-0">
-                Pusat penetapan harga jual resmi berkala (misal tiap 3 bulan / kenaikan pabrik) lengkap dengan rekam jejak audit trail.
-              </p>
-            </div>
-          </div>
+    <!-- Header -->
+    <div class="d-flex align-center justify-space-between mb-4">
+      <div>
+        <h2 class="text-h4 font-weight-bold mb-1">
+          Penyesuaian Harga Periode & Riwayat Perubahan
+        </h2>
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          Pusat penetapan harga jual resmi berkala (misal tiap 3 bulan / kenaikan pabrik) lengkap dengan rekam jejak audit trail.
+        </p>
+      </div>
 
-          <div class="d-flex align-center gap-3">
-            <VBtn
-              variant="tonal"
-              color="secondary"
-              prepend-icon="ri-store-2-line"
-              to="/inventori-cabang"
-            >
-              Lihat Inventori Cabang
-            </VBtn>
-            <VBtn
-              color="primary"
-              prepend-icon="ri-add-line"
-              @click="openCreateDrawer"
-            >
-              Buat Penyesuaian Harga Baru
-            </VBtn>
-          </div>
-        </div>
-      </VCardText>
+      <div class="d-flex align-center gap-3">
+        <VBtn
+          variant="tonal"
+          color="secondary"
+          prepend-icon="ri-store-2-line"
+          to="/inventori-cabang"
+        >
+          Lihat Inventori Cabang
+        </VBtn>
+        <VBtn
+          color="primary"
+          prepend-icon="ri-add-line"
+          @click="openCreateDrawer"
+        >
+          Buat Penyesuaian Harga Baru
+        </VBtn>
+      </div>
+    </div>
 
-      <!-- Tabs Navigation -->
-      <VTabs v-model="activeTab" class="px-4 border-t">
+    <!-- Tabs Navigation -->
+    <VCard  class="border rounded-lg mb-4 bg-var-theme-surface">
+      <VTabs v-model="activeTab" class="px-4">
         <VTab value="documents" prepend-icon="ri-file-list-3-line">
           Dokumen Penyesuaian Harga ({{ totalAdjustments }})
         </VTab>
@@ -329,7 +323,7 @@ onMounted(() => {
     <!-- TAB 1: DOKUMEN PENYESUAIAN HARGA -->
     <div v-if="activeTab === 'documents'">
       <!-- Filter Toolbar -->
-      <VCard elevation="0" class="border rounded-lg mb-4 pa-4 bg-var-theme-surface">
+      <VCard  class="border rounded-lg mb-4 pa-4 bg-var-theme-surface">
         <VRow dense align="center">
           <VCol cols="12" sm="3">
             <VTextField
@@ -397,7 +391,7 @@ onMounted(() => {
       </VCard>
 
       <!-- Main Data Table -->
-      <VCard elevation="0" class="border rounded-lg">
+      <VCard  class="border rounded-lg">
         <VDataTableServer
           v-model:items-per-page="itemsPerPageDoc"
           v-model:page="pageDoc"
@@ -519,7 +513,7 @@ onMounted(() => {
     <!-- TAB 2: RIWAYAT PERUBAHAN HARGA (AUDIT TRAIL) -->
     <div v-else-if="activeTab === 'history'">
       <!-- Filter Toolbar -->
-      <VCard elevation="0" class="border rounded-lg mb-4 pa-4 bg-var-theme-surface">
+      <VCard  class="border rounded-lg mb-4 pa-4 bg-var-theme-surface">
         <VRow dense align="center">
           <VCol cols="12" sm="4">
             <VTextField
@@ -571,7 +565,7 @@ onMounted(() => {
       </VCard>
 
       <!-- History Data Table -->
-      <VCard elevation="0" class="border rounded-lg">
+      <VCard  class="border rounded-lg">
         <VDataTableServer
           v-model:items-per-page="itemsPerPageHistory"
           v-model:page="pageHistory"

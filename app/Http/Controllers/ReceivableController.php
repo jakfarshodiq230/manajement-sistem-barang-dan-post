@@ -43,25 +43,23 @@ class ReceivableController extends Controller
         // Calculate summary KPI
         $summaryQuery = clone $query;
         $summaryQuery->reorder();
-        $allReceivables = $summaryQuery->get();
-
-        $totalDue = $allReceivables->sum('amount_due');
-        $totalPaid = $allReceivables->sum('amount_paid');
+        $totalDue = (float) (clone $summaryQuery)->sum('amount_due');
+        $totalPaid = (float) (clone $summaryQuery)->sum('amount_paid');
         $totalRemaining = $totalDue - $totalPaid;
         $today = now()->toDateString();
-        $totalOverdue = $allReceivables->filter(function($r) use ($today) {
-            return $r->status !== 'paid' && $r->due_date && $r->due_date < $today;
-        })->sum(function($r) {
-            return $r->amount_due - $r->amount_paid;
-        });
+        $totalOverdue = (float) (clone $summaryQuery)
+            ->where('status', '!=', 'paid')
+            ->whereNotNull('due_date')
+            ->where('due_date', '<', $today)
+            ->sum(DB::raw('amount_due - amount_paid'));
 
         $summary = [
             'total_due' => (float) $totalDue,
             'total_paid' => (float) $totalPaid,
             'total_remaining' => (float) $totalRemaining,
             'total_overdue' => (float) $totalOverdue,
-            'count_unpaid' => $allReceivables->whereIn('status', ['unpaid', 'partial'])->count(),
-            'count_paid' => $allReceivables->where('status', 'paid')->count(),
+            'count_unpaid' => (clone $summaryQuery)->whereIn('status', ['unpaid', 'partial'])->count(),
+            'count_paid' => (clone $summaryQuery)->where('status', 'paid')->count(),
         ];
 
         $itemsPerPage = (int) $request->input('itemsPerPage', 15);
@@ -99,7 +97,7 @@ class ReceivableController extends Controller
     public function pay(Request $request, Receivable $receivable)
     {
         $validated = $request->validate([
-            'amount' => 'required|numeric|min:1',
+            'amount' => 'required|numeric|min:0',
             'payment_method' => 'required|string|in:cash,transfer,bank_transfer,qris,giro_cheque,other',
             'bank_account_id' => 'nullable|exists:bank_accounts,id',
             'payment_date' => 'required|date',
@@ -108,6 +106,9 @@ class ReceivableController extends Controller
             'bank_account_number' => 'nullable|string|max:100',
             'bank_account_name' => 'nullable|string|max:100',
             'transfer_phone_number' => 'nullable|string|max:100',
+            'ori_discounts' => 'nullable|array',
+            'ori_discounts.*.sale_item_id' => 'required|exists:sale_items,id',
+            'ori_discounts.*.amount' => 'required|numeric|min:0',
         ]);
 
         if ($receivable->status === 'paid') {
@@ -116,11 +117,25 @@ class ReceivableController extends Controller
 
         $remainingBalance = $receivable->amount_due - $receivable->amount_paid;
         
-        if ($validated['amount'] > ($remainingBalance + 0.01)) {
+        $totalDiscount = 0;
+        if (!empty($validated['ori_discounts'])) {
+            foreach ($validated['ori_discounts'] as $discount) {
+                $totalDiscount += $discount['amount'];
+            }
+        }
+        
+        $totalPaymentApplied = $validated['amount'] + $totalDiscount;
+
+        if ($totalPaymentApplied > ($remainingBalance + 0.01)) {
             return response()->json([
-                'message' => 'Nominal pembayaran tidak boleh melebihi sisa piutang.',
+                'message' => 'Total nominal (Bayar + Diskon) tidak boleh melebihi sisa piutang.',
                 'remaining' => $remainingBalance
             ], 422);
+        }
+        
+        // If they are only saving discounts and 0 cash, allow it. But we should check if at least one is > 0
+        if ($totalPaymentApplied <= 0) {
+            return response()->json(['message' => 'Harus ada nominal pembayaran atau diskon.'], 422);
         }
 
         $user = $request->user() ?: (auth('sanctum')->user() ?: (auth()->user() ?: \App\Models\User::first()));
@@ -134,30 +149,59 @@ class ReceivableController extends Controller
 
             // Jika pembayaran non-tunai (Transfer Bank / QRIS), update & tambah saldo rekening bank
             $bankAccount = null;
-            if ($request->filled('bank_account_id')) {
+            if ($request->filled('bank_account_id') && $validated['amount'] > 0) {
                 $bankAccount = BankAccount::find($request->bank_account_id);
                 if ($bankAccount) {
                     $bankAccount->increment('current_balance', $validated['amount']);
                 }
             }
 
-            // Create payment record
-            $payment = ReceivablePayment::create([
-                'receivable_id' => $receivable->id,
-                'payment_date' => $validated['payment_date'],
-                'amount' => $validated['amount'],
-                'payment_method' => $validated['payment_method'],
-                'bank_account_id' => $bankAccount ? $bankAccount->id : null,
-                'payment_proof' => $proofPath ? '/storage/' . $proofPath : null,
-                'bank_name' => $bankAccount ? $bankAccount->bank_name : ($validated['bank_name'] ?? null),
-                'bank_account_number' => $bankAccount ? $bankAccount->account_number : ($validated['bank_account_number'] ?? null),
-                'bank_account_name' => $bankAccount ? $bankAccount->account_name : ($validated['bank_account_name'] ?? null),
-                'transfer_phone_number' => $validated['transfer_phone_number'] ?? null,
-                'user_id' => $user ? $user->id : 1,
-            ]);
+            $payment = null;
+            // Create payment record for cash/transfer if amount > 0
+            if ($validated['amount'] > 0) {
+                $payment = ReceivablePayment::create([
+                    'receivable_id' => $receivable->id,
+                    'payment_date' => $validated['payment_date'],
+                    'amount' => $validated['amount'],
+                    'payment_method' => $validated['payment_method'],
+                    'bank_account_id' => $bankAccount ? $bankAccount->id : null,
+                    'payment_proof' => $proofPath ? '/storage/' . $proofPath : null,
+                    'bank_name' => $bankAccount ? $bankAccount->bank_name : ($validated['bank_name'] ?? null),
+                    'bank_account_number' => $bankAccount ? $bankAccount->account_number : ($validated['bank_account_number'] ?? null),
+                    'bank_account_name' => $bankAccount ? $bankAccount->account_name : ($validated['bank_account_name'] ?? null),
+                    'transfer_phone_number' => $validated['transfer_phone_number'] ?? null,
+                    'user_id' => $user ? $user->id : 1,
+                ]);
+            }
+            
+            // Create payment record for promo ori discount
+            if ($totalDiscount > 0) {
+                $discountPayment = ReceivablePayment::create([
+                    'receivable_id' => $receivable->id,
+                    'payment_date' => $validated['payment_date'],
+                    'amount' => $totalDiscount,
+                    'payment_method' => 'promo_ori',
+                    'user_id' => $user ? $user->id : 1,
+                ]);
+                
+                // If main payment is null (0 cash), we use discount payment for receipts/journals
+                if (!$payment) {
+                    $payment = $discountPayment;
+                }
+                
+                // Update sale items
+                foreach ($validated['ori_discounts'] as $discount) {
+                    if ($discount['amount'] > 0) {
+                        \App\Models\SaleItem::where('id', $discount['sale_item_id'])->update([
+                            'is_ori' => true,
+                            'ori_promo_type' => 'discount'
+                        ]);
+                    }
+                }
+            }
 
             // Update receivable amounts and status
-            $receivable->amount_paid += $validated['amount'];
+            $receivable->amount_paid += $totalPaymentApplied;
             
             if ($receivable->amount_paid >= ($receivable->amount_due - 0.01)) {
                 $receivable->status = 'paid';

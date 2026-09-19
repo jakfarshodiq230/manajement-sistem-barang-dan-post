@@ -403,41 +403,34 @@ class DashboardController extends Controller
         // Base Query
         $salesQuery = Sale::where('status', 'completed');
         $expenseQuery = \App\Models\PettyCash::query();
+        
+        $cogsQuery = DB::table('sale_items')
+            ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
+            ->where('sales.status', 'completed');
 
         if ($branchId && $branchId !== 'all') {
             $salesQuery->where('branch_id', $branchId);
             $expenseQuery->where('branch_id', $branchId);
+            $cogsQuery->where('sales.branch_id', $branchId);
         }
 
         // Today
-        $salesToday = (clone $salesQuery)->whereDate('date', $today)->get();
-        $revenueToday = (float) $salesToday->sum('total_amount');
-        $cogsToday = 0;
-        foreach ($salesToday as $sale) {
-            $cogsToday += DB::table('sale_items')->where('sale_id', $sale->id)->sum(DB::raw('cost_price * qty'));
-        }
+        $revenueToday = (float) (clone $salesQuery)->whereDate('date', $today)->sum('total_amount');
+        $cogsToday = (float) (clone $cogsQuery)->whereDate('sales.date', $today)->sum(DB::raw('sale_items.cost_price * sale_items.qty'));
         $expenseToday = (float) (clone $expenseQuery)->whereDate('date', $today)->sum('amount');
         $grossProfitToday = $revenueToday - $cogsToday;
         $netProfitToday = $grossProfitToday - $expenseToday;
 
         // This Month
-        $salesMonth = (clone $salesQuery)->whereMonth('date', $thisMonth)->whereYear('date', $thisYear)->get();
-        $revenueMonth = (float) $salesMonth->sum('total_amount');
-        $cogsMonth = 0;
-        foreach ($salesMonth as $sale) {
-            $cogsMonth += DB::table('sale_items')->where('sale_id', $sale->id)->sum(DB::raw('cost_price * qty'));
-        }
+        $revenueMonth = (float) (clone $salesQuery)->whereMonth('date', $thisMonth)->whereYear('date', $thisYear)->sum('total_amount');
+        $cogsMonth = (float) (clone $cogsQuery)->whereMonth('sales.date', $thisMonth)->whereYear('sales.date', $thisYear)->sum(DB::raw('sale_items.cost_price * sale_items.qty'));
         $expenseMonth = (float) (clone $expenseQuery)->whereMonth('date', $thisMonth)->whereYear('date', $thisYear)->sum('amount');
         $grossProfitMonth = $revenueMonth - $cogsMonth;
         $netProfitMonth = $grossProfitMonth - $expenseMonth;
 
         // All Time
-        $salesAll = (clone $salesQuery)->get();
-        $revenueAll = (float) $salesAll->sum('total_amount');
-        $cogsAll = 0;
-        foreach ($salesAll as $sale) {
-            $cogsAll += DB::table('sale_items')->where('sale_id', $sale->id)->sum(DB::raw('cost_price * qty'));
-        }
+        $revenueAll = (float) (clone $salesQuery)->sum('total_amount');
+        $cogsAll = (float) (clone $cogsQuery)->sum(DB::raw('sale_items.cost_price * sale_items.qty'));
         $expenseAll = (float) (clone $expenseQuery)->sum('amount');
         $grossProfitAll = $revenueAll - $cogsAll;
         $netProfitAll = $grossProfitAll - $expenseAll;
@@ -451,13 +444,11 @@ class DashboardController extends Controller
         for ($i = 5; $i >= 0; $i--) {
             $d = clone $now;
             $d->subMonths($i);
-            $mSales = (clone $salesQuery)->whereMonth('date', $d->month)->whereYear('date', $d->year)->get();
-            $rev = (float) $mSales->sum('total_amount');
-            $cg = 0;
-            foreach ($mSales as $sale) {
-                $cg += DB::table('sale_items')->where('sale_id', $sale->id)->sum(DB::raw('cost_price * qty'));
-            }
+            
+            $rev = (float) (clone $salesQuery)->whereMonth('date', $d->month)->whereYear('date', $d->year)->sum('total_amount');
+            $cg = (float) (clone $cogsQuery)->whereMonth('sales.date', $d->month)->whereYear('sales.date', $d->year)->sum(DB::raw('sale_items.cost_price * sale_items.qty'));
             $exp = (float) (clone $expenseQuery)->whereMonth('date', $d->month)->whereYear('date', $d->year)->sum('amount');
+            
             $gross = $rev - $cg;
             $net = $gross - $exp;
 

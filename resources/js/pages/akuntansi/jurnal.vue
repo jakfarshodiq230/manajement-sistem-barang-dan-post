@@ -286,7 +286,7 @@ onMounted(() => {
     </div>
 
     <!-- Filter Card -->
-    <VCard elevation="1" class="border rounded-lg mb-6">
+    <VCard  class="border rounded-lg mb-6">
       <VCardText class="pa-4">
         <VRow>
           <VCol cols="12" sm="6" md="3">
@@ -360,7 +360,7 @@ onMounted(() => {
     </VCard>
 
     <!-- Table of Journals -->
-    <VCard elevation="1" class="border rounded-lg">
+    <VCard  class="border rounded-lg">
       <VDataTableServer
         v-model:items-per-page="itemsPerPage"
         v-model:page="page"
@@ -458,7 +458,7 @@ onMounted(() => {
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -467,7 +467,7 @@ onMounted(() => {
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalItems / itemsPerPage)"

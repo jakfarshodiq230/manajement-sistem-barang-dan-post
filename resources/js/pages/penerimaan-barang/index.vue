@@ -384,7 +384,7 @@ const executeDeleteGR = async () => {
     <VRow class="mb-5">
       <VCol cols="12" sm="6" md="3">
         <VCard
-          class="pa-4 border rounded-xl shadow-xs cursor-pointer hover-card"
+          class="pa-4 border rounded shadow-xs cursor-pointer hover-card"
           :class="activeTab === 'pending' ? 'border-warning border-2 bg-warning-subtle' : ''"
           @click="() => { activeTab = 'pending'; page = 1; fetchData(); }"
         >
@@ -404,7 +404,7 @@ const executeDeleteGR = async () => {
 
       <VCol cols="12" sm="6" md="3">
         <VCard
-          class="pa-4 border rounded-xl shadow-xs cursor-pointer hover-card"
+          class="pa-4 border rounded shadow-xs cursor-pointer hover-card"
           :class="activeTab === 'pending_approval' ? 'border-info border-2 bg-info-subtle' : ''"
           @click="() => { activeTab = 'pending_approval'; page = 1; fetchData(); }"
         >
@@ -424,7 +424,7 @@ const executeDeleteGR = async () => {
 
       <VCol cols="12" sm="6" md="3">
         <VCard
-          class="pa-4 border rounded-xl shadow-xs cursor-pointer hover-card"
+          class="pa-4 border rounded shadow-xs cursor-pointer hover-card"
           :class="activeTab === 'rejected' ? 'border-error border-2 bg-error-subtle' : (counts.rejected > 0 ? 'border-error' : '')"
           @click="() => { activeTab = 'rejected'; page = 1; fetchData(); }"
         >
@@ -444,7 +444,7 @@ const executeDeleteGR = async () => {
 
       <VCol cols="12" sm="6" md="3">
         <VCard
-          class="pa-4 border rounded-xl shadow-xs cursor-pointer hover-card"
+          class="pa-4 border rounded shadow-xs cursor-pointer hover-card"
           :class="activeTab === 'approved' ? 'border-success border-2 bg-success-subtle' : ''"
           @click="() => { activeTab = 'approved'; page = 1; fetchData(); }"
         >
@@ -464,7 +464,7 @@ const executeDeleteGR = async () => {
     </VRow>
 
     <!-- Main Tabs & Table Card -->
-    <VCard class="border rounded-xl shadow-xs">
+    <VCard class="border rounded shadow-xs">
       <VTabs
         v-model="activeTab"
         class="px-4 border-b"
@@ -830,7 +830,7 @@ const executeDeleteGR = async () => {
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -839,7 +839,7 @@ const executeDeleteGR = async () => {
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalItems / itemsPerPage)"
@@ -857,7 +857,7 @@ const executeDeleteGR = async () => {
       max-width="960"
       scrollable
     >
-      <VCard v-if="detailDialogData" class="rounded-xl overflow-hidden shadow-lg d-flex flex-column" style="max-height: 90vh;">
+      <VCard v-if="detailDialogData" class="rounded overflow-hidden shadow-lg d-flex flex-column" style="max-height: 90vh;">
         <!-- Header Kuitansi / Dialog -->
         <div class="px-6 py-5 border-b bg-gradient-header d-flex justify-space-between align-center flex-shrink-0">
           <div class="d-flex align-center gap-3">
@@ -885,7 +885,7 @@ const executeDeleteGR = async () => {
         <VCardText class="pa-6 overflow-y-auto" style="max-height: calc(90vh - 130px);">
           <!-- Content for PENDING -->
           <div v-if="activeTab === 'pending'">
-            <div class="mb-4 pa-4 rounded-xl border bg-var-theme-surface">
+            <div class="mb-4 pa-4 rounded border bg-var-theme-surface">
               <VRow dense>
                 <VCol cols="12" sm="4">
                   <div class="text-caption text-medium-emphasis">Supplier / Vendor:</div>
@@ -902,7 +902,7 @@ const executeDeleteGR = async () => {
               </VRow>
             </div>
 
-            <div class="border rounded-xl overflow-hidden mb-4">
+            <div class="border rounded overflow-hidden mb-4">
               <table class="w-100 table-receipt">
                 <thead>
                   <tr class="bg-grey-100 text-left">
@@ -941,7 +941,7 @@ const executeDeleteGR = async () => {
               v-if="detailDialogData.approval_status === 'rejected'"
               type="error"
               variant="tonal"
-              class="mb-4 pa-4 rounded-xl border-dashed"
+              class="mb-4 pa-4 rounded border-dashed"
               icon="ri-error-warning-fill"
             >
               <div class="font-weight-bold text-subtitle-2 mb-1">
@@ -953,7 +953,7 @@ const executeDeleteGR = async () => {
             </VAlert>
 
             <!-- Invoice Header Box -->
-            <div class="mb-5 pa-4 rounded-xl border bg-var-theme-surface shadow-xs">
+            <div class="mb-5 pa-4 rounded border bg-var-theme-surface shadow-xs">
               <div class="d-flex justify-space-between align-center mb-3 pb-3 border-b flex-wrap gap-2">
                 <div>
                   <div class="text-subtitle-1 font-weight-bold text-primary">
@@ -1024,7 +1024,7 @@ const executeDeleteGR = async () => {
             </div>
 
             <!-- Table Items Matching Capella Invoice -->
-            <div class="border rounded-xl overflow-hidden mb-5">
+            <div class="border rounded overflow-hidden mb-5">
               <table class="w-100 table-receipt">
                 <thead>
                   <tr class="bg-grey-100 text-left">
@@ -1083,7 +1083,7 @@ const executeDeleteGR = async () => {
             </div>
 
             <!-- Bottom Capella Invoice Summary Box -->
-            <div class="pa-4 bg-var-theme-surface border rounded-xl shadow-xs mb-5">
+            <div class="pa-4 bg-var-theme-surface border rounded shadow-xs mb-5">
               <VRow align="center" justify="space-between">
                 <VCol cols="12" md="6">
                   <div class="text-caption text-medium-emphasis mb-1 font-weight-bold">
@@ -1226,7 +1226,7 @@ const executeDeleteGR = async () => {
       v-model="isApproveDialogVisible"
       max-width="520"
     >
-      <VCard class="rounded-xl overflow-hidden shadow-lg">
+      <VCard class="rounded overflow-hidden shadow-lg">
         <VCardTitle class="pa-5 pb-3 font-weight-bold text-h6 text-success d-flex align-center gap-2 bg-success-subtle border-b">
           <VIcon icon="ri-checkbox-circle-fill" color="success" size="24" />
           Konfirmasi Persetujuan Penerimaan Barang
@@ -1271,7 +1271,7 @@ const executeDeleteGR = async () => {
       v-model="isRejectDialogVisible"
       max-width="500"
     >
-      <VCard class="rounded-xl">
+      <VCard class="rounded">
         <VCardTitle class="pa-5 pb-2 font-weight-bold text-h6 text-error d-flex align-center gap-2">
           <VIcon icon="ri-error-warning-line" />
           Tolak Dokumen Penerimaan Gudang

@@ -310,7 +310,7 @@ const handleFileUpload = async event => {
     <!-- KPI Summary Row -->
     <VRow class="mb-4">
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+        <VCard  class="pa-4 border-s-lg border-primary">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-primary font-weight-bold">TOTAL MASTER PRODUK</div>
@@ -325,7 +325,7 @@ const handleFileUpload = async event => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+        <VCard  class="pa-4 border-s-lg border-info">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-info font-weight-bold">KATEGORI PRODUK</div>
@@ -340,7 +340,7 @@ const handleFileUpload = async event => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+        <VCard  class="pa-4 border-s-lg border-success">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-success font-weight-bold">PRODUK AKTIF</div>
@@ -355,7 +355,7 @@ const handleFileUpload = async event => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-warning">
+        <VCard  class="pa-4 border-s-lg border-warning">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-warning font-weight-bold">PRODUK FEFO (EXPIRED)</div>
@@ -371,7 +371,7 @@ const handleFileUpload = async event => {
     </VRow>
 
     <!-- Main Table Card -->
-    <VCard elevation="2">
+    <VCard >
       <!-- Toolbar & Filters -->
       <VCardItem class="pa-4">
         <VRow align="center">
@@ -497,25 +497,22 @@ const handleFileUpload = async event => {
 
         <!-- Promo Ori -->
         <template #item.promo_ori="{ item }">
-          <div v-if="Number(item.ori_discount_percent) > 0 || Number(item.ori_cashback_percent) > 0" class="d-flex flex-column align-center gap-1">
-            <VChip
-              v-if="Number(item.ori_discount_percent) > 0"
-              size="x-small"
-              color="error"
-              variant="flat"
-            >
-              Disc {{ item.ori_discount_percent }}%
-            </VChip>
-            <VChip
-              v-if="Number(item.ori_cashback_percent) > 0"
-              size="x-small"
-              color="warning"
-              variant="flat"
-            >
-              CB {{ item.ori_cashback_percent }}%
-            </VChip>
+          <div v-if="item.product_branches && item.product_branches.length > 0" class="d-flex flex-column gap-1">
+            <template v-for="pb in item.product_branches" :key="pb.id">
+              <div v-if="Number(pb.ori_discount_percent) > 0 || Number(pb.ori_cashback_percent) > 0" class="d-flex align-center gap-1">
+                <span class="text-caption font-weight-medium me-1" style="font-size: 10px !important;">{{ pb.branch?.name }}:</span>
+                <VChip v-if="Number(pb.ori_discount_percent) > 0" size="x-small" color="error" variant="flat">
+                  Disc {{ pb.ori_discount_percent }}%
+                </VChip>
+                <VChip v-if="Number(pb.ori_cashback_percent) > 0" size="x-small" color="warning" variant="flat">
+                  CB {{ pb.ori_cashback_percent }}%
+                </VChip>
+              </div>
+            </template>
+            <!-- Check if there's any active promo across all branches -->
+            <span v-if="!item.product_branches.some(pb => Number(pb.ori_discount_percent) > 0 || Number(pb.ori_cashback_percent) > 0)" class="text-caption text-disabled text-center">-</span>
           </div>
-          <span v-else class="text-caption text-disabled">-</span>
+          <span v-else class="text-caption text-disabled text-center">-</span>
         </template>
 
         <!-- Stock Method -->
@@ -597,7 +594,7 @@ const handleFileUpload = async event => {
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -606,7 +603,7 @@ const handleFileUpload = async event => {
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalItems / itemsPerPage)"

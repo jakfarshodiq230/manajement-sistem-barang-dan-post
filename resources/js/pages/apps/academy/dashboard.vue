@@ -180,7 +180,7 @@ const timeSpendingChartSeries = [
             <div>
               <VChip
                 color="success"
-                density="comfortable"
+                density="compact"
               >
                 +18.4%
               </VChip>

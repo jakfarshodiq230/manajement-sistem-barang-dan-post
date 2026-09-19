@@ -333,6 +333,29 @@ const backToList = () => {
   fetchOpnames()
 }
 
+const isSaveDisabled = (item) => {
+  if (item.temp_physical_qty === null || item.temp_physical_qty === undefined || item.temp_physical_qty === '') {
+    return true
+  }
+
+  const tempPhys = parseFloat(item.temp_physical_qty)
+  if (isNaN(tempPhys)) return true
+
+  if (item.physical_qty === null || item.physical_qty === undefined) {
+    return false
+  }
+
+  const savedPhys = parseFloat(item.physical_qty)
+  const tempDmg = parseFloat(item.temp_damaged_qty || 0)
+  const savedDmg = parseFloat(item.damaged_qty || 0)
+
+  if (tempPhys === savedPhys && tempDmg === savedDmg) {
+    return true
+  }
+
+  return false
+}
+
 const updateItemQty = async (item, qty, damagedQty) => {
   if (qty === null || qty === '') return
   try {
@@ -345,9 +368,12 @@ const updateItemQty = async (item, qty, damagedQty) => {
       },
     })
 
-    // Reload only current page
-    currentFetchUrl.value = '' // Force refresh
-    fetchOpnameItems(itemsPage.value)
+    // Update local item without refreshing whole page to prevent resetting other inputs
+    item.physical_qty = qty
+    item.damaged_qty = damagedQty || 0
+    item.variance = (parseFloat(qty) + parseFloat(damagedQty || 0)) - parseFloat(item.system_qty)
+    
+    showSnackbar('Tersimpan', 'success')
   } catch (error) {
     console.error('Error updating item:', error)
     showSnackbar(error.data?.message || 'Gagal update qty', 'error')
@@ -672,10 +698,10 @@ onMounted(async () => {
               size="small" 
               color="primary" 
               variant="tonal"
-              :disabled="!item.temp_physical_qty && item.temp_physical_qty !== 0"
+              :disabled="isSaveDisabled(item)"
               @click="updateItemQty(item, item.temp_physical_qty, item.temp_damaged_qty)"
             >
-              Simpan
+              {{ item.physical_qty !== null ? 'Update' : 'Simpan' }}
             </VBtn>
           </template>
         </VDataTableServer>

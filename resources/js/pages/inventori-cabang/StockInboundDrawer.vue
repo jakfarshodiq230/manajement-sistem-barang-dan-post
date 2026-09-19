@@ -118,7 +118,7 @@ const projectedTotalStock = computed(() => {
         <!-- Product & Branch Info Card -->
         <div
           v-if="props.selectedBranchProduct"
-          class="pa-4 mb-5 rounded-xl border bg-var-theme-surface shadow-xs"
+          class="pa-4 mb-5 rounded border bg-var-theme-surface shadow-xs"
         >
           <div class="d-flex align-center gap-3 mb-2">
             <VAvatar
@@ -162,7 +162,7 @@ const projectedTotalStock = computed(() => {
                 type="number"
                 min="1"
                 placeholder="10"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
                 prepend-inner-icon="ri-add-circle-line"
                 :suffix="props.selectedBranchProduct?.product?.unit || 'Pcs'"
@@ -185,7 +185,7 @@ const projectedTotalStock = computed(() => {
                 label="Harga Modal Satuan Masuk (HPP) (Rp)"
                 type="text"
                 placeholder="0"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
                 prepend-inner-icon="ri-money-dollar-circle-line"
                 prefix="Rp"
@@ -201,7 +201,7 @@ const projectedTotalStock = computed(() => {
                 label="Catatan / Nomor Dokumen Pembelian"
                 placeholder="Misal: Penerimaan tambahan dari Supplier A (Nota #123)"
                 rows="3"
-                density="comfortable"
+                density="compact"
                 variant="outlined"
                 prepend-inner-icon="ri-file-text-line"
               />

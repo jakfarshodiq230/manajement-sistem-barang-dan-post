@@ -206,7 +206,7 @@ const executeReceiveReplacement = async () => {
     </div>
 
     <!-- Main Card with Tabs -->
-    <VCard elevation="2">
+    <VCard >
       <!-- Tabs Navigation -->
       <VTabs
         v-model="activeTab"
@@ -442,7 +442,7 @@ const executeReceiveReplacement = async () => {
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -451,7 +451,7 @@ const executeReceiveReplacement = async () => {
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalItems / itemsPerPage)"
@@ -635,7 +635,7 @@ const executeReceiveReplacement = async () => {
       v-model="isReceiveReplacementDialogVisible"
       max-width="520"
     >
-      <VCard class="rounded-xl overflow-hidden shadow-lg">
+      <VCard class="rounded overflow-hidden shadow-lg">
         <VCardTitle class="pa-5 pb-3 font-weight-bold text-h6 text-success d-flex align-center gap-2 bg-success-subtle border-b">
           <VIcon icon="ri-inbox-archive-line" color="success" size="24" />
           Konfirmasi Penerimaan Barang Pengganti

@@ -349,7 +349,7 @@ const confirmDelete = async () => {
     <VRow class="mb-6">
       <!-- 1. Total Semua Pengeluaran -->
       <VCol cols="12" sm="6" md="4">
-        <VCard class="rounded-xl border elevation-1">
+        <VCard class="rounded border elevation-1">
           <VCardText class="d-flex align-center justify-space-between">
             <div>
               <span class="text-caption text-medium-emphasis font-weight-medium">TOTAL PENGELUARAN (TERFILTER)</span>
@@ -367,7 +367,7 @@ const confirmDelete = async () => {
 
       <!-- 2. Pengeluaran Kas Tunai -->
       <VCol cols="12" sm="6" md="4">
-        <VCard class="rounded-xl border elevation-1">
+        <VCard class="rounded border elevation-1">
           <VCardText class="d-flex align-center justify-space-between">
             <div>
               <span class="text-caption text-medium-emphasis font-weight-medium">DANA KAS TUNAI TOKO</span>
@@ -385,7 +385,7 @@ const confirmDelete = async () => {
 
       <!-- 3. Pengeluaran Transfer Bank -->
       <VCol cols="12" sm="6" md="4">
-        <VCard class="rounded-xl border elevation-1">
+        <VCard class="rounded border elevation-1">
           <VCardText class="d-flex align-center justify-space-between">
             <div>
               <span class="text-caption text-medium-emphasis font-weight-medium">DANA POTONG SALDO BANK</span>
@@ -403,7 +403,7 @@ const confirmDelete = async () => {
     </VRow>
 
     <!-- Filter Card -->
-    <VCard class="mb-6 rounded-xl border elevation-1">
+    <VCard class="mb-6 rounded border elevation-1">
       <VCardText class="pa-4">
         <VRow class="g-3">
           <!-- Search -->
@@ -582,7 +582,7 @@ const confirmDelete = async () => {
       max-width="580"
       scrollable
     >
-      <VCard class="rounded-xl overflow-hidden shadow-lg border d-flex flex-column" max-height="85vh">
+      <VCard class="rounded overflow-hidden shadow-lg border d-flex flex-column" max-height="85vh">
         <!-- Dialog Header (Fixed) -->
         <div class="pa-4 px-5 bg-var-theme-surface border-b d-flex align-center justify-space-between flex-shrink-0">
           <div class="d-flex align-center gap-3">
@@ -639,7 +639,7 @@ const confirmDelete = async () => {
               <div class="d-grid grid-cols-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                 <!-- Option 1: Kas Tunai -->
                 <div
-                  class="payment-option-card pa-3 rounded-xl border cursor-pointer d-flex align-center gap-3"
+                  class="payment-option-card pa-3 rounded border cursor-pointer d-flex align-center gap-3"
                   :class="formPaymentMethod === 'cash' ? 'selected-cash' : 'unselected-card'"
                   @click="formPaymentMethod = 'cash'"
                 >
@@ -669,7 +669,7 @@ const confirmDelete = async () => {
 
                 <!-- Option 2: Transfer Bank -->
                 <div
-                  class="payment-option-card pa-3 rounded-xl border cursor-pointer d-flex align-center gap-3"
+                  class="payment-option-card pa-3 rounded border cursor-pointer d-flex align-center gap-3"
                   :class="formPaymentMethod === 'bank_transfer' ? 'selected-bank' : 'unselected-card'"
                   @click="formPaymentMethod = 'bank_transfer'"
                 >
@@ -701,7 +701,7 @@ const confirmDelete = async () => {
 
             <!-- Row 2b: Dropdown Rekening Bank jika Transfer Bank -->
             <VCol v-if="formPaymentMethod === 'bank_transfer'" cols="12">
-              <div class="pa-4 rounded-xl border border-info" style="background-color: rgba(var(--v-theme-info), 0.04);">
+              <div class="pa-4 rounded border border-info" style="background-color: rgba(var(--v-theme-info), 0.04);">
                 <div class="d-flex align-center justify-space-between mb-2">
                   <span class="text-caption font-weight-bold text-info d-flex align-center gap-1">
                     <VIcon icon="ri-bank-line" size="16" />
@@ -773,7 +773,7 @@ const confirmDelete = async () => {
 
             <!-- Input Kategori Baru jika dipilih -->
             <VCol v-if="isCustomCategory" cols="12">
-              <div class="pa-3 rounded-xl border border-primary" style="background-color: rgba(var(--v-theme-primary), 0.04);">
+              <div class="pa-3 rounded border border-primary" style="background-color: rgba(var(--v-theme-primary), 0.04);">
                 <div class="d-flex align-center gap-1 mb-2 text-primary font-weight-bold text-caption">
                   <VIcon icon="ri-add-circle-line" size="16" />
                   Ketik Nama Kategori Baru:
@@ -849,7 +849,7 @@ const confirmDelete = async () => {
       :fullscreen="$vuetify.display.xs"
       max-width="420"
     >
-      <VCard class="rounded-xl overflow-hidden shadow-lg border">
+      <VCard class="rounded overflow-hidden shadow-lg border">
         <VCardTitle class="pa-4 bg-var-theme-surface border-b d-flex align-center gap-2 text-error">
           <VIcon icon="ri-delete-bin-line" size="22" />
           <span class="font-weight-bold text-h6">Hapus Catatan Kas Kecil</span>

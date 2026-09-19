@@ -186,7 +186,7 @@ const marginCalc = row => {
     <!-- ── Summary Cards ─────────────────────────── -->
     <VRow class="mb-6">
       <VCol cols="12" sm="6" md="2" lg="2">
-        <VCard elevation="2" class="pa-3 rounded-xl border h-100" :loading="isLoading">
+        <VCard  class="pa-3 rounded border h-100" :loading="isLoading">
           <p class="text-caption text-medium-emphasis mb-1 font-weight-bold">
             TOTAL TRANSAKSI
           </p>
@@ -198,7 +198,7 @@ const marginCalc = row => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3" lg="3">
-        <VCard elevation="2" class="pa-3 rounded-xl border border-s-lg border-primary h-100" :loading="isLoading">
+        <VCard  class="pa-3 rounded border border-s-lg border-primary h-100" :loading="isLoading">
           <p class="text-caption text-primary mb-1 font-weight-bold">
             TOTAL OMSET PENJUALAN
           </p>
@@ -210,7 +210,7 @@ const marginCalc = row => {
       </VCol>
 
       <VCol cols="12" sm="6" md="2" lg="2">
-        <VCard elevation="2" class="pa-3 rounded-xl border border-s-lg border-error h-100" :loading="isLoading">
+        <VCard  class="pa-3 rounded border border-s-lg border-error h-100" :loading="isLoading">
           <p class="text-caption text-error mb-1 font-weight-bold">
             BEBAN KAS KECIL
           </p>
@@ -222,7 +222,7 @@ const marginCalc = row => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3" lg="3">
-        <VCard elevation="2" class="pa-3 rounded-xl border border-s-lg border-success h-100" :loading="isLoading">
+        <VCard  class="pa-3 rounded border border-s-lg border-success h-100" :loading="isLoading">
           <p class="text-caption text-success mb-1 font-weight-bold">
             LABA BERSIH RIIL
           </p>
@@ -234,7 +234,7 @@ const marginCalc = row => {
       </VCol>
 
       <VCol cols="12" sm="6" md="2" lg="2">
-        <VCard elevation="2" class="pa-3 rounded-xl border border-s-lg border-info h-100" :loading="isLoading">
+        <VCard  class="pa-3 rounded border border-s-lg border-info h-100" :loading="isLoading">
           <p class="text-caption text-info mb-1 font-weight-bold">
             MARGIN BERSIH
           </p>
@@ -249,7 +249,7 @@ const marginCalc = row => {
     <!-- ── Main Table (12 bulan) ──────────────────── -->
     <VRow class="mb-6">
       <VCol cols="12">
-        <VCard class="rounded-xl border elevation-2">
+        <VCard class="rounded border elevation-2">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="primary" variant="tonal" size="38" class="me-2" rounded="lg">
@@ -271,7 +271,7 @@ const marginCalc = row => {
             item-value="bulan_num"
             :items-per-page="-1"
             hide-default-footer
-            density="comfortable"
+            density="compact"
             hover
             class="text-no-wrap rekap-table"
           >
@@ -409,7 +409,7 @@ const marginCalc = row => {
     <!-- ── Catatan Rumus ──────────────────────────── -->
     <VRow>
       <VCol cols="12">
-        <VCard class="rounded-xl border elevation-1" title="📐 Standar Perhitungan Akuntansi Rekap Keuangan">
+        <VCard class="rounded border elevation-1" title="📐 Standar Perhitungan Akuntansi Rekap Keuangan">
           <VCardText>
             <VAlert
               color="info"
@@ -458,7 +458,7 @@ const marginCalc = row => {
       v-model="detailDialog"
       max-width="950"
     >
-      <VCard class="rounded-xl">
+      <VCard class="rounded">
         <VCardTitle class="bg-primary text-white pa-4 d-flex align-center justify-space-between">
           <span class="font-weight-bold">Detail Harian &mdash; {{ detailMonth?.bulan }} {{ selectedYear }}</span>
           <VBtn icon="ri-close-line" variant="text" size="small" @click="detailDialog = false" />

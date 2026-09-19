@@ -247,7 +247,7 @@ const financialModules = [
     <VRow class="mb-6 match-height">
       <!-- 1. Total Saldo Bank -->
       <VCol cols="12" sm="6" md="4" lg="2">
-        <VCard elevation="1" class="h-100 pa-4 border rounded-lg">
+        <VCard  class="h-100 pa-4 border rounded-lg">
           <div class="d-flex align-center justify-space-between mb-2">
             <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Saldo Bank</span>
             <VAvatar color="primary" variant="tonal" size="36" rounded>
@@ -265,7 +265,7 @@ const financialModules = [
 
       <!-- 2. Omzet Bulan Ini -->
       <VCol cols="12" sm="6" md="4" lg="2">
-        <VCard elevation="1" class="h-100 pa-4 border rounded-lg">
+        <VCard  class="h-100 pa-4 border rounded-lg">
           <div class="d-flex align-center justify-space-between mb-2">
             <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Omzet Bulan Ini</span>
             <VAvatar color="info" variant="tonal" size="36" rounded>
@@ -283,7 +283,7 @@ const financialModules = [
 
       <!-- 3. Estimasi Laba Bersih -->
       <VCol cols="12" sm="6" md="4" lg="2">
-        <VCard elevation="1" class="h-100 pa-4 border rounded-lg">
+        <VCard  class="h-100 pa-4 border rounded-lg">
           <div class="d-flex align-center justify-space-between mb-2">
             <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Laba Bersih</span>
             <VAvatar color="success" variant="tonal" size="36" rounded>
@@ -301,7 +301,7 @@ const financialModules = [
 
       <!-- 4. Piutang Pelanggan -->
       <VCol cols="12" sm="6" md="4" lg="2">
-        <VCard elevation="1" class="h-100 pa-4 border rounded-lg">
+        <VCard  class="h-100 pa-4 border rounded-lg">
           <div class="d-flex align-center justify-space-between mb-2">
             <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Piutang Pelanggan</span>
             <VAvatar color="secondary" variant="tonal" size="36" rounded>
@@ -319,7 +319,7 @@ const financialModules = [
 
       <!-- 5. Hutang Supplier -->
       <VCol cols="12" sm="6" md="4" lg="2">
-        <VCard elevation="1" class="h-100 pa-4 border rounded-lg">
+        <VCard  class="h-100 pa-4 border rounded-lg">
           <div class="d-flex align-center justify-space-between mb-2">
             <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Hutang Supplier</span>
             <VAvatar color="error" variant="tonal" size="36" rounded>
@@ -337,7 +337,7 @@ const financialModules = [
 
       <!-- 6. Sisa Modal Cabang -->
       <VCol cols="12" sm="6" md="4" lg="2">
-        <VCard elevation="1" class="h-100 pa-4 border rounded-lg">
+        <VCard  class="h-100 pa-4 border rounded-lg">
           <div class="d-flex align-center justify-space-between mb-2">
             <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Sisa Modal</span>
             <VAvatar color="warning" variant="tonal" size="36" rounded>
@@ -372,7 +372,7 @@ const financialModules = [
       >
         <VCard
           class="h-100 d-flex flex-column border rounded-lg module-card"
-          elevation="1"
+          
           :to="mod.to"
         >
           <VCardText class="pa-5 flex-grow-1">
@@ -413,7 +413,7 @@ const financialModules = [
     <VRow class="match-height">
       <!-- Rekening Bank Terdaftar -->
       <VCol cols="12" md="7">
-        <VCard class="h-100 border rounded-lg" elevation="1">
+        <VCard class="h-100 border rounded-lg" >
           <VCardItem class="pa-4 pb-2">
             <template #prepend>
               <VAvatar color="primary" variant="tonal" size="36" rounded class="me-2">
@@ -493,7 +493,7 @@ const financialModules = [
 
       <!-- Pintasan Aksi Cepat -->
       <VCol cols="12" md="5">
-        <VCard class="h-100 border rounded-lg" elevation="1">
+        <VCard class="h-100 border rounded-lg" >
           <VCardItem class="pa-4 pb-2">
             <template #prepend>
               <VAvatar color="warning" variant="tonal" size="36" rounded class="me-2">

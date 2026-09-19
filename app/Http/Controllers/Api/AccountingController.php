@@ -32,67 +32,12 @@ class AccountingController extends Controller
         $startDate = $request->query('start_date', now()->startOfMonth()->toDateString());
         $endDate = $request->query('end_date', now()->endOfMonth()->toDateString());
 
-        // 1. Total Assets
-        $assetAccounts = Account::where('type', 'asset')->where('is_active', true)->get();
-        $totalAssets = 0;
-        foreach ($assetAccounts as $acc) {
-            $totalAssets += $this->calculateAccountBalance($acc, $branchId, $endDate);
-        }
-
-        // 2. Total Liabilities
-        $liabilityAccounts = Account::where('type', 'liability')->where('is_active', true)->get();
-        $totalLiabilities = 0;
-        foreach ($liabilityAccounts as $acc) {
-            $totalLiabilities += $this->calculateAccountBalance($acc, $branchId, $endDate);
-        }
-
-        // 3. Total Equity
-        $equityAccounts = Account::where('type', 'equity')->where('is_active', true)->get();
-        $totalEquity = 0;
-        foreach ($equityAccounts as $acc) {
-            $bal = $this->calculateAccountBalance($acc, $branchId, $endDate);
-            if ($acc->normal_balance === 'debit') {
-                $totalEquity -= $bal;
-            } else {
-                $totalEquity += $bal;
-            }
-        }
-
-        // 4. Period Revenue & Expense
-        $revenueAccounts = Account::where('type', 'revenue')->where('is_active', true)->get();
-        $totalRevenue = 0;
-        foreach ($revenueAccounts as $acc) {
-            $totalRevenue += $this->calculateAccountMovement($acc, $branchId, $startDate, $endDate);
-        }
-
-        $cogsAccounts = Account::where('type', 'cogs')->where('is_active', true)->get();
-        $totalCogs = 0;
-        foreach ($cogsAccounts as $acc) {
-            $totalCogs += $this->calculateAccountMovement($acc, $branchId, $startDate, $endDate);
-        }
-
-        $expenseAccounts = Account::where('type', 'expense')->where('is_active', true)->get();
-        $totalExpenses = 0;
-        foreach ($expenseAccounts as $acc) {
-            $totalExpenses += $this->calculateAccountMovement($acc, $branchId, $startDate, $endDate);
-        }
-
-        $netProfit = $totalRevenue - $totalCogs - $totalExpenses;
-        $totalJournalsCount = JournalEntry::when($branchId, fn($q) => $q->where('branch_id', $branchId))->count();
+        $service = app(\App\Services\AccountingReportService::class);
+        $metrics = $service->getOverviewMetrics($branchId, $startDate, $endDate);
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'total_assets' => round($totalAssets, 2),
-                'total_liabilities' => round($totalLiabilities, 2),
-                'total_equity' => round($totalEquity, 2),
-                'total_revenue' => round($totalRevenue, 2),
-                'total_cogs' => round($totalCogs, 2),
-                'total_expenses' => round($totalExpenses, 2),
-                'net_profit' => round($netProfit, 2),
-                'total_journals_count' => $totalJournalsCount,
-                'is_balance_sheet_balanced' => abs($totalAssets - ($totalLiabilities + $totalEquity + $netProfit)) < 1.0,
-            ],
+            'data' => $metrics,
         ]);
     }
 
@@ -123,8 +68,11 @@ class AccountingController extends Controller
         }
 
         // Attach calculated balance
-        $accounts->map(function ($acc) use ($branchId) {
-            $acc->current_balance = $this->calculateAccountBalance($acc, $branchId);
+        $service = app(\App\Services\AccountingReportService::class);
+        $balances = $service->getAccountBalances($branchId, now()->toDateString());
+
+        $accounts->map(function ($acc) use ($service, $balances) {
+            $acc->current_balance = $service->calculateBalance($acc, $balances);
             return $acc;
         });
 

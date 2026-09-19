@@ -428,7 +428,7 @@ const widgetData = computed(() => [
             md="3"
             sm="6"
           >
-            <VCard class="rounded-xl border elevation-1">
+            <VCard class="rounded border elevation-1">
               <VCardText>
                 <div class="d-flex justify-space-between align-center">
                   <div class="d-flex flex-column gap-y-1">
@@ -460,7 +460,7 @@ const widgetData = computed(() => [
     </div>
 
     <!-- Filter Card -->
-    <VCard class="mb-6 rounded-xl border elevation-1">
+    <VCard class="mb-6 rounded border elevation-1">
       <VCardItem class="pb-2">
         <VCardTitle class="text-subtitle-1 font-weight-bold d-flex align-center gap-2">
           <VIcon icon="ri-filter-3-line" size="20" color="primary" />
@@ -736,7 +736,7 @@ const widgetData = computed(() => [
               <VBtn
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -744,7 +744,7 @@ const widgetData = computed(() => [
 
               <VBtn
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalUsers / itemsPerPage)"
@@ -803,7 +803,7 @@ const widgetData = computed(() => [
 
         <VCardText class="pa-0 mb-4">
           <!-- Quick Role Bar -->
-          <div class="bg-grey-50 rounded-xl pa-3 mb-4 border">
+          <div class="bg-grey-50 rounded pa-3 mb-4 border">
             <div class="d-flex align-center justify-space-between flex-wrap gap-3">
               <div class="flex-grow-1" style="min-width: 220px;">
                 <VSelect
@@ -871,7 +871,7 @@ const widgetData = computed(() => [
             <div
               v-for="branch in modalBranchesList"
               :key="branch.id"
-              class="d-flex align-center justify-space-between p-3 rounded-xl border transition-all"
+              class="d-flex align-center justify-space-between p-3 rounded border transition-all"
               :class="selectedBranchIds.includes(branch.id) ? 'bg-primary-lighten-5 border-primary' : 'bg-surface'"
               style="cursor: pointer; padding: 10px 14px;"
               @click="toggleBranchSelection(branch.id)"
@@ -1003,7 +1003,7 @@ const widgetData = computed(() => [
             <VBtn
               icon="ri-close-line"
               variant="text"
-              density="comfortable"
+              density="compact"
               @click="isEditUserDialogVisible = false"
             />
           </div>

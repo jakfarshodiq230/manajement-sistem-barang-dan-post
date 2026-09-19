@@ -548,7 +548,7 @@ const onSubmit = async () => {
 
             <!-- Aturan Harga Batch Fisik -->
             <VCol cols="12">
-              <VCard elevation="0" class="border rounded-lg pa-4 bg-var-theme-surface">
+              <VCard  class="border rounded-lg pa-4 bg-var-theme-surface">
                 <div class="d-flex align-center gap-2 mb-2">
                   <VIcon icon="ri-stack-line" color="primary" size="20" />
                   <span class="font-weight-bold text-subtitle-2">Aturan Penyesuaian Harga Batch Fisik (Stok yang Ada)</span>
@@ -601,7 +601,7 @@ const onSubmit = async () => {
 
             <!-- Section: Bulk Calculator -->
             <VCol cols="12">
-              <VCard elevation="0" class="border rounded-lg pa-4 bg-var-theme-surface">
+              <VCard  class="border rounded-lg pa-4 bg-var-theme-surface">
                 <div class="d-flex align-center justify-space-between mb-3">
                   <div class="d-flex align-center gap-2">
                     <VIcon icon="ri-calculator-line" color="primary" size="20" />
@@ -721,7 +721,7 @@ const onSubmit = async () => {
               <!-- Search Results Dropdown -->
               <VCard
                 v-if="searchResults.length > 0"
-                elevation="3"
+                
                 class="mt-1 border rounded-lg"
                 style="max-block-size: 220px; overflow-y: auto;"
               >
@@ -785,7 +785,7 @@ const onSubmit = async () => {
               </div>
 
               <div class="border rounded-lg overflow-hidden shadow-xs">
-                <VTable density="comfortable" class="price-adjust-table text-no-wrap" hover>
+                <VTable density="compact" class="price-adjust-table text-no-wrap" hover>
                   <thead class="bg-var-theme-surface">
                     <tr>
                       <th style="inline-size: 40px;" class="px-2">
@@ -934,7 +934,7 @@ const onSubmit = async () => {
 
               <!-- Option Direct Approval -->
               <VCol cols="12" class="mt-2">
-                <VCard elevation="0" class="border rounded-lg pa-3 bg-var-theme-surface">
+                <VCard  class="border rounded-lg pa-3 bg-var-theme-surface">
                   <VCheckbox
                     v-model="applyImmediately"
                     label="Langsung sahkan & terapkan harga baru ini serentak ke kasir POS"

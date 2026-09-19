@@ -176,7 +176,7 @@ const filteredSettings = computed(() => {
     </div>
 
     <!-- Main Card -->
-    <VCard class="rounded-xl border elevation-1">
+    <VCard class="rounded border elevation-1">
       <VCardText class="d-flex flex-wrap align-center py-5 gap-4">
         <VTextField
           v-model="search"
@@ -303,7 +303,7 @@ const filteredSettings = computed(() => {
                 v-model="editedItem.name"
                 placeholder="Contoh: Thermal Standar 80mm"
                 variant="outlined"
-                density="comfortable"
+                density="compact"
                 rounded="lg"
                 hide-details
               />
@@ -314,7 +314,7 @@ const filteredSettings = computed(() => {
                 v-model="editedItem.width"
                 placeholder="Contoh: 80mm"
                 variant="outlined"
-                density="comfortable"
+                density="compact"
                 rounded="lg"
                 hide-details
               />

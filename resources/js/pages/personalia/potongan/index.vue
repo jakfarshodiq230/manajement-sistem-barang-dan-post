@@ -145,7 +145,7 @@ const handleSearch = () => {
     </div>
 
     <!-- Filter Card -->
-    <VCard elevation="1" class="border rounded-lg mb-6">
+    <VCard  class="border rounded-lg mb-6">
       <VCardText class="pa-4">
         <VRow>
           <VCol cols="12" md="6">
@@ -162,7 +162,7 @@ const handleSearch = () => {
     </VCard>
 
     <!-- Data Table -->
-    <VCard elevation="1" class="border rounded-lg">
+    <VCard  class="border rounded-lg">
       <VDataTableServer
         v-model:items-per-page="itemsPerPage"
         v-model:page="page"
@@ -221,7 +221,7 @@ const handleSearch = () => {
                 v-model="page"
                 :length="Math.ceil(totalItems / itemsPerPage)"
                 :total-visible="5"
-                density="comfortable"
+                density="compact"
                 active-color="primary"
                 @update:model-value="fetchData"
               />

@@ -125,41 +125,32 @@ onMounted(() => {
 
 <template>
   <div>
-    <!-- Page Header Banner -->
-    <div class="mb-6 pa-6 rounded-xl bg-gradient-header border shadow-sm">
-      <div class="d-flex align-center justify-space-between flex-wrap gap-4">
-        <div class="d-flex align-center gap-4">
-          <VAvatar color="primary" size="56" variant="tonal" class="rounded-xl shadow-xs">
-            <VIcon icon="ri-file-chart-line" size="32" />
-          </VAvatar>
-          <div>
-            <h3 class="text-h4 font-weight-bold text-high-emphasis mb-1">
-              Pusat Laporan & Analitik (Reports Hub)
-            </h3>
-            <p class="text-body-1 text-medium-emphasis mb-0">
-              Pusat rekap laporan finansial, mutasi rekening bank, inventori barang, closing audit, dan piutang perusahaan.
-            </p>
-          </div>
-        </div>
-
-        <div class="d-flex gap-2">
-          <VBtn
-            color="primary"
-            prepend-icon="ri-refresh-line"
-            variant="tonal"
-            :loading="isLoading"
-            @click="fetchDashboardStats"
-          >
-            Segarkan Data
-          </VBtn>
-        </div>
+    <!-- Header -->
+    <div class="d-flex align-center justify-space-between mb-4">
+      <div>
+        <h2 class="text-h4 font-weight-bold mb-1">
+          Pusat Laporan & Analitik (Reports Hub)
+        </h2>
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          Pusat rekap laporan finansial, mutasi rekening bank, inventori barang, closing audit, dan piutang perusahaan.
+        </p>
       </div>
+
+      <VBtn
+        color="primary"
+        prepend-icon="ri-refresh-line"
+        variant="tonal"
+        :loading="isLoading"
+        @click="fetchDashboardStats"
+      >
+        Segarkan Data
+      </VBtn>
     </div>
 
     <!-- Quick Financial KPI Highlight Cards -->
     <VRow class="mb-6">
       <VCol cols="12" sm="6" md="4">
-        <VCard class="pa-4 rounded-xl border shadow-xs h-100 kpi-hover">
+        <VCard class="pa-4 rounded border shadow-xs h-100 kpi-hover">
           <div class="d-flex justify-space-between align-center mb-2">
             <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Total Omzet Bulan Ini</span>
             <VAvatar color="primary" variant="tonal" size="36" class="rounded-lg">
@@ -176,7 +167,7 @@ onMounted(() => {
       </VCol>
 
       <VCol cols="12" sm="6" md="4">
-        <VCard class="pa-4 rounded-xl border shadow-xs h-100 kpi-hover">
+        <VCard class="pa-4 rounded border shadow-xs h-100 kpi-hover">
           <div class="d-flex justify-space-between align-center mb-2">
             <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Total Saldo di Bank</span>
             <VAvatar color="info" variant="tonal" size="36" class="rounded-lg">
@@ -193,7 +184,7 @@ onMounted(() => {
       </VCol>
 
       <VCol cols="12" sm="6" md="4">
-        <VCard class="pa-4 rounded-xl border shadow-xs h-100 kpi-hover">
+        <VCard class="pa-4 rounded border shadow-xs h-100 kpi-hover">
           <div class="d-flex justify-space-between align-center mb-2">
             <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Sisa Piutang Pelanggan</span>
             <VAvatar color="warning" variant="tonal" size="36" class="rounded-lg">
@@ -227,7 +218,7 @@ onMounted(() => {
         lg="4"
       >
         <VCard
-          class="pa-5 rounded-xl border h-100 report-card d-flex flex-column justify-space-between"
+          class="pa-5 rounded border h-100 report-card d-flex flex-column justify-space-between"
           :to="rep.to"
         >
           <div>
@@ -236,7 +227,7 @@ onMounted(() => {
                 :color="rep.color"
                 variant="tonal"
                 size="46"
-                class="rounded-xl"
+                class="rounded"
               >
                 <VIcon :icon="rep.icon" size="24" />
               </VAvatar>

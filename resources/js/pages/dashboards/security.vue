@@ -289,7 +289,7 @@ onUnmounted(() => {
 <template>
   <div class="pa-4">
     <!-- Header Banner -->
-    <VCard elevation="2" class="mb-4 pa-4 rounded-xl border bg-var-theme-surface">
+    <VCard  class="mb-4 pa-4 rounded border bg-var-theme-surface">
       <div class="d-flex flex-wrap align-center justify-space-between gap-4">
         <!-- Title -->
         <div class="d-flex align-center gap-3">
@@ -372,7 +372,7 @@ onUnmounted(() => {
     <VRow class="mb-4 match-height">
       <!-- 1. Total Akses 24 Jam -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary h-100 d-flex flex-column justify-space-between" :loading="isSummaryLoading">
+        <VCard  class="pa-4 border-s-lg border-primary h-100 d-flex flex-column justify-space-between" :loading="isSummaryLoading">
           <div>
             <div class="d-flex align-center justify-space-between">
               <span class="text-caption text-primary font-weight-bold text-uppercase">Total Akses Masuk (24 Jam)</span>
@@ -393,7 +393,7 @@ onUnmounted(() => {
 
       <!-- 2. Ancaman & Serangan Terdeteksi -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-error h-100 d-flex flex-column justify-space-between" :loading="isSummaryLoading">
+        <VCard  class="pa-4 border-s-lg border-error h-100 d-flex flex-column justify-space-between" :loading="isSummaryLoading">
           <div>
             <div class="d-flex align-center justify-space-between">
               <span class="text-caption text-error font-weight-bold text-uppercase">Serangan / Ancaman (24 Jam)</span>
@@ -414,7 +414,7 @@ onUnmounted(() => {
 
       <!-- 3. Alamat IP Mencurigakan -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-warning h-100 d-flex flex-column justify-space-between" :loading="isSummaryLoading">
+        <VCard  class="pa-4 border-s-lg border-warning h-100 d-flex flex-column justify-space-between" :loading="isSummaryLoading">
           <div>
             <div class="d-flex align-center justify-space-between">
               <span class="text-caption text-warning font-weight-bold text-uppercase">IP Mencurigakan Unik</span>
@@ -434,7 +434,7 @@ onUnmounted(() => {
 
       <!-- 4. Total IP Diblokir (Blacklist) -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-secondary h-100 d-flex flex-column justify-space-between" :loading="isSummaryLoading">
+        <VCard  class="pa-4 border-s-lg border-secondary h-100 d-flex flex-column justify-space-between" :loading="isSummaryLoading">
           <div>
             <div class="d-flex align-center justify-space-between">
               <span class="text-caption text-secondary font-weight-bold text-uppercase">IP Dicekal (Blacklist)</span>
@@ -455,7 +455,7 @@ onUnmounted(() => {
     </VRow>
 
     <!-- Top Suspicious / Attacking IPs Quick Action Bar -->
-    <VCard v-if="summary?.top_attacking_ips && summary.top_attacking_ips.length > 0" elevation="2" class="mb-4 pa-4 rounded-xl border border-error bg-var-theme-surface">
+    <VCard v-if="summary?.top_attacking_ips && summary.top_attacking_ips.length > 0"  class="mb-4 pa-4 rounded border border-error bg-var-theme-surface">
       <div class="d-flex align-center justify-space-between mb-2">
         <div class="d-flex align-center gap-2">
           <VIcon icon="ri-fire-line" color="error" size="20" />
@@ -487,7 +487,7 @@ onUnmounted(() => {
     </VCard>
 
     <!-- Main Log Table Card -->
-    <VCard elevation="2" class="rounded-xl border" :loading="isLoading">
+    <VCard  class="rounded border" :loading="isLoading">
       <!-- Filter Bar -->
       <VCardText class="pa-4 border-b">
         <div class="d-flex flex-wrap align-center justify-space-between gap-3">
@@ -723,7 +723,7 @@ onUnmounted(() => {
       :fullscreen="$vuetify.display.xs"
       max-width="650"
     >
-      <VCard class="pa-4 rounded-xl">
+      <VCard class="pa-4 rounded">
         <div class="d-flex align-center justify-space-between mb-3 border-b pb-3">
           <div class="d-flex align-center gap-2">
             <VAvatar :color="getRiskColor(selectedLog?.risk_level)" variant="tonal" size="36">
@@ -827,7 +827,7 @@ onUnmounted(() => {
       :fullscreen="$vuetify.display.xs"
       max-width="500"
     >
-      <VCard class="pa-4 rounded-xl">
+      <VCard class="pa-4 rounded">
         <div class="d-flex align-center gap-2 mb-3">
           <VAvatar color="error" variant="tonal" size="36">
             <VIcon icon="ri-forbid-2-line" size="22" />
@@ -877,7 +877,7 @@ onUnmounted(() => {
       :fullscreen="$vuetify.display.xs"
       max-width="700"
     >
-      <VCard class="pa-4 rounded-xl">
+      <VCard class="pa-4 rounded">
         <div class="d-flex align-center justify-space-between mb-3 border-b pb-3">
           <div class="d-flex align-center gap-2">
             <VAvatar color="error" variant="tonal" size="36">
@@ -959,7 +959,7 @@ onUnmounted(() => {
       :fullscreen="$vuetify.display.xs"
       max-width="450"
     >
-      <VCard class="pa-4 rounded-xl">
+      <VCard class="pa-4 rounded">
         <div class="d-flex align-center gap-2 mb-3">
           <VAvatar color="warning" variant="tonal" size="36">
             <VIcon icon="ri-delete-bin-line" size="22" />

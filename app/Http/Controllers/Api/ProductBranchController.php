@@ -76,6 +76,8 @@ class ProductBranchController extends Controller
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
             'other_fees' => 'nullable|numeric|min:0',
             'min_nego_price' => 'nullable|numeric|min:0',
+            'ori_discount_percent' => 'nullable|numeric|min:0|max:100',
+            'ori_cashback_percent' => 'nullable|numeric|min:0|max:100',
         ]);
 
         // Ensure unique combination
@@ -87,10 +89,12 @@ class ProductBranchController extends Controller
             return response()->json(['message' => 'Produk ini sudah ada di cabang tersebut'], 422);
         }
 
-        $data = $request->only(['product_id', 'branch_id', 'cost_price', 'price', 'tax_percentage', 'other_fees', 'min_nego_price']);
+        $data = $request->only(['product_id', 'branch_id', 'cost_price', 'price', 'tax_percentage', 'other_fees', 'min_nego_price', 'ori_discount_percent', 'ori_cashback_percent']);
         $data['tax_percentage'] = $data['tax_percentage'] ?? 0;
         $data['other_fees'] = $data['other_fees'] ?? 0;
         $data['min_nego_price'] = $data['min_nego_price'] ?? 0;
+        $data['ori_discount_percent'] = $data['ori_discount_percent'] ?? 0;
+        $data['ori_cashback_percent'] = $data['ori_cashback_percent'] ?? 0;
         $data['stock'] = 0; // initial stock is 0
 
         $productBranch = ProductBranch::create($data);
@@ -119,9 +123,11 @@ class ProductBranchController extends Controller
             'tax_percentage' => 'nullable|numeric|min:0|max:100',
             'other_fees' => 'nullable|numeric|min:0',
             'min_nego_price' => 'nullable|numeric|min:0',
+            'ori_discount_percent' => 'nullable|numeric|min:0|max:100',
+            'ori_cashback_percent' => 'nullable|numeric|min:0|max:100',
         ]);
 
-        $data = $request->only(['cost_price', 'price', 'tax_percentage', 'other_fees', 'min_nego_price']);
+        $data = $request->only(['cost_price', 'price', 'tax_percentage', 'other_fees', 'min_nego_price', 'ori_discount_percent', 'ori_cashback_percent']);
         
         if ($request->has('tax_percentage')) {
             $data['tax_percentage'] = $request->tax_percentage ?? 0;
@@ -131,6 +137,12 @@ class ProductBranchController extends Controller
         }
         if ($request->has('min_nego_price')) {
             $data['min_nego_price'] = $request->min_nego_price ?? 0;
+        }
+        if ($request->has('ori_discount_percent')) {
+            $data['ori_discount_percent'] = $request->ori_discount_percent ?? 0;
+        }
+        if ($request->has('ori_cashback_percent')) {
+            $data['ori_cashback_percent'] = $request->ori_cashback_percent ?? 0;
         }
 
         $productBranch->update($data);

@@ -232,6 +232,7 @@ const requiredValidator = val => !!val || 'Kolom ini wajib diisi'
                   item-title="name"
                   item-value="id"
                   label="Penempatan Cabang"
+                  :rules="[requiredValidator]"
                   clearable
                 />
               </VCol>
@@ -240,7 +241,7 @@ const requiredValidator = val => !!val || 'Kolom ini wajib diisi'
               <VCol cols="12" md="6">
                 <VSelect
                   v-model="localData.gender"
-                  :items="[{title: 'Laki-Laki', value: 'L'}, {title: 'Perempuan', value: 'P'}]"
+                  :items="['Laki-laki', 'Perempuan']"
                   label="Jenis Kelamin"
                 />
               </VCol>

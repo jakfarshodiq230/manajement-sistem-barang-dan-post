@@ -84,7 +84,7 @@ const headers = [
     <!-- KPI Summary Row -->
     <VRow class="mb-4">
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-warning">
+        <VCard  class="pa-4 border-s-lg border-warning">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-warning font-weight-bold">STOK MENIPIS (&le; 10)</div>
@@ -99,7 +99,7 @@ const headers = [
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-error">
+        <VCard  class="pa-4 border-s-lg border-error">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-error font-weight-bold">STOK HABIS (0)</div>
@@ -114,7 +114,7 @@ const headers = [
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+        <VCard  class="pa-4 border-s-lg border-info">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-info font-weight-bold">TOTAL LOG MUTASI</div>
@@ -129,7 +129,7 @@ const headers = [
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+        <VCard  class="pa-4 border-s-lg border-success">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-success font-weight-bold">KONTROL GUDANG</div>
@@ -148,7 +148,7 @@ const headers = [
     <VRow class="mb-4">
       <!-- Low Stock Column -->
       <VCol cols="12" md="6">
-        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
+        <VCard  class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="warning" variant="tonal" size="36" class="me-2">
@@ -161,7 +161,7 @@ const headers = [
           <VDivider />
           <VProgressLinear v-if="isLoading" indeterminate color="warning" height="2" />
 
-          <VTable class="text-no-wrap" hover density="comfortable">
+          <VTable class="text-no-wrap" hover density="compact">
             <thead>
               <tr class="bg-grey-50">
                 <th class="text-left font-weight-bold">PRODUK</th>
@@ -211,7 +211,7 @@ const headers = [
 
       <!-- Out of Stock Column -->
       <VCol cols="12" md="6">
-        <VCard elevation="2" class="h-100 d-flex flex-column" :loading="isLoading">
+        <VCard  class="h-100 d-flex flex-column" :loading="isLoading">
           <VCardItem class="pb-2">
             <template #prepend>
               <VAvatar color="error" variant="tonal" size="36" class="me-2">
@@ -224,7 +224,7 @@ const headers = [
           <VDivider />
           <VProgressLinear v-if="isLoading" indeterminate color="error" height="2" />
 
-          <VTable class="text-no-wrap" hover density="comfortable">
+          <VTable class="text-no-wrap" hover density="compact">
             <thead>
               <tr class="bg-grey-50">
                 <th class="text-left font-weight-bold">PRODUK</th>
@@ -274,7 +274,7 @@ const headers = [
     </VRow>
 
     <!-- Recent Stock Movements Table -->
-    <VCard elevation="2" :loading="isLoading">
+    <VCard  :loading="isLoading">
       <VCardItem class="pb-2">
         <template #prepend>
           <VAvatar color="primary" variant="tonal" size="36" class="me-2">
@@ -287,7 +287,7 @@ const headers = [
       <VDivider />
       <VProgressLinear v-if="isLoading" indeterminate color="primary" height="2" />
 
-      <VTable class="text-no-wrap" hover density="comfortable">
+      <VTable class="text-no-wrap" hover density="compact">
         <thead>
           <tr class="bg-grey-50">
             <th class="text-left font-weight-bold">WAKTU & TANGGAL</th>

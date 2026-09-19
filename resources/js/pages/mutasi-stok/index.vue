@@ -835,7 +835,7 @@ const printDeliveryNote = () => {
     </div>
 
     <!-- Main Card -->
-    <VCard elevation="2">
+    <VCard >
       <!-- Tabs Navigation -->
       <VTabs
         v-model="activeTab"
@@ -1101,7 +1101,7 @@ const printDeliveryNote = () => {
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -1110,7 +1110,7 @@ const printDeliveryNote = () => {
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalItems / itemsPerPage)"
@@ -2262,7 +2262,7 @@ const printDeliveryNote = () => {
       v-model="isSignatureInfoDialogVisible"
       max-width="520"
     >
-      <VCard v-if="selectedSignatureInfo" class="rounded-xl overflow-hidden">
+      <VCard v-if="selectedSignatureInfo" class="rounded overflow-hidden">
         <VCardTitle class="bg-primary text-white pa-4 d-flex align-center justify-space-between">
           <div class="d-flex align-center gap-2">
             <VIcon icon="ri-shield-check-fill" color="white" />

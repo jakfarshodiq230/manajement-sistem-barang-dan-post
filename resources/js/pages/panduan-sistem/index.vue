@@ -685,7 +685,7 @@ const filteredGuides = computed(() => {
 <template>
   <div class="pa-4">
     <!-- Hero Header Banner with Live Search -->
-    <VCard elevation="2" class="mb-6 border rounded-2xl overflow-hidden hero-card">
+    <VCard  class="mb-6 border rounded-2xl overflow-hidden hero-card">
       <VCardText class="pa-6 pa-md-8 text-white">
         <VRow align="center">
           <VCol cols="12" md="8">
@@ -708,13 +708,13 @@ const filteredGuides = computed(() => {
             </p>
 
             <!-- Search Input -->
-            <VCard elevation="3" class="rounded-xl pa-1 max-w-550">
+            <VCard  class="rounded pa-1 max-w-550">
               <VTextField
                 v-model="searchQuery"
                 placeholder="Cari alur kerja atau SOP (contoh: kasir, opname, FIFO, retur, PIN, closing)..."
                 prepend-inner-icon="ri-search-line"
                 variant="plain"
-                density="comfortable"
+                density="compact"
                 hide-details
                 clearable
                 class="px-2"
@@ -736,7 +736,7 @@ const filteredGuides = computed(() => {
       color="error"
       icon="ri-alert-fill"
       variant="tonal"
-      class="mb-6 rounded-xl border-error border"
+      class="mb-6 rounded border-error border"
       prominent
     >
       <div class="text-h6 font-weight-bold mb-1">PENTING: Langkah Pertama Sebelum Menggunakan Sistem!</div>
@@ -753,7 +753,7 @@ const filteredGuides = computed(() => {
     </VAlert>
 
     <!-- Navigation Tabs: Peta Alur Visual vs Dokumentasi Lengkap vs Pintasan Keyboard -->
-    <VCard class="rounded-xl border elevation-1 mb-6">
+    <VCard class="rounded border elevation-1 mb-6">
       <VTabs
         v-model="activeTab"
         color="primary"
@@ -793,7 +793,7 @@ const filteredGuides = computed(() => {
             sm="6"
             md="4"
           >
-            <VCard class="h-100 pa-5 rounded-xl border bg-var-theme-background d-flex flex-column justify-space-between flow-step-card" hover>
+            <VCard class="h-100 pa-5 rounded border bg-var-theme-background d-flex flex-column justify-space-between flow-step-card" hover>
               <div>
                 <div class="d-flex align-center justify-space-between mb-3">
                   <VAvatar :color="item.color" variant="tonal" size="44" rounded="lg">
@@ -869,8 +869,8 @@ const filteredGuides = computed(() => {
           <VExpansionPanel
             v-for="guide in filteredGuides"
             :key="guide.id"
-            elevation="1"
-            class="border rounded-xl mb-4 overflow-hidden"
+            
+            class="border rounded mb-4 overflow-hidden"
           >
             <VExpansionPanelTitle class="py-4 px-6">
               <div class="d-flex align-center gap-4">
@@ -927,7 +927,7 @@ const filteredGuides = computed(() => {
                 v-if="guide.tips"
                 :color="guide.color"
                 variant="tonal"
-                density="comfortable"
+                density="compact"
                 class="rounded-lg"
               >
                 <template #prepend>
@@ -961,7 +961,7 @@ const filteredGuides = computed(() => {
             sm="6"
             md="4"
           >
-            <div class="pa-4 rounded-xl border bg-var-theme-background d-flex align-center gap-3">
+            <div class="pa-4 rounded border bg-var-theme-background d-flex align-center gap-3">
               <div class="shortcut-key d-flex align-center justify-center font-weight-extrabold text-primary bg-surface elevation-1 border rounded-lg">
                 {{ sc.key }}
               </div>

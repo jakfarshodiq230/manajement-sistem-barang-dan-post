@@ -689,13 +689,13 @@ const filteredFaqs = computed(() => {
         </p>
 
         <!-- Live Instant Search Input -->
-        <VCard elevation="4" class="search-card rounded-xl pa-2 max-w-650 mx-auto">
+        <VCard  class="search-card rounded pa-2 max-w-650 mx-auto">
           <VTextField
             v-model="searchQuery"
             placeholder="Cari alur kerja, modul, atau kata kunci (misal: kasir, printer, opname, FIFO, retur, PIN)..."
             prepend-inner-icon="ri-search-line"
             variant="plain"
-            density="comfortable"
+            density="compact"
             hide-details
             clearable
             class="px-2"
@@ -707,7 +707,7 @@ const filteredFaqs = computed(() => {
     <!-- Quick Contact Channels (WhatsApp, Hotline, Email) -->
     <VRow class="mb-8">
       <VCol cols="12" sm="6" md="4">
-        <VCard class="h-100 pa-5 rounded-xl border elevation-1 contact-card" hover>
+        <VCard class="h-100 pa-5 rounded border elevation-1 contact-card" hover>
           <div class="d-flex align-center gap-4 mb-3">
             <VAvatar color="success" variant="tonal" size="52" rounded="lg">
               <VIcon icon="ri-whatsapp-line" size="28" />
@@ -735,7 +735,7 @@ const filteredFaqs = computed(() => {
       </VCol>
 
       <VCol cols="12" sm="6" md="4">
-        <VCard class="h-100 pa-5 rounded-xl border elevation-1 contact-card" hover>
+        <VCard class="h-100 pa-5 rounded border elevation-1 contact-card" hover>
           <div class="d-flex align-center gap-4 mb-3">
             <VAvatar color="primary" variant="tonal" size="52" rounded="lg">
               <VIcon icon="ri-phone-line" size="28" />
@@ -762,7 +762,7 @@ const filteredFaqs = computed(() => {
       </VCol>
 
       <VCol cols="12" sm="12" md="4">
-        <VCard class="h-100 pa-5 rounded-xl border elevation-1 contact-card" hover>
+        <VCard class="h-100 pa-5 rounded border elevation-1 contact-card" hover>
           <div class="d-flex align-center gap-4 mb-3">
             <VAvatar color="info" variant="tonal" size="52" rounded="lg">
               <VIcon icon="ri-mail-send-line" size="28" />
@@ -790,7 +790,7 @@ const filteredFaqs = computed(() => {
     </VRow>
 
     <!-- Main Navigation Tabs: Alur Sistem, FAQ, Pintasan Keyboard -->
-    <VCard class="rounded-xl border elevation-1 mb-6">
+    <VCard class="rounded border elevation-1 mb-6">
       <VTabs
         v-model="activeTab"
         color="primary"
@@ -835,7 +835,7 @@ const filteredFaqs = computed(() => {
             <VCard
               v-for="wf in filteredWorkflows"
               :key="wf.id"
-              class="border rounded-xl pa-5 pa-md-6 elevation-1"
+              class="border rounded pa-5 pa-md-6 elevation-1"
             >
               <!-- Workflow Header -->
               <div class="d-flex align-center gap-3 mb-4">
@@ -968,7 +968,7 @@ const filteredFaqs = computed(() => {
               sm="6"
               md="4"
             >
-              <div class="pa-4 rounded-xl border bg-var-theme-background d-flex align-center gap-3">
+              <div class="pa-4 rounded border bg-var-theme-background d-flex align-center gap-3">
                 <div class="shortcut-badge d-flex align-center justify-center font-weight-extrabold text-primary bg-surface elevation-1 border rounded-lg">
                   {{ sc.key }}
                 </div>

@@ -256,7 +256,7 @@ const downloadTemplate = async () => {
     </div>
 
     <!-- Filter Card -->
-    <VCard elevation="1" class="border rounded-lg mb-6 pa-4">
+    <VCard  class="border rounded-lg mb-6 pa-4">
       <div class="d-flex flex-wrap gap-4 align-center">
         <VSelect
           v-model="branchId"
@@ -297,7 +297,7 @@ const downloadTemplate = async () => {
     <VWindow v-model="activeTab">
       <!-- Tab Rekap -->
       <VWindowItem value="summary">
-        <VCard elevation="1" class="border rounded-lg">
+        <VCard  class="border rounded-lg">
           <VDataTable
             :headers="summaryHeaders"
             :items="summaryData"
@@ -322,7 +322,7 @@ const downloadTemplate = async () => {
 
       <!-- Tab Log -->
       <VWindowItem value="log">
-        <VCard elevation="1" class="border rounded-lg">
+        <VCard  class="border rounded-lg">
           <VDataTableServer
             v-model:items-per-page="itemsPerPage"
             v-model:page="page"
@@ -357,7 +357,7 @@ const downloadTemplate = async () => {
                     v-model="page"
                     :length="Math.ceil(totalItems / itemsPerPage)"
                     :total-visible="5"
-                    density="comfortable"
+                    density="compact"
                     active-color="primary"
                     @update:model-value="fetchLogs"
                   />

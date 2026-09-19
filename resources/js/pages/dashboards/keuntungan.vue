@@ -199,7 +199,7 @@ const chartSeries = computed(() => [
     </div>
 
     <!-- Highlight Total Net Profit Hero Card -->
-    <VCard elevation="3" class="mb-6 bg-gradient-primary text-white rounded-xl" :loading="isLoading">
+    <VCard  class="mb-6 bg-gradient-primary text-white rounded" :loading="isLoading">
       <VCardText class="d-flex flex-wrap align-center justify-space-between pa-6">
         <div>
           <div class="text-caption font-weight-bold text-uppercase tracking-wider text-white-50">
@@ -253,7 +253,7 @@ const chartSeries = computed(() => [
     <!-- Summary KPI Row -->
     <VRow class="mb-6">
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 rounded-xl border-s-lg border-success h-100" :loading="isLoading">
+        <VCard  class="pa-4 rounded border-s-lg border-success h-100" :loading="isLoading">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-success font-weight-bold">LABA BERSIH HARI INI</div>
@@ -270,7 +270,7 @@ const chartSeries = computed(() => [
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 rounded-xl border-s-lg border-primary h-100" :loading="isLoading">
+        <VCard  class="pa-4 rounded border-s-lg border-primary h-100" :loading="isLoading">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-primary font-weight-bold">LABA BERSIH BULAN INI</div>
@@ -287,7 +287,7 @@ const chartSeries = computed(() => [
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 rounded-xl border-s-lg border-error h-100" :loading="isLoading">
+        <VCard  class="pa-4 rounded border-s-lg border-error h-100" :loading="isLoading">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-error font-weight-bold">BEBAN KAS KECIL BULAN INI</div>
@@ -304,7 +304,7 @@ const chartSeries = computed(() => [
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 rounded-xl border-s-lg border-warning h-100" :loading="isLoading">
+        <VCard  class="pa-4 rounded border-s-lg border-warning h-100" :loading="isLoading">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-warning font-weight-bold">TOTAL OMZET PENJUALAN</div>
@@ -322,7 +322,7 @@ const chartSeries = computed(() => [
     </VRow>
 
     <!-- Monthly Multi-Bar Chart -->
-    <VCard elevation="2" class="mb-6 rounded-xl" :loading="isLoading">
+    <VCard  class="mb-6 rounded" :loading="isLoading">
       <VCardItem class="pb-2">
         <template #prepend>
           <VAvatar color="primary" variant="tonal" size="38" class="me-2" rounded="lg">
@@ -346,7 +346,7 @@ const chartSeries = computed(() => [
     </VCard>
 
     <!-- Accounting Formula & Integration Explanation Card -->
-    <VCard elevation="2" class="rounded-xl">
+    <VCard  class="rounded">
       <VCardItem class="pb-2">
         <template #prepend>
           <VAvatar color="info" variant="tonal" size="38" class="me-2" rounded="lg">
@@ -361,7 +361,7 @@ const chartSeries = computed(() => [
       <VCardText class="pa-5">
         <VRow>
           <VCol cols="12" md="4">
-            <div class="pa-4 bg-var-theme-surface rounded-xl border h-100">
+            <div class="pa-4 bg-var-theme-surface rounded border h-100">
               <div class="font-weight-bold text-subtitle-2 mb-1 text-primary d-flex align-center gap-2">
                 <VIcon icon="ri-coins-line" size="18" />
                 1. Laba Kotor (Gross Profit)
@@ -376,7 +376,7 @@ const chartSeries = computed(() => [
           </VCol>
 
           <VCol cols="12" md="4">
-            <div class="pa-4 bg-var-theme-surface rounded-xl border h-100">
+            <div class="pa-4 bg-var-theme-surface rounded border h-100">
               <div class="font-weight-bold text-subtitle-2 mb-1 text-error d-flex align-center gap-2">
                 <VIcon icon="ri-hand-coin-line" size="18" />
                 2. Beban Operasional (Kas Kecil)
@@ -391,7 +391,7 @@ const chartSeries = computed(() => [
           </VCol>
 
           <VCol cols="12" md="4">
-            <div class="pa-4 bg-var-theme-surface rounded-xl border h-100">
+            <div class="pa-4 bg-var-theme-surface rounded border h-100">
               <div class="font-weight-bold text-subtitle-2 mb-1 text-success d-flex align-center gap-2">
                 <VIcon icon="ri-trophy-line" size="18" />
                 3. Laba Bersih Riil (Net Profit)

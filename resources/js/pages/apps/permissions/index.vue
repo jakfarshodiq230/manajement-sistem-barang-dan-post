@@ -123,7 +123,7 @@ const resolveActionColor = name => {
       <!-- KPI Summary Cards -->
       <VRow class="mb-6">
         <VCol cols="12" sm="4">
-          <VCard class="pa-5 rounded-xl border elevation-1">
+          <VCard class="pa-5 rounded border elevation-1">
             <div class="d-flex align-center gap-4">
               <VAvatar color="primary" variant="tonal" size="48" rounded="lg">
                 <VIcon icon="ri-key-2-line" size="26" />
@@ -137,7 +137,7 @@ const resolveActionColor = name => {
         </VCol>
 
         <VCol cols="12" sm="4">
-          <VCard class="pa-5 rounded-xl border elevation-1">
+          <VCard class="pa-5 rounded border elevation-1">
             <div class="d-flex align-center gap-4">
               <VAvatar color="success" variant="tonal" size="48" rounded="lg">
                 <VIcon icon="ri-shield-check-line" size="26" />
@@ -151,7 +151,7 @@ const resolveActionColor = name => {
         </VCol>
 
         <VCol cols="12" sm="4">
-          <VCard class="pa-5 rounded-xl border elevation-1">
+          <VCard class="pa-5 rounded border elevation-1">
             <div class="d-flex align-center gap-4">
               <VAvatar color="warning" variant="tonal" size="48" rounded="lg">
                 <VIcon icon="ri-lock-password-line" size="26" />
@@ -166,7 +166,7 @@ const resolveActionColor = name => {
       </VRow>
 
       <!-- Main Data Table Card -->
-      <VCard class="rounded-xl border elevation-1">
+      <VCard class="rounded border elevation-1">
         <VCardText class="pa-5 d-flex align-center justify-space-between gap-4 flex-wrap">
           <VTextField
             v-model="search"
@@ -295,7 +295,7 @@ const resolveActionColor = name => {
                 <VBtn
                   icon="ri-arrow-left-s-line"
                   variant="text"
-                  density="comfortable"
+                  density="compact"
                   color="high-emphasis"
                   :disabled="page <= 1"
                   @click="page <= 1 ? page = 1 : page--"
@@ -303,7 +303,7 @@ const resolveActionColor = name => {
 
                 <VBtn
                   icon="ri-arrow-right-s-line"
-                  density="comfortable"
+                  density="compact"
                   variant="text"
                   color="high-emphasis"
                   :disabled="page >= Math.ceil(totalPermissions / itemsPerPage)"

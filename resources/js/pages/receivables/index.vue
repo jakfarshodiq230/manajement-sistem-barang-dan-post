@@ -191,7 +191,7 @@ const executeDelete = async () => {
     <!-- Summary KPI Cards -->
     <VRow class="mb-4">
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-primary">
+        <VCard  class="pa-4 border-s-lg border-primary">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">TOTAL PIUTANG AKTIF</div>
@@ -206,7 +206,7 @@ const executeDelete = async () => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-warning">
+        <VCard  class="pa-4 border-s-lg border-warning">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">SISA BELUM DIBAYAR</div>
@@ -221,7 +221,7 @@ const executeDelete = async () => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+        <VCard  class="pa-4 border-s-lg border-success">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">TOTAL SUDAH TERTAGIH</div>
@@ -236,7 +236,7 @@ const executeDelete = async () => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-error">
+        <VCard  class="pa-4 border-s-lg border-error">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-error font-weight-bold">PIUTANG JATUH TEMPO</div>
@@ -252,7 +252,7 @@ const executeDelete = async () => {
     </VRow>
 
     <!-- Filter & Table Card -->
-    <VCard elevation="2">
+    <VCard >
       <!-- Filter Bar -->
       <VCardText class="d-flex flex-wrap align-center py-4 gap-4">
         <VTextField
@@ -454,7 +454,7 @@ const executeDelete = async () => {
                 class="flip-in-rtl"
                 icon="ri-arrow-left-s-line"
                 variant="text"
-                density="comfortable"
+                density="compact"
                 color="high-emphasis"
                 :disabled="page <= 1"
                 @click="page <= 1 ? page = 1 : page--"
@@ -463,7 +463,7 @@ const executeDelete = async () => {
               <VBtn
                 class="flip-in-rtl"
                 icon="ri-arrow-right-s-line"
-                density="comfortable"
+                density="compact"
                 variant="text"
                 color="high-emphasis"
                 :disabled="page >= Math.ceil(totalItems / itemsPerPage)"

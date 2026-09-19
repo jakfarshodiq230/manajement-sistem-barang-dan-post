@@ -201,7 +201,7 @@ onMounted(async () => {
     </div>
 
     <!-- Filter Bar Card -->
-    <VCard elevation="1" class="border rounded-lg mb-6 d-print-none">
+    <VCard  class="border rounded-lg mb-6 d-print-none">
       <VCardText class="pa-4">
         <VRow>
           <VCol cols="12" md="5">
@@ -261,7 +261,7 @@ onMounted(async () => {
     <VRow class="mb-6 match-height">
       <!-- Saldo Awal -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="1" class="pa-4 border rounded-lg h-100">
+        <VCard  class="pa-4 border rounded-lg h-100">
           <div class="text-caption font-weight-bold text-uppercase text-medium-emphasis mb-1">
             Saldo Awal (Beginning)
           </div>
@@ -274,7 +274,7 @@ onMounted(async () => {
 
       <!-- Total Debit -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="1" class="pa-4 border rounded-lg h-100">
+        <VCard  class="pa-4 border rounded-lg h-100">
           <div class="text-caption font-weight-bold text-uppercase text-primary mb-1">
             Total Mutasi Debit
           </div>
@@ -287,7 +287,7 @@ onMounted(async () => {
 
       <!-- Total Kredit -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="1" class="pa-4 border rounded-lg h-100">
+        <VCard  class="pa-4 border rounded-lg h-100">
           <div class="text-caption font-weight-bold text-uppercase text-warning mb-1">
             Total Mutasi Kredit
           </div>
@@ -300,7 +300,7 @@ onMounted(async () => {
 
       <!-- Saldo Akhir -->
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="1" class="pa-4 border rounded-lg h-100 bg-primary-lighten-5">
+        <VCard  class="pa-4 border rounded-lg h-100 bg-primary-lighten-5">
           <div class="text-caption font-weight-bold text-uppercase text-primary mb-1">
             Saldo Akhir (Ending Balance)
           </div>
@@ -313,7 +313,7 @@ onMounted(async () => {
     </VRow>
 
     <!-- Ledger Table Card -->
-    <VCard elevation="1" class="border rounded-lg">
+    <VCard  class="border rounded-lg">
       <VCardItem class="pa-4 pb-2">
         <VCardTitle class="font-weight-bold text-h6">
           <span class="font-mono text-primary">{{ ledgerData.account?.code }}</span> - {{ ledgerData.account?.name }}
@@ -416,7 +416,7 @@ onMounted(async () => {
             class="flip-in-rtl"
             icon="ri-arrow-left-s-line"
             variant="text"
-            density="comfortable"
+            density="compact"
             color="high-emphasis"
             :disabled="page <= 1"
             @click="page <= 1 ? page = 1 : page--"
@@ -425,7 +425,7 @@ onMounted(async () => {
           <VBtn
             class="flip-in-rtl"
             icon="ri-arrow-right-s-line"
-            density="comfortable"
+            density="compact"
             variant="text"
             color="high-emphasis"
             :disabled="page >= Math.ceil(ledgerData.transactions.length / itemsPerPage)"

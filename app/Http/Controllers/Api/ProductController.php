@@ -25,7 +25,7 @@ class ProductController extends Controller
         $itemsPerPage = $request->query('itemsPerPage', 15);
         $page = $request->query('page', 1);
 
-        $query = Product::with(['category', 'productBranches']);
+        $query = Product::with(['category', 'productBranches.branch']);
 
         if ($search) {
             $query->where(function($q) use ($search) {
@@ -99,14 +99,11 @@ class ProductController extends Controller
             'height' => 'nullable|numeric|min:0',
             'is_returnable' => 'nullable|boolean',
             'tax_type' => 'nullable|string|max:255',
-            'ori_discount_percent' => 'nullable|numeric|min:0|max:100',
-            'ori_cashback_percent' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $data = $request->only([
             'name', 'sku', 'category_id', 'description', 'stock_method',
-            'brand', 'barcode', 'unit', 'weight', 'length', 'width', 'height', 'is_returnable', 'tax_type',
-            'ori_discount_percent', 'ori_cashback_percent'
+            'brand', 'barcode', 'unit', 'weight', 'length', 'width', 'height', 'is_returnable', 'tax_type'
         ]);
         $data['status'] = $request->status ?? 'Aktif';
 
@@ -148,14 +145,11 @@ class ProductController extends Controller
             'height' => 'nullable|numeric|min:0',
             'is_returnable' => 'nullable|boolean',
             'tax_type' => 'nullable|string|max:255',
-            'ori_discount_percent' => 'nullable|numeric|min:0|max:100',
-            'ori_cashback_percent' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $data = $request->only([
             'name', 'sku', 'category_id', 'description', 'status', 'stock_method',
-            'brand', 'barcode', 'unit', 'weight', 'length', 'width', 'height', 'is_returnable', 'tax_type',
-            'ori_discount_percent', 'ori_cashback_percent'
+            'brand', 'barcode', 'unit', 'weight', 'length', 'width', 'height', 'is_returnable', 'tax_type'
         ]);
 
         if ($request->hasFile('image')) {

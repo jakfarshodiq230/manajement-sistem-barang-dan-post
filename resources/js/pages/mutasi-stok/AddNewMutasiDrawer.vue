@@ -271,7 +271,7 @@ const handleDrawerModelValueUpdate = val => {
                   item-value="id"
                   label="Cabang / Gudang Asal (Sumber)"
                   placeholder="Pilih Gudang Pusat / Cabang"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-store-2-line"
                 />
@@ -286,7 +286,7 @@ const handleDrawerModelValueUpdate = val => {
                   item-value="id"
                   label="Cabang Tujuan (Pemohon)"
                   placeholder="Pilih Cabang Penerima"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-store-3-line"
                 />
@@ -298,7 +298,7 @@ const handleDrawerModelValueUpdate = val => {
                   label="Catatan / Instruksi Permintaan Barang"
                   rows="2"
                   placeholder="Contoh: Permintaan restok darurat karena stok menipis..."
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   prepend-inner-icon="ri-file-text-line"
                 />
@@ -332,7 +332,7 @@ const handleDrawerModelValueUpdate = val => {
             <div
               v-for="(item, index) in items"
               :key="index"
-              class="d-flex align-center gap-3 mb-3 pa-3 rounded-xl border bg-var-theme-surface shadow-xs"
+              class="d-flex align-center gap-3 mb-3 pa-3 rounded border bg-var-theme-surface shadow-xs"
             >
               <div class="flex-grow-1">
                 <VAutocomplete
@@ -342,7 +342,7 @@ const handleDrawerModelValueUpdate = val => {
                   item-value="id"
                   label="Pilih Produk (Ketik Nama / SKU)"
                   placeholder="Ketik untuk mencari..."
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   clearable
                   hide-details
@@ -362,7 +362,7 @@ const handleDrawerModelValueUpdate = val => {
                   v-model.number="item.qty"
                   type="number"
                   label="Qty Diminta"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   min="1"
                   hide-details

@@ -102,7 +102,7 @@ const getTransferStatusBadge = status => {
     <!-- Valid Stock Transfer Verification Card -->
     <VCard
       v-else-if="isValid && docData && docData.type === 'stock_transfer'"
-      class="pa-6 elevation-4 rounded-xl"
+      class="pa-6 elevation-4 rounded"
       max-width="760"
       width="100%"
     >
@@ -288,7 +288,7 @@ const getTransferStatusBadge = status => {
     <!-- Standard Document Verification Card (PO, GR, Sale) -->
     <VCard
       v-else-if="isValid && docData"
-      class="pa-6 text-center elevation-3 rounded-xl"
+      class="pa-6 text-center elevation-3 rounded"
       max-width="520"
       width="100%"
     >
@@ -356,7 +356,7 @@ const getTransferStatusBadge = status => {
     <!-- Invalid Document State -->
     <VCard
       v-else
-      class="pa-6 text-center elevation-3 rounded-xl"
+      class="pa-6 text-center elevation-3 rounded"
       max-width="500"
       width="100%"
     >

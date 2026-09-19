@@ -140,7 +140,7 @@ const saveProfile = async () => {
     <VRow v-else>
       <VCol cols="12" md="4">
         <!-- Identity Card -->
-        <VCard elevation="2" class="mb-4 text-center">
+        <VCard  class="mb-4 text-center">
           <VCardText class="pa-6">
             <div class="d-flex justify-center mb-4">
               <VAvatar
@@ -178,7 +178,7 @@ const saveProfile = async () => {
         </VCard>
 
         <!-- QRIS Card -->
-        <VCard elevation="2">
+        <VCard >
           <VCardTitle class="pa-4 pb-0 text-subtitle-1 font-weight-bold text-center">
             QRIS Pembayaran
           </VCardTitle>
@@ -206,7 +206,7 @@ const saveProfile = async () => {
       </VCol>
 
       <VCol cols="12" md="8">
-        <VCard elevation="2">
+        <VCard >
           <VCardTitle class="pa-4 font-weight-bold d-flex align-center">
             <VIcon icon="ri-file-edit-line" class="me-2 text-primary" />
             Edit Informasi Perusahaan
@@ -221,7 +221,7 @@ const saveProfile = async () => {
                     label="Nama Perusahaan *"
                     placeholder="Masukkan nama perusahaan"
                     variant="outlined"
-                    density="comfortable"
+                    density="compact"
                     prepend-inner-icon="ri-building-line"
                     :rules="[v => !!v || 'Nama wajib diisi']"
                   />
@@ -233,7 +233,7 @@ const saveProfile = async () => {
                     type="email"
                     placeholder="contoh@email.com"
                     variant="outlined"
-                    density="comfortable"
+                    density="compact"
                     prepend-inner-icon="ri-mail-line"
                     :rules="[v => !!v || 'Email wajib diisi']"
                   />
@@ -244,7 +244,7 @@ const saveProfile = async () => {
                     label="Nomor Telepon"
                     placeholder="0812xxxxxxxx"
                     variant="outlined"
-                    density="comfortable"
+                    density="compact"
                     prepend-inner-icon="ri-phone-line"
                   />
                 </VCol>
@@ -254,7 +254,7 @@ const saveProfile = async () => {
                     label="Alamat Lengkap"
                     placeholder="Masukkan alamat lengkap perusahaan"
                     variant="outlined"
-                    density="comfortable"
+                    density="compact"
                     prepend-inner-icon="ri-map-pin-line"
                     rows="3"
                   />
@@ -268,7 +268,7 @@ const saveProfile = async () => {
                     prepend-icon=""
                     prepend-inner-icon="ri-image-add-line"
                     variant="outlined"
-                    density="comfortable"
+                    density="compact"
                     show-size
                     clearable
                     hint="Format JPG/PNG. Maksimal 2MB."
@@ -284,7 +284,7 @@ const saveProfile = async () => {
                     prepend-icon=""
                     prepend-inner-icon="ri-qr-code-line"
                     variant="outlined"
-                    density="comfortable"
+                    density="compact"
                     show-size
                     clearable
                     hint="Format JPG/PNG. Maksimal 2MB."

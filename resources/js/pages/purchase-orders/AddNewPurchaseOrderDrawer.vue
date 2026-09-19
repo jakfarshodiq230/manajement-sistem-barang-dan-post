@@ -338,7 +338,7 @@ const handleDrawerModelValueUpdate = val => {
           @submit.prevent="onSubmit"
         >
           <!-- Section 1: Info Pemesanan -->
-          <div class="mb-6 pa-5 rounded-xl border bg-var-theme-surface shadow-xs">
+          <div class="mb-6 pa-5 rounded border bg-var-theme-surface shadow-xs">
             <div class="d-flex align-center gap-2 mb-4">
               <VIcon icon="ri-information-line" color="primary" size="20" />
               <span class="font-weight-bold text-subtitle-2 text-uppercase letter-spacing-1">
@@ -357,7 +357,7 @@ const handleDrawerModelValueUpdate = val => {
                   label="Pilih Supplier / Vendor"
                   placeholder="Ketik atau cari nama supplier"
                   prepend-inner-icon="ri-truck-line"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                 />
                 <VAlert
@@ -382,7 +382,7 @@ const handleDrawerModelValueUpdate = val => {
                   label="Cabang Penerima Barang"
                   placeholder="Pilih Cabang"
                   prepend-inner-icon="ri-store-2-line"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                 />
               </VCol>
@@ -394,7 +394,7 @@ const handleDrawerModelValueUpdate = val => {
                   :rules="[v => !!v || 'Tanggal pemesanan wajib diisi']"
                   label="Tanggal Pemesanan PO"
                   prepend-inner-icon="ri-calendar-event-line"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                 />
               </VCol>
@@ -408,7 +408,7 @@ const handleDrawerModelValueUpdate = val => {
                   ]"
                   label="Metode Pembayaran ke Supplier"
                   prepend-inner-icon="ri-bank-card-line"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                 />
               </VCol>
@@ -419,7 +419,7 @@ const handleDrawerModelValueUpdate = val => {
                   readonly
                   label="Tanggal Jatuh Tempo Pembayaran"
                   prepend-inner-icon="ri-time-line"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   hint="Tanggal jatuh tempo faktur resmi diisi saat fisik barang diterima di Penerimaan Gudang"
                   persistent-hint
@@ -432,7 +432,7 @@ const handleDrawerModelValueUpdate = val => {
                   label="Catatan Pemesanan (Opsional)"
                   placeholder="Misal: Prioritaskan pengiriman pagi..."
                   prepend-inner-icon="ri-file-text-line"
-                  density="comfortable"
+                  density="compact"
                   variant="outlined"
                   hide-details
                 />
@@ -465,8 +465,8 @@ const handleDrawerModelValueUpdate = val => {
             </div>
 
             <!-- Items Table Card -->
-            <div class="border rounded-xl overflow-hidden shadow-xs">
-              <VTable density="comfortable" class="po-items-table">
+            <div class="border rounded overflow-hidden shadow-xs">
+              <VTable density="compact" class="po-items-table">
                 <thead>
                   <tr class="bg-grey-100">
                     <th class="font-weight-bold py-3 text-uppercase text-caption" style="min-width: 280px;">
@@ -545,7 +545,7 @@ const handleDrawerModelValueUpdate = val => {
           </div>
 
           <!-- Section 3: Ringkasan Total Pesanan -->
-          <div class="pa-4 bg-primary-lighten-5 border border-primary border-opacity-25 rounded-xl d-flex justify-space-between align-center mb-6 flex-wrap gap-3">
+          <div class="pa-4 bg-primary-lighten-5 border border-primary border-opacity-25 rounded d-flex justify-space-between align-center mb-6 flex-wrap gap-3">
             <div class="d-flex align-center gap-3">
               <VAvatar color="primary" variant="flat" size="38" class="rounded-lg">
                 <VIcon icon="ri-stack-line" color="white" size="20" />

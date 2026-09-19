@@ -82,6 +82,15 @@ watch([
 
     <!-- 👉 Pages -->
     <GlobalPrerequisiteAlert />
+
+    <!-- 👉 Global Breadcrumbs (Point 12) -->
+    <div class="px-4 pt-4 pb-0 d-none d-md-block" v-if="$route.path !== '/'">
+      <VBreadcrumbs :items="[
+        { title: 'Dashboard', disabled: false, to: '/' },
+        { title: String($route.name || $route.path.split('/').pop()).replace(/-/g, ' ').toUpperCase(), disabled: true }
+      ]" class="px-0 py-0 text-caption font-weight-bold" active-color="primary" style="margin-left: -4px;" />
+    </div>
+
     <slot />
 
     <!-- 👉 Footer -->

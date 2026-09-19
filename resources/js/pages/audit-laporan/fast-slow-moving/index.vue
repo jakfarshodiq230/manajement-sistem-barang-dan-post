@@ -235,7 +235,7 @@ const getSpeedBadge = speed => {
     <!-- Summary KPI Cards -->
     <VRow class="mb-4">
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-success">
+        <VCard  class="pa-4 border-s-lg border-success">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">FAST MOVING</div>
@@ -250,7 +250,7 @@ const getSpeedBadge = speed => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-info">
+        <VCard  class="pa-4 border-s-lg border-info">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">MEDIUM MOVING</div>
@@ -265,7 +265,7 @@ const getSpeedBadge = speed => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-warning">
+        <VCard  class="pa-4 border-s-lg border-warning">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-medium-emphasis font-weight-medium">SLOW MOVING</div>
@@ -280,7 +280,7 @@ const getSpeedBadge = speed => {
       </VCol>
 
       <VCol cols="12" sm="6" md="3">
-        <VCard elevation="2" class="pa-4 border-s-lg border-error">
+        <VCard  class="pa-4 border-s-lg border-error">
           <div class="d-flex align-center justify-space-between">
             <div>
               <div class="text-caption text-error font-weight-bold">DEAD STOCK (MACET)</div>
@@ -298,7 +298,7 @@ const getSpeedBadge = speed => {
     </VRow>
 
     <!-- Filter Controls Card -->
-    <VCard elevation="2" class="mb-4">
+    <VCard  class="mb-4">
       <VCardText class="d-flex flex-wrap gap-4 align-center py-4">
         <!-- Month & Year -->
         <VSelect
